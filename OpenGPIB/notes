@@ -1,0 +1,19 @@
+Voltage=(point value - YOFF)*YMULT
+
+    The 2440 has an A-D converter that always resolves waveforms to 1/25 of
+1 vertical division. This means waveforms are displayed on the instrument
+screen with a vertical resolution of 25 values (also called digitizing levels) per
+division. The total number of values available for making waveform
+measurements is the vertical window size and is different for different ranges of
+acquisition rate settings. It is always greater than the 8 division available on
+screen, and varies from a minimum of 226 values (9 divisions) to a maximum of
+256 values (10.24 divisions). (See Vertical Window for Making
+Measurementsn in Section 3 of this guide for a discussion of vertical windows.
+
+There are always 1024 points.... XINCR is the time interval between points
+
+
+
+WFMPRE WFID:"CH1 DC   5mV 500ms NORMAL",NR.PT:1024,PT.OFF:128,PT.FMT:Y,XUNIT:SEC
+,XINCR:1.000E-2,YMULT:2.000E-4,YOFF:-2.625E+1,YUNIT:V,BN.FMT:RI,ENCDG:ASCII;CURV
+E -4,-2,
