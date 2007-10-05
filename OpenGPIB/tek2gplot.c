@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.2  2007/10/05 14:45:56  dfs
+Added trigger, plot title, and fixed y-axis label
+
 Revision 1.1.1.1  2007/10/05 13:59:11  dfs
 Initial Creation
 
@@ -24,6 +27,7 @@ Initial Creation
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <inttypes.h>
 /**build with 
 gcc -Wall -lm -o tek2plot tek2gplot.c
   */
@@ -277,15 +281,23 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.2 $\n"
+	printf("tek2gplot: $Revision: 1.3 $\n"
 	" -h This display\n"
-	" -g generate a gnuplot script file with data\n"	
+	" -g generate a gnuplot script file with data (default just data)\n"	
 	" -i fname use fname for input file\n"
+	" -l color set line color in 0xRRGGBB format \n"
 	" -o fname use fname for output file\n"
-	" -s val Use smoothing with value val\n");
+	" -s val Use smoothing with value val\n"
+	" -t term, set terminal to png, ascii, or x11 (default is x11)\n"
+	"if you use -t png, gnuplot usage is:\n"
+	" gnuplot fname > image.png\n" \
+	);
+	
 	
 }
-
+#define TERM_X 		1
+#define TERM_PNG 	2
+#define TERM_DUMB 3
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -294,17 +306,20 @@ void usage( void)
 
 int main (int argc, char *argv[])
 {
-	char *iname,*oname, *preamble, buf[100], obuf[50];
+	char *iname,*oname, *preamble, buf[256], obuf[50], *line_color;
 	char *fmt, *enc, *title;
 	int id, od, ret=1, c, data;
-	int sgn,gnuplot,smoothing, datapoint;
+	int sgn,gnuplot,smoothing, datapoint, terminal;
 	double yoff, ymult, xincr, x,y, trigger,ytrig,xtrig;
 	struct extended ext;
 	int yrange, xrange, trig,offset;
+	uint32_t ilinecolor;
 	iname=oname=NULL;
 	gnuplot=0;
 	smoothing=0;
-	while( -1 != (c = getopt(argc, argv, "i:o:gs:")) ) {
+	terminal=TERM_X;
+	line_color="x00ff00";
+	while( -1 != (c = getopt(argc, argv, "i:l:o:gs:t:")) ) {
 		switch(c){
 			case 'g':
 				gnuplot=1;
@@ -316,16 +331,67 @@ int main (int argc, char *argv[])
 			case 'i':
 				iname=strdup(optarg);
 				break;
+			case 'l':
+				line_color=strdup(&optarg[1]);
+				break;
 			case 'o':
 				oname=strdup(optarg);
 				break;	
 			case 's':
 				smoothing=strtol(optarg,NULL,10);
 				break;
+			case 't':
+				if(!strcmp(optarg,"png"))
+					terminal=TERM_PNG;
+				else if(!strcmp(optarg,"x11"))
+					terminal=TERM_X;
+				else if(!strcmp(optarg,"ascii"))
+					terminal=TERM_DUMB;				
+				else {
+					printf("Must specify X or png for -t option\n");
+					usage();
+					return 1;
+				}
+				break;
 		}
 	}
+	if(TERM_X == terminal ){
+		sprintf(buf,"0%s",line_color);
+		ilinecolor=strtol(buf,NULL,16);
+		switch(ilinecolor){
+			case 0xff0000: /**red  */
+				ilinecolor=1;
+				break;
+			case 0x00FF00: /*green */
+				ilinecolor=2;
+				break;                           
+			case 0x0000ff:  /*blue  */
+				ilinecolor=3;                  
+				break;	                       
+			case 0xFF00FF:  /*magenta */
+				ilinecolor=4;                  
+				break;                         
+			case 0x00FFFF:  /*cyan */
+				ilinecolor=5;
+				break;
+			case 0xA0522D: /*sienna */
+				ilinecolor=6;
+				break;
+			case 0xffa500: /**orange */
+				ilinecolor=7;
+				break;	
+			case 0xFF7F50: /*coral */
+				ilinecolor=8;
+				break;				
+			default:
+				ilinecolor=2;
+				break;
+		}
+	}
+	else ilinecolor=2;
 	if( NULL == iname || NULL == oname){
 		printf("Must supply at least -o, -i\n");
+		usage();
 		return 1;
 	}
 	if(1>(od=open(oname,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
@@ -388,8 +454,51 @@ int main (int argc, char *argv[])
 		write(od,buf,c);
 		c=sprintf(buf,"set title %s\n",title);
 		write(od,buf,c);
-		c=sprintf(buf,"set style line 4 lt 4 lw 2.000 pointtype 4\n");
-		write(od,buf,c);
+		for (data=1; data<9;++data){
+			c=sprintf(buf,"set style line %d lt %d lw 2.000 pointtype 4\n",data,data);
+			write(od,buf,c);	
+		}
+		
+		switch(terminal){
+			/**
+			set terminal png medium size 640,480 \
+                      xffffff x000000 x404040 \
+                      xff0000 xffa500 x66cdaa xcdb5cd \
+                      xadd8e6 x0000ff xdda0dd x9500d3 
+			which uses white for the non-transparent background, black for borders, 
+			gray for the axes, and red, orange, medium aquamarine, thistle 3, 
+			light blue, blue, plum and dark violet for eight plotting colors
+			*/
+			case TERM_PNG:
+				c=sprintf(buf,"set terminal png medium size 640,480 \\\n"
+                      "xffffff x000000 x404040 \\\n"
+                      "xff0000 %s x66cdaa xcdb5cd \\\n"
+                      "xadd8e6 x0000ff xdda0dd x9500d3\n",line_color );
+				write(od,buf,c);
+				break;
+			/**  
+			gnuplot*background:  white
+		  gnuplot*textColor:   black
+		  gnuplot*borderColor: black
+		  gnuplot*axisColor:   black
+		  gnuplot*line1Color:  red
+		  gnuplot*line2Color:  green
+		  gnuplot*line3Color:  blue
+		  gnuplot*line4Color:  magenta
+		  gnuplot*line5Color:  cyan
+		  gnuplot*line6Color:  sienna
+		  gnuplot*line7Color:  orange
+		  gnuplot*line8Color:  coral
+				*/
+			case TERM_X:
+				c=sprintf(buf,"set terminal x11 title \"%s\" persist\n",ext.src);
+				write(od,buf,c);
+				break;
+			case TERM_DUMB:
+				c=sprintf(buf,"set terminal dumb\n");
+				write(od,buf,c);
+				break;
+		}
 		c=sprintf(buf,"set label 1 'T' at ");
 		write(od,buf,c);
 		offset=lseek(od,0,SEEK_CUR);
@@ -403,11 +512,11 @@ int main (int argc, char *argv[])
 		if(smoothing){
 			c=sprintf(buf,"set samples %d\n",smoothing);
 			write(od,buf,c);		
-			c=sprintf(buf,"plot '-' title \"%s\" ls 4 smooth csplines with lines\n",ext.src);
+			c=sprintf(buf,"plot '-' title \"%s\" ls %d smooth csplines with lines\n",ext.src,ilinecolor);
 			write(od,buf,c);			
 		}
 		else{
-			c=sprintf(buf,"plot '-' title \"%s\" ls 4 with lines\n",ext.src);
+			c=sprintf(buf,"plot '-' title \"%s\" ls %d with lines\n",ext.src,ilinecolor);
 			write(od,buf,c);			
 		}
 
