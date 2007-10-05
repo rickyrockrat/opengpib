@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.1.1.1  2007/10/05 13:59:11  dfs
+Initial Creation
+
 */
 #define _GNU_SOURCE
 /*#define _ISOC99_SOURCE  */
@@ -138,9 +141,9 @@ double get_value( char *f, char *buf)
 	for (k=0,i=strlen(f)+1; k<10 && find[i] != ',' && find[i] != ';';++i,++k)
 		tbuf[k]=find[i];
 	tbuf[k]=0;
-	printf("Found %s->%s",f,tbuf);
+	/*printf("Found %s->%s",f,tbuf); */
 	x=strtof(tbuf, NULL);
-	printf(" : %f\n",x);
+	/*printf(" : %f\n",x); */
 	
 	return(x );	 
 }
@@ -161,7 +164,7 @@ char * get_string( char *f, char *buf)
 	for (k=0,i=strlen(f)+1; k<30 && find[i] != ',' && find[i] != ';';++i,++k)
 		tbuf[k]=find[i];
 	tbuf[k]=0;
-	printf("Found %s->%s\n",f,tbuf);
+	/*printf("Found %s->%s\n",f,tbuf); */
 	
 	return(strdup(tbuf));	 
 }
@@ -194,7 +197,7 @@ int break_extended(char *data, struct extended *x)
 	int k,i,state;
 	char buf[10];
 	state=_SRC;
-	printf("%s\n",data);
+	/*printf("%s\n",data); */
 	memset(x,0,sizeof(struct extended));
 	for (i=k=0;data[i];){
 		if(data[i] != '"' && data[i] != ' ')
@@ -202,7 +205,7 @@ int break_extended(char *data, struct extended *x)
 		else if(data[i] == ' '){
 			buf[k]=0;
 			while (data[i] == ' ') ++i;
-			printf("%s\n",buf);
+			/*printf("%s\n",buf); */
 			switch(state){
 				case _SRC:
 					x->src=strdup(buf);
@@ -223,7 +226,7 @@ int break_extended(char *data, struct extended *x)
 							x->vert_mult=1000;
 					else 
 						x->vert_mult=1;
-					printf("Vert:%d%s %E\n",x->vert_div,x->vert_units,x->vert_mult);
+					/*printf("Vert:%d%s %E\n",x->vert_div,x->vert_units,x->vert_mult); */
 					++state;
 					break;
 				case _HORIZ:
@@ -243,7 +246,7 @@ int break_extended(char *data, struct extended *x)
 							x->time_mult=1000000000000;
 					else 
 						x->time_mult=1;					
-					printf("time:%d%s %E\n",x->time_div,x->time_units,x->time_mult);
+					/*printf("time:%d%s %E\n",x->time_div,x->time_units,x->time_mult); */
 					++state;
 					break;
 				default:
@@ -274,7 +277,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.1.1.1 $\n"
+	printf("tek2gplot: $Revision: 1.2 $\n"
 	" -h This display\n"
 	" -g generate a gnuplot script file with data\n"	
 	" -i fname use fname for input file\n"
@@ -291,13 +294,13 @@ void usage( void)
 
 int main (int argc, char *argv[])
 {
-	char *iname,*oname, *preamble, buf[50], obuf[50];
+	char *iname,*oname, *preamble, buf[100], obuf[50];
 	char *fmt, *enc, *title;
 	int id, od, ret=1, c, data;
-	int sgn,gnuplot,smoothing;
-	double yoff, ymult, xincr, x,y, trigger;
+	int sgn,gnuplot,smoothing, datapoint;
+	double yoff, ymult, xincr, x,y, trigger,ytrig,xtrig;
 	struct extended ext;
-	int yrange, xrange;
+	int yrange, xrange, trig,offset;
 	iname=oname=NULL;
 	gnuplot=0;
 	smoothing=0;
@@ -366,13 +369,16 @@ int main (int argc, char *argv[])
 	
 	printf("yrange=[-%d:%d] in %s ",yrange,yrange,ext.vert_units);
 	xrange=(int)round(xincr*1024*ext.time_mult);
+	trig=(int)round(trigger);
 	printf("Xrange=[0:%d] in %s\n",xrange,ext.time_units);
 	printf("set xtics 0,%d\n",(int)round(ext.time_div));
 	x=0;
 	if(gnuplot){
 		c=sprintf(buf,"set xlabel \"%s\"\n",ext.time_units);
 		write(od,buf,c);
-		c=sprintf(buf,"set ylabel \"%s\"\n",ext.vert_units);
+		c=sprintf(buf,"set lmargin 10\n");
+		write(od,buf,c);
+		c=sprintf(buf,"set label 2 \"%s\" at graph -0.06, graph .5\n",ext.vert_units);
 		write(od,buf,c);
 		c=sprintf(buf,"set yrange[%d:%d]\n",-yrange,yrange);
 		write(od,buf,c);
@@ -384,20 +390,30 @@ int main (int argc, char *argv[])
 		write(od,buf,c);
 		c=sprintf(buf,"set style line 4 lt 4 lw 2.000 pointtype 4\n");
 		write(od,buf,c);
+		c=sprintf(buf,"set label 1 'T' at ");
+		write(od,buf,c);
+		offset=lseek(od,0,SEEK_CUR);
+		printf("offset at %d\n",offset);
+		/**save space for rest of line..  */
+		c=sprintf(buf,"																					");
+		write(od,buf,c);
+		c=sprintf(buf,"																					\n");
+		write(od,buf,c);
+		
 		if(smoothing){
 			c=sprintf(buf,"set samples %d\n",smoothing);
 			write(od,buf,c);		
-			c=sprintf(buf,"plot '-' ls 4 smooth csplines with lines\n");
+			c=sprintf(buf,"plot '-' title \"%s\" ls 4 smooth csplines with lines\n",ext.src);
 			write(od,buf,c);			
 		}
 		else{
-			c=sprintf(buf,"plot '-' ls 4 with lines\n");
+			c=sprintf(buf,"plot '-' title \"%s\" ls 4 with lines\n",ext.src);
 			write(od,buf,c);			
 		}
 
 		
 	}
-	do{
+	for (datapoint=0; datapoint<1024 && buf[0];++datapoint) {
 		if(1> get_next_value(id,buf))	
 			goto closeid;
 		y=strtof(buf, NULL);
@@ -408,7 +424,15 @@ int main (int argc, char *argv[])
 		c=sprintf(obuf,"%E %E\n",ext.time_mult*x,y);
 		write(od,obuf,c);
 		x+=xincr;
-	}while(buf[0]);
+		if(datapoint==trig){
+			ytrig=y;
+			xtrig=ext.time_mult*x;
+		}
+			
+	}
+	lseek(od,offset,SEEK_SET);
+	c=sprintf(buf,"%E,%E front",xtrig,ytrig);
+	write(od,buf,c);
 	ret=0;
 	
 	
@@ -436,7 +460,7 @@ use -persist to leave plot up when gnuplot exits
 
 		printf("set xlabel \"%s\"\n",ext.time_units);
 		printf("set ylabel \"%s\"\n",ext.vert_units);
-  
+  set label 1 'Y-AXIS' at graph -0.2, graph 0.5
 
 
 2440/ProLogix notes:
