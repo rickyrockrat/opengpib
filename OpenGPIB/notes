@@ -12,8 +12,59 @@ Measurementsn in Section 3 of this guide for a discussion of vertical windows.
 
 There are always 1024 points.... XINCR is the time interval between points
 
+This should return the Scope ID.
+id? 
+
 
 
 WFMPRE WFID:"CH1 DC   5mV 500ms NORMAL",NR.PT:1024,PT.OFF:128,PT.FMT:Y,XUNIT:SEC
 ,XINCR:1.000E-2,YMULT:2.000E-4,YOFF:-2.625E+1,YUNIT:V,BN.FMT:RI,ENCDG:ASCII;CURV
 E -4,-2,
+
+To obtain the waveform from the scope, use these commands:
+First, find the GPIB address by pressing the output (2440), then setup->Addr.
+Next open up minicom to the instrument ttyUSBx,(usually ttyUSB0), then type 
+++ver
+This should print this string:
+Prologix GPIB-USB Controller version 5.0
+Then set to Controller mode
+++mode 1
+Set the address to talk to (2, usually)
+++addr 2
+Set the eoi mode (EOI after cmd)
+++eoi 1
+Set the eos mode (LF)
+++eos 2
+Then communicate with the scope.
+DATA SOURCE: REF1-4 CH1-2
+DATA ENCDG:ASCI
+WAV?
+++read
+
+DATA SOURCE:CH2
+To grab a waveform, set the data source, then download it. If ++auto is not set, then 
+DATA SOURCE:CH1
+wav?
+
+
+To get the cursor info, just type
+cursor?
+The return string is something like:
+CURSOR FUNCTION:VOLTS,TARGET:CH1,UNITS:TIME:BASE,UNITS:SLOPE:BASE,UNITS:VOLTS:BA
+SE,REFVOLTS:UNITS:V,REFVOLTS:VALUE:1.0000,REFSLOPE:XUNIT:SEC,REFSLOPE:YUNIT:V,RE
+FSLOPE:VALUE:1.0000,REFTIME:UNITS:SEC,REFTIME:VALUE:1.0000,XPOS:ONE:3.00,XPOS:TW
+O:-3.00,YPOS:ONE:2.47,YPOS:TWO:1.38,TPOS:ONE:1.24000E+2,TPOS:TWO:1.95500E+2,MODE
+:DELTA,SELECT:TWO
+Then look for function (VOLTS or?) target (CH1)
+Send the command to read target: 
+ch1?
+Data looks like:
+CH1 VOLTS:5E-1,VARIABLE:0,POSITION:-3.15,COUPLING:DC,FIFTY:OFF,INVERT:OFF
+
+Then you take the YPOS:ONE and YPOS:TWO and subtract, then multiply by the CH1 VOLTS: value.
+This example gives you 545 mV.
+
+use this to figure out which channel(s) are on.
+vmode?
+Data:
+VMODE CH1:ON,CH2:ON,ADD:OFF,MULT:OFF,DISPLAY:YT
