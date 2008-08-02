@@ -8,9 +8,18 @@
 #Change Log: \n
 #
 
+CFLAGS+=-Wall
+
+all: tek2gplot get_tek_waveform
+
 tek2gplot: tek2gplot.c
-	gcc -Wall -lm -o $@ $^
-	
+	gcc  -lm -o $@ $^
+
+serial.o get_tek_waveform.o: serial.h
+
+get_tek_waveform:	serial.o get_tek_waveform.o
+	gcc -o $@ $^
+
 .PHONY: clean
 clean:
 	-rm *.o tek2gplot
