@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.3  2007/10/05 20:35:44  dfs
+Added -l and -t options
+
 Revision 1.2  2007/10/05 14:45:56  dfs
 Added trigger, plot title, and fixed y-axis label
 
@@ -281,7 +284,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.3 $\n"
+	printf("tek2gplot: $Revision: 1.4 $\n"
 	" -h This display\n"
 	" -g generate a gnuplot script file with data (default just data)\n"	
 	" -i fname use fname for input file\n"
@@ -312,7 +315,7 @@ int main (int argc, char *argv[])
 	int sgn,gnuplot,smoothing, datapoint, terminal;
 	double yoff, ymult, xincr, x,y, trigger,ytrig,xtrig;
 	struct extended ext;
-	int yrange, xrange, trig,offset;
+	int yrange_plus, yrange_minus, xrange, trig,offset;
 	uint32_t ilinecolor;
 	iname=oname=NULL;
 	gnuplot=0;
@@ -431,9 +434,19 @@ int main (int argc, char *argv[])
 	printf("off=%E mult=%E inc=%E\n",yoff,ymult,xincr);
 	break_extended(title,&ext);
 	printf("Total time = %f %f points per division\n",xincr*1024,round((ext.time_div/(ext.time_mult))/xincr));
-	yrange=((int)round(ext.vert_div*8))>>1;
+	/*yrange=( ((int)round(ext.vert_div*8))+yoff<0?(int)(yoff*-1):(int)yoff)>>1; */
+	yrange_plus=yrange_minus=((int)round(ext.vert_div*8))>>1;
+	if(yoff >=0)
+		yrange_minus+=round(yoff);
+	else
+		yrange_plus+=round(-yoff);
 	
-	printf("yrange=[-%d:%d] in %s ",yrange,yrange,ext.vert_units);
+	/**now take it to the closest volt.  */
+	if(yrange_minus%1000)
+		yrange_minus+=1000;
+	if(yrange_plus%1000)
+		yrange_plus+=1000;
+	printf("yrange=[-%d:%d] in %s ",yrange_minus,yrange_plus,ext.vert_units);
 	xrange=(int)round(xincr*1024*ext.time_mult);
 	trig=(int)round(trigger);
 	printf("Xrange=[0:%d] in %s\n",xrange,ext.time_units);
@@ -446,7 +459,7 @@ int main (int argc, char *argv[])
 		write(od,buf,c);
 		c=sprintf(buf,"set label 2 \"%s\" at graph -0.06, graph .5\n",ext.vert_units);
 		write(od,buf,c);
-		c=sprintf(buf,"set yrange[%d:%d]\n",-yrange,yrange);
+		c=sprintf(buf,"set yrange[%d:%d]\n",-yrange_minus,yrange_plus);
 		write(od,buf,c);
 		c=sprintf(buf,"set xrange[0:%d]\n",xrange);
 		write(od,buf,c);
