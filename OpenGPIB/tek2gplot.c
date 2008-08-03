@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.5  2008/08/03 06:20:25  dfs
+Moved get_string, get_value to common
+
 Revision 1.4  2008/08/02 08:54:43  dfs
 Attempt to add yrange adjustment
 
@@ -34,6 +37,50 @@ Initial Creation
 #include <math.h>
 #include <inttypes.h>
 #include "common.h"
+#define MAX_INPUTFILES 10
+
+#define TERM_X 		1
+#define TERM_PNG 	2
+#define TERM_DUMB 3
+
+#define BUF_LEN 1024
+
+#define WR_SINGLE_PLOT 0
+#define WR_CLOSE			 -1
+#define WR_TRIGGER     -2
+#define WR_DATA				 -3
+#define WR_SETFILENAME -4
+
+
+struct extended {
+	char *src;
+	char *coupling;
+	int vert_div;
+	char *vert_units;
+	double vert_mult;
+	int time_div;
+	char *time_units;
+	char *line_color;
+	double time_mult;
+	double xtrig;
+	double ytrig;
+	double x;
+	double y;
+	int xrange;
+	int yrange_minus;
+	int yrange_plus;
+	int terminal;
+	int smoothing;
+};
+
+enum {
+	_SRC,
+	_COUPLE,
+	_VERT,
+	_HORIZ,
+	_MODE
+};
+
 /**build with 
 gcc -Wall -lm -o tek2plot tek2gplot.c
   */
@@ -75,7 +122,7 @@ char *load_preamble(int fd, int *offset)
 	return (strdup(buf));
 	
 }
-#define BUF_LEN 1024
+
 /***************************************************************************/
 /** use internal buffered file I/O to read next value.
 \n\b Arguments:
@@ -99,8 +146,11 @@ int get_next_value (int fd, char *dst)
     return 0;
   }
 
-  else if( len == -1)
-    return -1;
+  else if( len == -1){
+		printf("Unable to read file or EOF\n");
+		return -1;
+	}
+    
   else if( len > BUF_LEN) {
     if(dbg)printf("Read returned more than buf size!\n");
     return(0);
@@ -124,8 +174,11 @@ int get_next_value (int fd, char *dst)
       /*printf("Ran out of input looking at term, reading again.\n"); */
       len=read(fd,buf,BUF_LEN);
       pos=0;
-      if( len == -1)
-        return -1;
+      if( len == -1){
+				printf("Unable to read file or EOF\n");		
+				return -1;
+			}
+        
     }
   }
 	/*printf("pos=%d ",pos); */
@@ -133,26 +186,6 @@ int get_next_value (int fd, char *dst)
   /*printf("Got %d bytes\n",i); */
   return(i);	
 }
-
-
-struct extended {
-	char *src;
-	char *coupling;
-	int vert_div;
-	char *vert_units;
-	double vert_mult;
-	int time_div;
-	char *time_units;
-	double time_mult;
-};
-
-enum {
-	_SRC,
-	_COUPLE,
-	_VERT,
-	_HORIZ,
-	_MODE
-};
 
 /***************************************************************************/
 /** .
@@ -165,7 +198,8 @@ int break_extended(char *data, struct extended *x)
 	char buf[10];
 	state=_SRC;
 	/*printf("%s\n",data); */
-	memset(x,0,sizeof(struct extended));
+	/*memset(x,0,sizeof(struct extended)); can't do this- we have persistent data*/
+	x->src=x->coupling=x->vert_units=x->time_units=NULL;
 	for (i=k=0;data[i];){
 		if(data[i] != '"' && data[i] != ' ')
 			buf[k++]=data[i++];
@@ -228,202 +262,66 @@ int break_extended(char *data, struct extended *x)
 	return 1;
 }
 
-/*encoding formats:
-ASCII, (Signed integer)	 RI
-RIBINARY,  (Signed integer)	RI
-RPBINARY,  (Positive integer)	RP
-RIPARTIAL, (Signed integer - partial) 
-RPPARTIAL. (Positive integer -partial)
-
-*/
-
 /***************************************************************************/
 /** .
 \n\b Arguments:
+if plotno is 1 or above, we do a multi-plot.  If 0, we do a single plot.
+if plotno is -1, we close the file
 \n\b Returns:
 ****************************************************************************/
-void usage( void)
+int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitle, int plotno)
 {
-	printf("tek2gplot: $Revision: 1.5 $\n"
-	" -h This display\n"
-	" -g generate a gnuplot script file with data (default just data)\n"	
-	" -i fname use fname for input file\n"
-	" -l color set line color in 0xRRGGBB format \n"
-	" -o fname use fname for output file\n"
-	" -s val Use smoothing with value val\n"
-	" -t term, set terminal to png, ascii, or x11 (default is x11)\n"
-	"if you use -t png, gnuplot usage is:\n"
-	" gnuplot fname > image.png\n" \
-	);
-	
-	
-}
-#define TERM_X 		1
-#define TERM_PNG 	2
-#define TERM_DUMB 3
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-
-int main (int argc, char *argv[])
-{
-	char *iname,*oname, *preamble, buf[256], obuf[50], *line_color;
-	char *fmt, *enc, *title;
-	int id, od, ret=1, c, data;
-	int sgn,gnuplot,smoothing, datapoint, terminal;
-	double yoff, ymult, xincr, x,y, trigger,ytrig,xtrig;
-	struct extended ext;
-	int yrange_plus, yrange_minus, xrange, trig,offset;
+	char buf[BUF_LEN];
+	int c,data;
+	static int od=0, first=1;
+	static int offset;
+	static char *fname;
 	uint32_t ilinecolor;
-	iname=oname=NULL;
-	gnuplot=0;
-	smoothing=0;
-	terminal=TERM_X;
-	line_color="x00ff00";
-	while( -1 != (c = getopt(argc, argv, "i:l:o:gs:t:")) ) {
-		switch(c){
-			case 'g':
-				gnuplot=1;
-				break;
-			case 'h':
-				usage();
-				return 0;
-				break;
-			case 'i':
-				iname=strdup(optarg);
-				break;
-			case 'l':
-				line_color=strdup(&optarg[1]);
-				break;
-			case 'o':
-				oname=strdup(optarg);
-				break;	
-			case 's':
-				smoothing=strtol(optarg,NULL,10);
-				break;
-			case 't':
-				if(!strcmp(optarg,"png"))
-					terminal=TERM_PNG;
-				else if(!strcmp(optarg,"x11"))
-					terminal=TERM_X;
-				else if(!strcmp(optarg,"ascii"))
-					terminal=TERM_DUMB;				
-				else {
-					printf("Must specify X or png for -t option\n");
-					usage();
-					return 1;
-				}
-				break;
+
+	if( WR_SETFILENAME == plotno){
+		sprintf(buf,"%s.plot",dfile);
+		fname=strdup(buf);
+		return 0;
+	}
+	if(od<3){	
+		if(NULL == fname){
+			printf("o filename is NULL\n");
+			return -1;
 		}
+		if(1>(od=open(fname,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
+			printf("Unable to open %s\n",fname);
+			return -1;
+		}	
+	}			
+	if( WR_CLOSE == plotno){
+		if(od>2)
+			close(od);
+		return 0;
 	}
-	if(TERM_X == terminal ){
-		sprintf(buf,"0%s",line_color);
-		ilinecolor=strtol(buf,NULL,16);
-		switch(ilinecolor){
-			case 0xff0000: /**red  */
-				ilinecolor=1;
-				break;
-			case 0x00FF00: /*green */
-				ilinecolor=2;
-				break;                           
-			case 0x0000ff:  /*blue  */
-				ilinecolor=3;                  
-				break;	                       
-			case 0xFF00FF:  /*magenta */
-				ilinecolor=4;                  
-				break;                         
-			case 0x00FFFF:  /*cyan */
-				ilinecolor=5;
-				break;
-			case 0xA0522D: /*sienna */
-				ilinecolor=6;
-				break;
-			case 0xffa500: /**orange */
-				ilinecolor=7;
-				break;	
-			case 0xFF7F50: /*coral */
-				ilinecolor=8;
-				break;				
-			default:
-				ilinecolor=2;
-				break;
-		}
+	if(WR_DATA == plotno){	/**write data  */
+		c=sprintf(buf,"%E %E\n",ext->time_mult*ext->x,ext->y);
+		write(od,buf,c);
+		return 0;
 	}
-	else ilinecolor=2;
-	if( NULL == iname || NULL == oname){
-		printf("Must supply at least -o, -i\n");
-		usage();
-		return 1;
+	if(WR_TRIGGER == plotno){/**write trigger  */
+		lseek(od,offset,SEEK_SET);
+		c=sprintf(buf,"%E,%E front",ext->xtrig,ext->ytrig);			
+		write(od,buf,c);
+		return 0;
 	}
-	if(1>(od=open(oname,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
-		printf("Unable to open %s\n",oname);
-		goto end;
-	}	
-	if(1>(id=open(iname,O_RDONLY)) ){
-		printf("Unable to open %s\n",argv[1]);
-		goto closeod;
-	}
-	if(NULL == (preamble=load_preamble(id, &data))){
-		printf("Unable to load preamble\n");
-		goto closeid;
-	}
-	/**PT.OFF  */
-	yoff=get_value("YOFF", preamble);
-	ymult=get_value("YMULT",preamble);
-	xincr=get_value("XINCR", preamble);
-	fmt=get_string("BN.FMT",preamble);
-	enc=get_string("ENCDG",preamble);
-	trigger=get_value("PT.OFF",preamble);
-	title=get_string("WFID",preamble);
-	if(!strcmp("RI",fmt))
-		sgn=1;
-	else if(!strcmp("RP",fmt))
-		sgn=0;
-	else {
-		printf("Unknown format %s\n",fmt);
-		goto closeid;
-	}
-	
-	if(strcmp(enc,"ASCII")){
-		printf("Encoding %s not supportd\n",enc);
-		goto closeid;
-	}
-	
-	printf("off=%E mult=%E inc=%E\n",yoff,ymult,xincr);
-	break_extended(title,&ext);
-	printf("Total time = %f %f points per division\n",xincr*1024,round((ext.time_div/(ext.time_mult))/xincr));
-	/*yrange=( ((int)round(ext.vert_div*8))+yoff<0?(int)(yoff*-1):(int)yoff)>>1; */
-	yrange_plus=yrange_minus=((int)round(ext.vert_div*8))>>1;
-	if(yoff >=0)
-		yrange_minus+=round(yoff);
-	else
-		yrange_plus+=round(-yoff);
-	
-	/**now take it to the closest volt.  */
-	if(yrange_minus%1000)
-		yrange_minus+=1000;
-	if(yrange_plus%1000)
-		yrange_plus+=1000;
-	printf("yrange=[-%d:%d] in %s ",yrange_minus,yrange_plus,ext.vert_units);
-	xrange=(int)round(xincr*1024*ext.time_mult);
-	trig=(int)round(trigger);
-	printf("Xrange=[0:%d] in %s\n",xrange,ext.time_units);
-	printf("set xtics 0,%d\n",(int)round(ext.time_div));
-	x=0;
-	if(gnuplot){
-		c=sprintf(buf,"set xlabel \"%s\"\n",ext.time_units);
+
+	if(plotno <2 ){
+		c=sprintf(buf,"set xlabel \"%s\"\n",ext->time_units);
 		write(od,buf,c);
 		c=sprintf(buf,"set lmargin 10\n");
 		write(od,buf,c);
-		c=sprintf(buf,"set label 2 \"%s\" at graph -0.06, graph .5\n",ext.vert_units);
+		c=sprintf(buf,"set label 2 \"%s\" at graph -0.06, graph .5\n",ext->vert_units);
 		write(od,buf,c);
-		c=sprintf(buf,"set yrange[%d:%d]\n",-yrange_minus,yrange_plus);
+		c=sprintf(buf,"set yrange[%d:%d]\n",-ext->yrange_minus,ext->yrange_plus);
 		write(od,buf,c);
-		c=sprintf(buf,"set xrange[0:%d]\n",xrange);
+		c=sprintf(buf,"set xrange[0:%d]\n",ext->xrange);
 		write(od,buf,c);
-		c=sprintf(buf,"set xtics 0,%d\n",(int)round(ext.time_div));
+		c=sprintf(buf,"set xtics 0,%d\n",(int)round(ext->time_div));
 		write(od,buf,c);
 		c=sprintf(buf,"set title %s\n",title);
 		write(od,buf,c);
@@ -432,21 +330,21 @@ int main (int argc, char *argv[])
 			write(od,buf,c);	
 		}
 		
-		switch(terminal){
+		switch(ext->terminal){
 			/**
 			set terminal png medium size 640,480 \
-                      xffffff x000000 x404040 \
-                      xff0000 xffa500 x66cdaa xcdb5cd \
-                      xadd8e6 x0000ff xdda0dd x9500d3 
+	                     xffffff x000000 x404040 \
+	                     xff0000 xffa500 x66cdaa xcdb5cd \
+	                     xadd8e6 x0000ff xdda0dd x9500d3 
 			which uses white for the non-transparent background, black for borders, 
 			gray for the axes, and red, orange, medium aquamarine, thistle 3, 
 			light blue, blue, plum and dark violet for eight plotting colors
 			*/
 			case TERM_PNG:
 				c=sprintf(buf,"set terminal png medium size 640,480 \\\n"
-                      "xffffff x000000 x404040 \\\n"
-                      "xff0000 %s x66cdaa xcdb5cd \\\n"
-                      "xadd8e6 x0000ff xdda0dd x9500d3\n",line_color );
+	                     "xffffff x000000 x404040 \\\n"
+	                     "xff0000 %s x66cdaa xcdb5cd \\\n"
+	                     "xadd8e6 x0000ff xdda0dd x9500d3\n",ext->line_color );
 				write(od,buf,c);
 				break;
 			/**  
@@ -464,7 +362,7 @@ int main (int argc, char *argv[])
 		  gnuplot*line8Color:  coral
 				*/
 			case TERM_X:
-				c=sprintf(buf,"set terminal x11 title \"%s\" persist\n",ext.src);
+				c=sprintf(buf,"set terminal x11 title \"%s\" persist\n",xtitle);
 				write(od,buf,c);
 				break;
 			case TERM_DUMB:
@@ -472,6 +370,40 @@ int main (int argc, char *argv[])
 				write(od,buf,c);
 				break;
 		}
+		if(TERM_X == ext->terminal ){
+			sprintf(buf,"0%s",ext->line_color);
+			ilinecolor=strtol(buf,NULL,16);
+			switch(ilinecolor){
+				case 0xff0000: /**red  */
+					ilinecolor=1;
+					break;
+				case 0x00FF00: /*green */
+					ilinecolor=2;
+					break;                           
+				case 0x0000ff:  /*blue  */
+					ilinecolor=3;                  
+					break;	                       
+				case 0xFF00FF:  /*magenta */
+					ilinecolor=4;                  
+					break;                         
+				case 0x00FFFF:  /*cyan */
+					ilinecolor=5;
+					break;
+				case 0xA0522D: /*sienna */
+					ilinecolor=6;
+					break;
+				case 0xffa500: /**orange */
+					ilinecolor=7;
+					break;	
+				case 0xFF7F50: /*coral */
+					ilinecolor=8;
+					break;				
+				default:
+					ilinecolor=2;
+					break;
+			}
+		}
+		else ilinecolor=2;
 		c=sprintf(buf,"set label 1 'T' at ");
 		write(od,buf,c);
 		offset=lseek(od,0,SEEK_CUR);
@@ -482,46 +414,337 @@ int main (int argc, char *argv[])
 		c=sprintf(buf,"																					\n");
 		write(od,buf,c);
 		
-		if(smoothing){
-			c=sprintf(buf,"set samples %d\n",smoothing);
+		if(ext->smoothing){
+			c=sprintf(buf,"set samples %d\n",ext->smoothing);
 			write(od,buf,c);		
-			c=sprintf(buf,"plot '-' title \"%s\" ls %d smooth csplines with lines\n",ext.src,ilinecolor);
-			write(od,buf,c);			
-		}
-		else{
-			c=sprintf(buf,"plot '-' title \"%s\" ls %d with lines\n",ext.src,ilinecolor);
-			write(od,buf,c);			
-		}
-
+		}		
+	}	
+	
+	if(ext->smoothing){
+		c=sprintf(buf,"%s'%s' title \"%s\" ls %d smooth csplines with lines%s",plotno>0?first?"plot ":",\\\n":"plot ",dfile,ext->src,ilinecolor,plotno>0?"":"\n");
+		write(od,buf,c);			
+	}
+	else{
+		c=sprintf(buf,"%s'%s' title \"%s\" ls %d with lines%s",plotno>0?first?"plot ":",\\\n":"plot ",dfile,ext->src,ilinecolor,plotno>0?"":"\n");
+		write(od,buf,c);			
+	}
+	++ilinecolor;
+	first=0;
+	return 0;
+}
 		
+
+/*encoding formats:
+ASCII, (Signed integer)	 RI
+RIBINARY,  (Signed integer)	RI
+RPBINARY,  (Positive integer)	RP
+RIPARTIAL, (Signed integer - partial) 
+RPPARTIAL. (Positive integer -partial)
+
+*/
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void usage( void)
+{
+	printf("tek2gplot: $Revision: 1.6 $\n"
+	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
+	"    which channel is trigger source. This must match an -i.\n"
+	"    if this is not set, the first file is assumed to have the trigger\n"
+	" -h This display\n"
+	" -g generate a gnuplot script file with data (default just data).\n"	
+	"    -g can only be used for one input file.\n"
+	" -i fname use fname for input file(s)\n"
+	" -l color set line color in 0xRRGGBB format \n"
+	" -m Set multi-plot mode. -o will have .plot appended to it\n"
+	" -o fname use fname for output file. if multiple -i are used, this name\n"
+	"    becomes a base filename with the -i names appended like ofname.ifname\n"
+	"    In all cases the script file becomes fname.plot\n"
+	" -s val Use smoothing with value val. \n"
+	
+	" -t term, set terminal to png, ascii, or x11 (default is x11)\n"
+	"if you use -t png, gnuplot usage is:\n"
+	" gnuplot fname > image.png\n" \
+	);
+	
+	
+}
+
+/***************************************************************************/
+/** strip double-quotes out of filename.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void strip_quotes(char *n)
+{
+	int i,len, s, e;
+	len=strlen(n);
+	s=e=-1;
+	for (i=0;i<len;++i){
+		if('"' ==n[i]){
+			if(-1 ==s)
+				s=i;
+			else 
+				e=i;
+		}	
 	}
-	for (datapoint=0; datapoint<1024 && buf[0];++datapoint) {
-		if(1> get_next_value(id,buf))	
-			goto closeid;
-		y=strtof(buf, NULL);
-		if(0 == sgn)
-			y=y-128;
-		y=(y - yoff)*ymult*ext.vert_mult;
-		/*printf("%E %E (%s)\n",x,y,buf); */
-		c=sprintf(obuf,"%E %E\n",ext.time_mult*x,y);
-		write(od,obuf,c);
-		x+=xincr;
-		if(datapoint==trig){
-			ytrig=y;
-			xtrig=ext.time_mult*x;
+	if(-1 != s && -1 != e)	{
+		++s;
+		for (i=0;s<len;++i,++s)
+			n[i]=n[s];
+		n[e-1]=0;
+	}else{
+		printf("Didn't find full quotes in '%s'\n",n);
+	}
+		
+		
+}
+/***************************************************************************/
+/** When gnuplot is specified, there is just one file, the script file, so
+write_script_file is used for all writing.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+
+int main (int argc, char *argv[])
+{
+	char *iname[MAX_INPUTFILES],*oname, *preamble, buf[BUF_LEN], obuf[50];
+	char *fmt, *enc, *title, titles[BUF_LEN], xtitle[50], *labels[MAX_INPUTFILES];
+	char *ofnames[MAX_INPUTFILES], *trigname;
+	int id, od, ret=1, c, data, idx;
+	int sgn,gnuplot, datapoint, multiplot, max_yrange_plus, max_yrange_minus;
+	double yoff, ymult, xincr, trigger, xtrig, ytrig;
+	struct extended ext;
+	int trig;
+	
+	trigname=iname[0]=oname=NULL;
+	multiplot=gnuplot=0;
+	ext.smoothing=0;
+	ext.terminal=TERM_X;
+	ext.line_color="x00ff00";
+	idx=0;
+	while( -1 != (c = getopt(argc, argv, "c:gi:ml:o:s:t:")) ) {
+		switch(c){
+			case 'c':
+				trigname=strdup(optarg);
+				break;
+			case 'g':
+				gnuplot=1;
+				break;
+			case 'h':
+				usage();
+				return 0;
+				break;
+			case 'i':
+				if(idx>= MAX_INPUTFILES){
+					printf("Exceeded max input files of %d\n",MAX_INPUTFILES);
+					return 1;
+				}
+					
+				iname[idx++]=strdup(optarg);
+				break;
+			case 'l':
+				ext.line_color=strdup(&optarg[1]);
+				break;
+			case 'm':
+				multiplot=1;
+				break;
+			case 'o':
+				oname=strdup(optarg);
+				break;	
+			case 's':
+				ext.smoothing=strtol(optarg,NULL,10);
+				break;
+			case 't':
+				if(!strcmp(optarg,"png"))
+					ext.terminal=TERM_PNG;
+				else if(!strcmp(optarg,"x11"))
+					ext.terminal=TERM_X;
+				else if(!strcmp(optarg,"ascii"))
+					ext.terminal=TERM_DUMB;				
+				else {
+					printf("Must specify X or png for -t option\n");
+					usage();
+					return 1;
+				}
+				break;
 		}
-			
 	}
-	lseek(od,offset,SEEK_SET);
-	c=sprintf(buf,"%E,%E front",xtrig,ytrig);
-	write(od,buf,c);
+	if( multiplot && gnuplot){
+		printf("Cannot specify both -m and -g\n");
+		return 1;
+	}
+	if( 0 == idx || NULL == oname){
+		printf("Must supply at least -o, -i\n");
+		usage();
+		return 1;
+	}
+	/**set the output script name  */
+	write_script_file(NULL, oname, NULL, NULL,WR_SETFILENAME);
+	
+	xtitle[0]=titles[0]=0;
+	max_yrange_minus=max_yrange_plus=0;
+	printf("idx=%d\n",idx);
+	for (c=0; c<idx;++c){
+		char *in,*bn;/**output name, input name, and base name of inputname  */
+		int i, trigfile;
+		if(gnuplot)
+			trigfile=1;
+		else if(NULL == trigname){
+			if(0 == c)	/**use first file  */
+				trigfile=1;
+			else
+				trigfile=0;
+		}
+		else if(!strcmp(trigname,iname[c]))
+			trigfile=1;
+		else
+			trigfile=0;
+		if(0 == gnuplot){
+			in=strdup(iname[c]);
+			bn=basename(in);
+			
+			if(NULL == (ofnames[c]=malloc(strlen(bn)+strlen(oname)+10)) ){
+				printf("Out of memory for bm&on\n");
+				goto end;
+			}
+			sprintf(ofnames[c],"%s.%s",oname,bn);
+			free (in);
+			if(1>(od=open(ofnames[c],O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
+				printf("Unable to open %s\n",ofnames[c]);
+				goto end;
+			}				
+			printf("Writing %s\n",ofnames[c]);
+		}else 
+			id=0;
+
+		if(1>(id=open(iname[c],O_RDONLY)) ){
+			printf("Unable to open %s\n",iname[c]);
+			goto closeod;
+		}
+		if(NULL == (preamble=load_preamble(id, &data))){
+			printf("Unable to load preamble for file %s\n",iname[c]);
+			goto closeid;
+		}
+		/**PT.OFF  */
+		yoff=get_value("YOFF", preamble);
+		ymult=get_value("YMULT",preamble);
+		xincr=get_value("XINCR", preamble);
+		fmt=get_string("BN.FMT",preamble);
+		enc=get_string("ENCDG",preamble);
+		trigger=get_value("PT.OFF",preamble);
+		title=get_string("WFID",preamble);
+		strip_quotes(title);
+		i=strlen(titles);
+		if(0 ==i)
+			sprintf(&titles[i],"%s",title);
+		else 
+			sprintf(&titles[i],"\\n%s",title);
+		if(!strcmp("RI",fmt))
+			sgn=1;
+		else if(!strcmp("RP",fmt))
+			sgn=0;
+		else {
+			printf("Unknown format %s\n",fmt);
+			goto closeid;
+		}
+		
+		if(strcmp(enc,"ASCII")){
+			printf("Encoding %s not supportd\n",enc);
+			goto closeid;
+		}
+		
+		printf("off=%E mult=%E inc=%E\n",yoff,ymult,xincr);
+		break_extended(title,&ext);
+		i=strlen(xtitle);
+		sprintf(&xtitle[i],"%s ",ext.src);
+		labels[c]=strdup(ext.src);
+		printf("Total time = %f %f points per division\n",xincr*1024,round((ext.time_div/(ext.time_mult))/xincr));
+		/*yrange=( ((int)round(ext.vert_div*8))+yoff<0?(int)(yoff*-1):(int)yoff)>>1; */
+		ext.yrange_plus=ext.yrange_minus=((int)round(ext.vert_div*8))>>1;
+		if(yoff >=0)
+			ext.yrange_minus+=round(yoff);
+		else
+			ext.yrange_plus+=round(-yoff);
+		
+		/**now take it to the closest volt.  */
+		if(ext.yrange_minus%1000)
+			ext.yrange_minus+=1000;
+		if(ext.yrange_plus%1000)
+			ext.yrange_plus+=1000;
+		if(max_yrange_plus <ext.yrange_plus)
+			max_yrange_plus =ext.yrange_plus;
+				if(max_yrange_minus <ext.yrange_minus)
+			max_yrange_minus =ext.yrange_minus;
+		printf("yrange=[-%d:%d] in %s ",ext.yrange_minus,ext.yrange_plus,ext.vert_units);
+		ext.xrange=(int)round(xincr*1024*ext.time_mult);
+		trig=(int)round(trigger);
+		printf("Xrange=[0:%d] in %s\n",ext.xrange,ext.time_units);
+		printf("set xtics 0,%d\n",(int)round(ext.time_div));
+		ext.x=0;
+		if(gnuplot){
+			if(-1 ==write_script_file(&ext, "-", titles, xtitle,WR_SINGLE_PLOT)) {
+				printf("Script file error\n");
+				goto end;
+			}
+		}
+		for (datapoint=0; datapoint<1024 && buf[0];++datapoint) {
+			if(1> get_next_value(id,buf))	
+				break;
+			ext.y=strtof(buf, NULL);
+			if(0 == sgn)
+				ext.y=ext.y-128;
+			ext.y=(ext.y - yoff)*ymult*ext.vert_mult;
+			if(gnuplot)	/**write data  */
+				write_script_file(&ext, NULL, NULL, NULL,WR_DATA); 
+			else {
+				/*printf("%E %E (%s)\n",x,y,buf); */
+				i=sprintf(obuf,"%E %E\n",ext.time_mult*ext.x,ext.y);
+				write(od,obuf,i);	
+			}
+			ext.x+=xincr;
+			/**we are on trigger channel, plot it, save it  */
+			if(trigfile &&datapoint==trig){
+				ytrig=ext.ytrig=ext.y;
+				xtrig=ext.xtrig=ext.time_mult*ext.x;
+			}
+		}
+		if(gnuplot){ /**write trigger  */
+			write_script_file(&ext,NULL,NULL,0,WR_TRIGGER);
+		}	else {
+			/*write(od,buf,i);	 */
+			close(od);
+		}
+		close(id);
+		id=od=0;
+	} /**end for loop  */	
 	ret=0;
-	
-	
+	if(0 == gnuplot)	{
+		ext.yrange_plus=max_yrange_plus;
+		ext.yrange_minus=max_yrange_minus;
+		/**write the script file  */
+		sprintf(buf,"\"%s\"",titles);
+		/**the offset to the trigger is set when c=0  */
+		for (c=0; c<idx;++c){
+			ext.src=labels[c];
+			write_script_file(&ext,ofnames[c],buf,xtitle,c+1);	
+		}
+		ext.ytrig=ytrig;
+		ext.xtrig=xtrig;
+		/**write the trigger.  */
+		write_script_file(&ext,NULL,NULL,0,WR_TRIGGER);	
+	}
+	/**close output file  */
+	write_script_file(NULL,NULL,NULL,0,WR_CLOSE);
 closeid:
-	close(id);
+	if(id>2)
+		close(id);
 closeod:
-	close(od);
+	if(od>2)
+		close(od);
 end:
 	return (ret);
 	
@@ -551,6 +774,14 @@ DATA ENCDG:ASCI
 WAV?
 ++read
 
+Todo:
+Add section to write the script file for a mulitplot. Need to add the second
+section.
+This will be a loop that iterates through the output filenames, which will need to
+be stored in an array.
+
+Get trigger channel. use option to set trigger file.
+See notes on reading the trigger point.
   
   */
 
