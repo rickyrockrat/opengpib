@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.3  2008/08/03 22:21:40  dfs
+Added trigger to cursors info
+
 Revision 1.2  2008/08/03 06:19:59  dfs
 Added multiple channel reads and cursor reads
 
@@ -412,7 +415,7 @@ int read_cursors(struct serial_port *p,int fd)
 	one *=volts;
 	two *=volts;
 	printf("volts=%E, diff=%E\n",volts,diff);
-	i=sprintf(buf,"CURSOR:%s %F %F %F\nTRIGGER:%s\n",function,i?two:one,i?one:two,diff,trigsrc);
+	i=sprintf(buf,"CURSOR:%s,MAX:%F,MIN:%F,DIFF:%F\nTRIGGER:%s\n",function,i?two:one,i?one:two,diff,trigsrc);
 	/*write(fd,buf,i); written out by loop*/
 	
 	return i;
