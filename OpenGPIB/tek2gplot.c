@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.4  2008/08/02 08:54:43  dfs
+Attempt to add yrange adjustment
+
 Revision 1.3  2007/10/05 20:35:44  dfs
 Added -l and -t options
 
@@ -26,11 +29,11 @@ Initial Creation
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include <stdlib.h>
+
 #include <stdio.h>
-#include <string.h>
 #include <math.h>
 #include <inttypes.h>
+#include "common.h"
 /**build with 
 gcc -Wall -lm -o tek2plot tek2gplot.c
   */
@@ -131,50 +134,7 @@ int get_next_value (int fd, char *dst)
   return(i);	
 }
 
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-double get_value( char *f, char *buf)
-{
-	char tbuf[50], *find;
-	int i,k;
-	double x; 
-	
-	find=strstr(buf,f);
-	if(NULL==find)
-		return -1;
-	for (k=0,i=strlen(f)+1; k<10 && find[i] != ',' && find[i] != ';';++i,++k)
-		tbuf[k]=find[i];
-	tbuf[k]=0;
-	/*printf("Found %s->%s",f,tbuf); */
-	x=strtof(tbuf, NULL);
-	/*printf(" : %f\n",x); */
-	
-	return(x );	 
-}
 
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-char * get_string( char *f, char *buf)
-{
-	char tbuf[50], *find;
-	int i,k;
-	
-	find=strstr(buf,f);
-	if(NULL==find)
-		return "NOTFOUND";
-	for (k=0,i=strlen(f)+1; k<30 && find[i] != ',' && find[i] != ';';++i,++k)
-		tbuf[k]=find[i];
-	tbuf[k]=0;
-	/*printf("Found %s->%s\n",f,tbuf); */
-	
-	return(strdup(tbuf));	 
-}
 struct extended {
 	char *src;
 	char *coupling;
@@ -284,7 +244,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.4 $\n"
+	printf("tek2gplot: $Revision: 1.5 $\n"
 	" -h This display\n"
 	" -g generate a gnuplot script file with data (default just data)\n"	
 	" -i fname use fname for input file\n"
