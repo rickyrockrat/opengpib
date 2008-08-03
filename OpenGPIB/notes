@@ -68,3 +68,8 @@ use this to figure out which channel(s) are on.
 vmode?
 Data:
 VMODE CH1:ON,CH2:ON,ADD:OFF,MULT:OFF,DISPLAY:YT
+
+To find out info on the trigger(s), use ATRIGGER?
+Data:
+ATRIGGER MODE:SGLSEQ,SOURCE:CH1,COUPLING:DC,LOGSRC:OFF,LEVEL:2.04,SLOPE:PLUS,POSITION:8,HOLDOFF:0,ABSELECT:A
+
