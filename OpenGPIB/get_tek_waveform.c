@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.2  2008/08/03 06:19:59  dfs
+Added multiple channel reads and cursor reads
+
 Revision 1.1  2008/08/02 08:53:58  dfs
 Initial working rev
 
@@ -366,12 +369,15 @@ CH1 VOLTS:5E-1,VARIABLE:0,POSITION:-3.15,COUPLING:DC,FIFTY:OFF,INVERT:OFF
 
 Then you take the YPOS:ONE and YPOS:TWO and subtract, then multiply by the CH1 VOLTS: value.
 This example gives you 545 mV.
+
+ATRIGGER data:
+ATRIGGER MODE:SGLSEQ,SOURCE:CH1,COUPLING:DC,LOGSRC:OFF,LEVEL:2.04,SLOPE:PLUS,POSITION:8,HOLDOFF:0,ABSELECT:A
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
 int read_cursors(struct serial_port *p,int fd)
 {
-	char *t,lbuf[100];
+	char *t,lbuf[100], *function, *trigsrc;
 	float one,two,volts, diff;
 	int i;
 	
@@ -383,10 +389,18 @@ int read_cursors(struct serial_port *p,int fd)
 	one=get_value("YPOS:ONE",buf);
 	two=get_value("YPOS:TWO",buf);
 	printf("Target=%s, one=%E, two=%E\n",t,one,two);
-	i=sprintf(lbuf,"%s?\r",t);
+	function=get_string("FUNCTION",buf);
+	
+	/*find out trigger channel*/
+	i=sprintf(lbuf,"ATRIGGER?\r");
 	write_string(p,lbuf,i);
 	read_string(p,buf,BUF_SIZE);
-	volts=get_value("VOLTS",buf);
+	trigsrc=get_string("SOURCE",buf);
+	/**get channel for cursor ref  */
+  i=sprintf(lbuf,"%s?\r",t);
+	write_string(p,lbuf,i);
+	read_string(p,buf,BUF_SIZE);
+	volts=get_value(function,buf);
 	diff=one-two;
 	if(diff <0){
 		diff *=-1;
@@ -398,7 +412,7 @@ int read_cursors(struct serial_port *p,int fd)
 	one *=volts;
 	two *=volts;
 	printf("volts=%E, diff=%E\n",volts,diff);
-	i=sprintf(buf,"%F %F %F\n",i?two:one,i?one:two,diff);
+	i=sprintf(buf,"CURSOR:%s %F %F %F\nTRIGGER:%s\n",function,i?two:one,i?one:two,diff,trigsrc);
 	/*write(fd,buf,i); written out by loop*/
 	
 	return i;
