@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.6  2008/08/03 22:22:07  dfs
+Added multiple plots, but gnuplot segfaults
+
 Revision 1.5  2008/08/03 06:20:25  dfs
 Moved get_string, get_value to common
 
@@ -50,7 +53,7 @@ Initial Creation
 #define WR_TRIGGER     -2
 #define WR_DATA				 -3
 #define WR_SETFILENAME -4
-
+#define WR_CURSORS     -5
 
 struct extended {
 	char *src;
@@ -304,9 +307,26 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		return 0;
 	}
 	if(WR_TRIGGER == plotno){/**write trigger  */
+		off_t o;
+		o=lseek(od,0,SEEK_CUR);
 		lseek(od,offset,SEEK_SET);
-		c=sprintf(buf,"%E,%E front",ext->xtrig,ext->ytrig);			
+		c=sprintf(buf,"%E,%E front\n",ext->xtrig,ext->ytrig);			
 		write(od,buf,c);
+		offset=lseek(od,0,SEEK_CUR);
+		lseek(od,o,SEEK_SET);
+		return 0;
+	}
+	if(WR_CURSORS == plotno){/**write trigger  */
+		off_t o;
+		o=lseek(od,0,SEEK_CUR);
+		lseek(od,offset,SEEK_SET);
+		c=sprintf(buf,"set label 2 '%s' at %E,%E front",ext->src,ext->x,ext->y);			
+		write(od,buf,c);
+		offset=lseek(od,0,SEEK_CUR);
+		lseek(od,o,SEEK_SET);
+		c=sprintf(buf,",\\\n'-' title \"\" ls %d with lines\n",ilinecolor);
+		write(od,buf,c);			
+		++ilinecolor;
 		return 0;
 	}
 
@@ -408,10 +428,12 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		write(od,buf,c);
 		offset=lseek(od,0,SEEK_CUR);
 		printf("offset at %d\n",offset);
-		/**save space for rest of line..  */
-		c=sprintf(buf,"																					");
+		/**save space for rest of line.. and possible cursor title */
+		c=sprintf(buf,"																					                  ");
 		write(od,buf,c);
-		c=sprintf(buf,"																					\n");
+		c=sprintf(buf,"																					                 ");
+		write(od,buf,c);
+		c=sprintf(buf,"																					                 ");
 		write(od,buf,c);
 		
 		if(ext->smoothing){
@@ -421,11 +443,11 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	}	
 	
 	if(ext->smoothing){
-		c=sprintf(buf,"%s'%s' title \"%s\" ls %d smooth csplines with lines%s",plotno>0?first?"plot ":",\\\n":"plot ",dfile,ext->src,ilinecolor,plotno>0?"":"\n");
+		c=sprintf(buf,"%s'%s' title \"%s\" ls %d smooth csplines with lines%s",plotno>0?first?"\nplot ":",\\\n":"\nplot ",dfile,ext->src,ilinecolor,plotno>0?"":"\n");
 		write(od,buf,c);			
 	}
 	else{
-		c=sprintf(buf,"%s'%s' title \"%s\" ls %d with lines%s",plotno>0?first?"plot ":",\\\n":"plot ",dfile,ext->src,ilinecolor,plotno>0?"":"\n");
+		c=sprintf(buf,"%s'%s' title \"%s\" ls %d with lines%s",plotno>0?first?"\nplot ":",\\\n":"\nplot ",dfile,ext->src,ilinecolor,plotno>0?"":"\n");
 		write(od,buf,c);			
 	}
 	++ilinecolor;
@@ -434,6 +456,17 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 }
 		
 
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void write_cursor(struct extended *e,double x, double y)
+{
+	e->x=x;
+	e->y=y;
+	write_script_file(e,NULL,NULL,0,WR_DATA);	
+}
 /*encoding formats:
 ASCII, (Signed integer)	 RI
 RIBINARY,  (Signed integer)	RI
@@ -450,10 +483,11 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.6 $\n"
+	printf("tek2gplot: $Revision: 1.7 $\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
 	"    if this is not set, the first file is assumed to have the trigger\n"
+	" -d cursorname Show the cursor info from the cursors file\n"
 	" -h This display\n"
 	" -g generate a gnuplot script file with data (default just data).\n"	
 	"    -g can only be used for one input file.\n"
@@ -513,24 +547,27 @@ int main (int argc, char *argv[])
 {
 	char *iname[MAX_INPUTFILES],*oname, *preamble, buf[BUF_LEN], obuf[50];
 	char *fmt, *enc, *title, titles[BUF_LEN], xtitle[50], *labels[MAX_INPUTFILES];
-	char *ofnames[MAX_INPUTFILES], *trigname;
+	char *ofnames[MAX_INPUTFILES], *trigname, *cursorfile;
 	int id, od, ret=1, c, data, idx;
 	int sgn,gnuplot, datapoint, multiplot, max_yrange_plus, max_yrange_minus;
-	double yoff, ymult, xincr, trigger, xtrig, ytrig;
+	double yoff, ymult, xincr, trigger, xtrig, ytrig, yoff_max;
 	struct extended ext;
 	int trig;
 	
-	trigname=iname[0]=oname=NULL;
+	cursorfile=trigname=iname[0]=oname=NULL;
 	multiplot=gnuplot=0;
 	ext.smoothing=0;
 	ext.terminal=TERM_X;
 	ext.line_color="x00ff00";
 	idx=0;
-	while( -1 != (c = getopt(argc, argv, "c:gi:ml:o:s:t:")) ) {
+	while( -1 != (c = getopt(argc, argv, "c:d:gi:ml:o:s:t:")) ) {
 		switch(c){
 			case 'c':
 				trigname=strdup(optarg);
 				break;
+			case 'd':
+				cursorfile=strdup(optarg);
+				break;			
 			case 'g':
 				gnuplot=1;
 				break;
@@ -582,6 +619,27 @@ int main (int argc, char *argv[])
 		usage();
 		return 1;
 	}
+	/*find our max offset*/
+	yoff_max=0;
+	for (c=0; c<idx;++c){
+		if(1>(id=open(iname[c],O_RDONLY)) ){
+			printf("Unable to open %s\n",iname[c]);
+			goto closeod;
+		}
+		if(NULL == (preamble=load_preamble(id, &data))){
+			printf("Unable to load preamble for file %s\n",iname[c]);
+			goto closeid;
+		}
+		yoff=get_value("YOFF", preamble);
+		ymult=get_value("YMULT",preamble);
+		title=get_string("WFID",preamble);
+		break_extended(title,&ext);
+		yoff=yoff*ymult*ext.vert_mult;
+		if(yoff_max > yoff)
+			yoff_max=yoff;
+		close (id);
+	}
+
 	/**set the output script name  */
 	write_script_file(NULL, oname, NULL, NULL,WR_SETFILENAME);
 	
@@ -630,7 +688,7 @@ int main (int argc, char *argv[])
 			goto closeid;
 		}
 		/**PT.OFF  */
-		yoff=get_value("YOFF", preamble);
+		yoff=yoff_max;
 		ymult=get_value("YMULT",preamble);
 		xincr=get_value("XINCR", preamble);
 		fmt=get_string("BN.FMT",preamble);
@@ -675,6 +733,9 @@ int main (int argc, char *argv[])
 			ext.yrange_minus+=1000;
 		if(ext.yrange_plus%1000)
 			ext.yrange_plus+=1000;
+		/**now add a volt  
+		ext.yrange_plus+=1000;
+		ext.yrange_minus+=1000;*/
 		if(max_yrange_plus <ext.yrange_plus)
 			max_yrange_plus =ext.yrange_plus;
 				if(max_yrange_minus <ext.yrange_minus)
@@ -697,7 +758,7 @@ int main (int argc, char *argv[])
 			ext.y=strtof(buf, NULL);
 			if(0 == sgn)
 				ext.y=ext.y-128;
-			ext.y=(ext.y - yoff)*ymult*ext.vert_mult;
+			ext.y=(ext.y*ymult*ext.vert_mult) - yoff;
 			if(gnuplot)	/**write data  */
 				write_script_file(&ext, NULL, NULL, NULL,WR_DATA); 
 			else {
@@ -737,6 +798,32 @@ int main (int argc, char *argv[])
 		/**write the trigger.  */
 		write_script_file(&ext,NULL,NULL,0,WR_TRIGGER);	
 	}
+	if(NULL != cursorfile){
+		double max,min,diff,center;
+		char *func;
+		if(1>(id=open(cursorfile,O_RDONLY)) ){
+			printf("Unable to open %s\n",cursorfile);
+			goto closeod;
+		}
+		read(id,buf,BUF_LEN-1);
+		func=get_string("CURSOR",buf);
+		max=(get_value("MAX",buf)*1000)+(-1*yoff_max);
+		min=(get_value("MIN",buf)*1000)+(-1*yoff_max);
+		diff=get_value("DIFF",buf);
+		printf("Buf=%s\noff %F max %F,min %F,diff %F\n",buf,yoff_max,max,min,diff);
+		center=((max-min)/2)+min;
+		ext.y=center;
+		ext.x=-4;
+		diff*=1000;
+		sprintf(buf,"%dmv",(int)round(diff));
+		ext.src=buf;
+		write_script_file(&ext,NULL,NULL,0,WR_CURSORS);	
+		/**now draw the cursors  */
+		write_cursor(&ext,0,max);
+		write_cursor(&ext,ext.xrange,max);
+		write_cursor(&ext,ext.xrange,min);
+		write_cursor(&ext,0,min);
+	}
 	/**close output file  */
 	write_script_file(NULL,NULL,NULL,0,WR_CLOSE);
 closeid:
@@ -775,13 +862,19 @@ WAV?
 ++read
 
 Todo:
-Add section to write the script file for a mulitplot. Need to add the second
-section.
-This will be a loop that iterates through the output filenames, which will need to
-be stored in an array.
+fix gnuplog segfault.
 
-Get trigger channel. use option to set trigger file.
-See notes on reading the trigger point.
+Add cursor input from get_tek_waveform:
+	Add 
+	set label 2 '545mV' at -4,2525 front
+	right after placing trigger.
+	Then add this line (based on yoff from data).:
+'-' title "" ls 4 with lines
+0 2810
+41 2810
+0 2810 
+0 2265
+41 2265
   
   */
 
