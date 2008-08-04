@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.4  2008/08/03 23:31:39  dfs
+Changed format of cursors file to match waveform preable
+
 Revision 1.3  2008/08/03 22:21:40  dfs
 Added trigger to cursors info
 
@@ -364,6 +367,14 @@ SE,REFVOLTS:UNITS:V,REFVOLTS:VALUE:1.0000,REFSLOPE:XUNIT:SEC,REFSLOPE:YUNIT:V,RE
 FSLOPE:VALUE:1.0000,REFTIME:UNITS:SEC,REFTIME:VALUE:1.0000,XPOS:ONE:3.00,XPOS:TW
 O:-3.00,YPOS:ONE:2.47,YPOS:TWO:1.38,TPOS:ONE:1.24000E+2,TPOS:TWO:1.95500E+2,MODE
 :DELTA,SELECT:TWO
+
+TIME:
+CURSOR FUNCTION:TIME,TARGET:CH1,UNITS:TIME:BASE,UNITS:SLOPE:BASE,UNITS:VOLTS:BAS
+E,REFVOLTS:UNITS:V,REFVOLTS:VALUE:1.0000,REFSLOPE:XUNIT:SEC,REFSLOPE:YUNIT:V,REF
+SLOPE:VALUE:1.0000,REFTIME:UNITS:SEC,REFTIME:VALUE:1.0000,XPOS:ONE:3.00,XPOS:TWO
+:-3.00,YPOS:ONE:2.39,YPOS:TWO:1.03,TPOS:ONE:2.56500E+2,TPOS:TWO:2.93000E+2,MODE:
+DELTA,SELECT:TWO
+
 Then look for function (VOLTS or?) target (CH1)
 Send the command to read target: 
 ch1?
@@ -378,44 +389,69 @@ ATRIGGER MODE:SGLSEQ,SOURCE:CH1,COUPLING:DC,LOGSRC:OFF,LEVEL:2.04,SLOPE:PLUS,POS
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
+#define FUNC_VOLT 1
+#define FUNC_TIME 2
 int read_cursors(struct serial_port *p,int fd)
 {
 	char *t,lbuf[100], *function, *trigsrc;
-	float one,two,volts, diff;
-	int i;
+	float one,two,volts, diff,xinc;
+	int i, f;
 	
 	printf("Reading Cursor\n");
 	write_string(p,"CURSOR?\r",0);
 	read_string(p,buf,BUF_SIZE);
-	t=get_string("TARGET",buf);
-	printf("Target=%s\n",t);
-	one=get_value("YPOS:ONE",buf);
-	two=get_value("YPOS:TWO",buf);
-	printf("Target=%s, one=%E, two=%E\n",t,one,two);
-	function=get_string("FUNCTION",buf);
 	
-	/*find out trigger channel*/
-	i=sprintf(lbuf,"ATRIGGER?\r");
-	write_string(p,lbuf,i);
-	read_string(p,buf,BUF_SIZE);
-	trigsrc=get_string("SOURCE",buf);
-	/**get channel for cursor ref  */
-  i=sprintf(lbuf,"%s?\r",t);
-	write_string(p,lbuf,i);
-	read_string(p,buf,BUF_SIZE);
-	volts=get_value(function,buf);
-	diff=one-two;
+	function=get_string("FUNCTION",buf);
+	if(!strcmp(function,"VOLTS") ){
+		
+		f=FUNC_VOLT;
+		one=get_value("YPOS:ONE",buf);
+		two=get_value("YPOS:TWO",buf);	
+		t=get_string("TARGET",buf); /**reference to  */
+		
+		/**get channel for cursor ref  */
+	  i=sprintf(lbuf,"%s?\r",t);
+		write_string(p,lbuf,i);
+		read_string(p,buf,BUF_SIZE);
+		/**get the volts/div  */
+		volts=get_value(function,buf);
+		one *=volts;
+		two *=volts;		
+		diff=one-two;
+	}else if( !strcmp(function,"TIME")){
+		f=FUNC_TIME;
+		one=get_value("TPOS:ONE",buf);
+		two=get_value("TPOS:TWO",buf);
+		i=sprintf(lbuf,"WFM?\r");
+		write_string(p,lbuf,i);
+		read_string(p,buf,BUF_SIZE);
+		xinc=get_value("XINCR",buf);
+		one*=xinc;
+		two*=xinc;
+		diff=one-two;
+	}else{
+		printf("Don't know how to handle cursor function '%s' in\n%s\n",function, buf);
+		diff=one=two=1;
+	}
+	
 	if(diff <0){
 		diff *=-1;
 		i=1; /**swap one-two  */
 	}else
 		i=0;
-		
-	diff*=volts;
-	one *=volts;
-	two *=volts;
-	printf("volts=%E, diff=%E\n",volts,diff);
-	i=sprintf(buf,"CURSOR:%s,MAX:%F,MIN:%F,DIFF:%F\nTRIGGER:%s\n",function,i?two:one,i?one:two,diff,trigsrc);
+	
+	/*find out trigger channel*/
+		i=sprintf(lbuf,"ATRIGGER?\r");
+		write_string(p,lbuf,i);
+		read_string(p,buf,BUF_SIZE);
+		trigsrc=get_string("SOURCE",buf);
+	
+	if(FUNC_VOLT ==f)
+		printf("volts");
+	else if(FUNC_TIME == f)
+		printf("time");
+	printf("=%E, diff=%E\n",volts,diff);
+	i=sprintf(buf,"CURSOR:%s,MAX:%E,MIN:%E,DIFF:%E\nTRIGGER:%s\n",function,i?two:one,i?one:two,diff,trigsrc);
 	/*write(fd,buf,i); written out by loop*/
 	
 	return i;
