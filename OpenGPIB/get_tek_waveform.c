@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.5  2008/08/04 09:46:39  dfs
+Added handling of time cursors
+
 Revision 1.4  2008/08/03 23:31:39  dfs
 Changed format of cursors file to match waveform preable
 
@@ -25,6 +28,8 @@ Initial working rev
 #include "serial.h"
 #include "common.h"
 #include <time.h>
+#include <ctype.h>
+
 
 #define MAX_CHANNELS 7
 #define CURSORS      6 /**offset into CH_LIST where cursors keyword is */
@@ -55,13 +60,13 @@ struct gpib_handle *open_gpib(struct gpib_port *port)
 
 char *CH_LIST[MAX_CHANNELS]=\
 {
-	"CH1",
-	"CH2",
-	"REF1",
-	"REF2",
-	"REF3",
-	"REF4",
-	"CURSORS",
+	"ch1",
+	"ch2",
+	"ref1",
+	"ref2",
+	"ref3",
+	"ref4",
+	"cursors",
 };
 /***************************************************************************/
 /** .
@@ -317,8 +322,12 @@ int init_prologix(struct serial_port *p, int inst_addr)
 int set_channel(struct serial_port *p,char *ch)
 {
 	int i;
+	char *c;
 	if(NULL == ch)
 		return -1;
+	c=strdup(ch);
+	for (i=0;0 != c[i];++i)
+		c[i]=toupper(c[i]);
 	i=sprintf(buf,"DATA SOURCE:%s\r",ch);
 	return write_string(p,buf,i);	
 }
@@ -386,11 +395,16 @@ This example gives you 545 mV.
 
 ATRIGGER data:
 ATRIGGER MODE:SGLSEQ,SOURCE:CH1,COUPLING:DC,LOGSRC:OFF,LEVEL:2.04,SLOPE:PLUS,POSITION:8,HOLDOFF:0,ABSELECT:A
+Todo:
+	Handle 'V.T'
+	Handle 'SLOPE'
+	Handle 'ONE/TIME'
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
 #define FUNC_VOLT 1
 #define FUNC_TIME 2
+#define FUNC_FREQ 3
 int read_cursors(struct serial_port *p,int fd)
 {
 	char *t,lbuf[100], *function, *trigsrc;
@@ -402,8 +416,11 @@ int read_cursors(struct serial_port *p,int fd)
 	read_string(p,buf,BUF_SIZE);
 	
 	function=get_string("FUNCTION",buf);
-	if(!strcmp(function,"VOLTS") ){
-		
+	if( !strcmp(function,"TIME"))
+		f=FUNC_TIME;
+	else if (!strcmp(function,"ONE/TIME") )
+		f=FUNC_FREQ;
+	else if(!strcmp(function,"VOLTS") ){
 		f=FUNC_VOLT;
 		one=get_value("YPOS:ONE",buf);
 		two=get_value("YPOS:TWO",buf);	
@@ -418,8 +435,12 @@ int read_cursors(struct serial_port *p,int fd)
 		one *=volts;
 		two *=volts;		
 		diff=one-two;
-	}else if( !strcmp(function,"TIME")){
-		f=FUNC_TIME;
+	}else{
+		printf("Don't know how to handle cursor function '%s' in\n%s\n",function, buf);
+		diff=one=two=1;
+		return 0;
+	}
+	if(FUNC_TIME ==f || FUNC_FREQ == f){
 		one=get_value("TPOS:ONE",buf);
 		two=get_value("TPOS:TWO",buf);
 		i=sprintf(lbuf,"WFM?\r");
@@ -429,11 +450,12 @@ int read_cursors(struct serial_port *p,int fd)
 		one*=xinc;
 		two*=xinc;
 		diff=one-two;
-	}else{
-		printf("Don't know how to handle cursor function '%s' in\n%s\n",function, buf);
-		diff=one=two=1;
+		if(f == FUNC_FREQ){
+			one=one;
+			two=two;
+			diff=1/diff;
+		}
 	}
-	
 	if(diff <0){
 		diff *=-1;
 		i=1; /**swap one-two  */
@@ -466,7 +488,7 @@ void usage(void)
 {
 	printf("get_tek_waveform <options>\n"
 	" -a addr set instrument address to addr (2)\n"
-	" -c n Use channel n for data (CH1). CH1, CH2, REF1-4, and CURSORS\n"
+	" -c n Use channel n for data (ch1). ch1, ch2, ref1-4, and cursors\n"
 	"    The -c option can be used multiple times. In this case, the fname\n"
 	"    is a base name, and the filename will have a .1 or .2, etc appended\n"
 	" -o fname put output to file called fname\n"
@@ -488,7 +510,7 @@ int main(int argc, char * argv[])
 	int i, c,inst_addr, rtn, ofd, ch_idx;
 	name="/dev/ttyUSB0";
 	inst_addr=2;
-	channel[0]="CH1";
+	channel[0]="ch1";
 	for (c=1;c<MAX_CHANNELS;++c){
 		channel[c] = NULL;
 	}
