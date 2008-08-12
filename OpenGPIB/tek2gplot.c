@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.7  2008/08/03 23:31:59  dfs
+Added cursor plotting
+
 Revision 1.6  2008/08/03 22:22:07  dfs
 Added multiple plots, but gnuplot segfaults
 
@@ -46,14 +49,22 @@ Initial Creation
 #define TERM_PNG 	2
 #define TERM_DUMB 3
 
-#define BUF_LEN 1024
+#define FUNCTION_NONE 0
+#define FUNCTION_DIFF 1
+#define FUNCTION_
+
+#define BUF_LEN 		1024
+#define MAX_POINTS 	2048
 
 #define WR_SINGLE_PLOT 0
+#define WR_MULTI_PLOT  2
 #define WR_CLOSE			 -1
 #define WR_TRIGGER     -2
 #define WR_DATA				 -3
 #define WR_SETFILENAME -4
 #define WR_CURSORS     -5
+
+
 
 struct extended {
 	char *src;
@@ -75,7 +86,15 @@ struct extended {
 	int terminal;
 	int smoothing;
 };
-
+struct _data_point {
+	double x;
+	double y;
+};
+struct data_point {
+	struct _data_point data[MAX_POINTS];
+	int idx;
+};
+struct data_point data_pt[MAX_INPUTFILES];
 enum {
 	_SRC,
 	_COUPLE,
@@ -330,7 +349,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		return 0;
 	}
 
-	if(plotno <2 ){
+	if(plotno <WR_MULTI_PLOT ){
 		c=sprintf(buf,"set xlabel \"%s\"\n",ext->time_units);
 		write(od,buf,c);
 		c=sprintf(buf,"set lmargin 10\n");
@@ -433,7 +452,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		write(od,buf,c);
 		c=sprintf(buf,"																					                 ");
 		write(od,buf,c);
-		c=sprintf(buf,"																					                 ");
+		c=sprintf(buf,"																					                 \n");
 		write(od,buf,c);
 		
 		if(ext->smoothing){
@@ -483,11 +502,12 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.7 $\n"
+	printf("tek2gplot: $Revision: 1.8 $\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
 	"    if this is not set, the first file is assumed to have the trigger\n"
 	" -d cursorname Show the cursor info from the cursors file\n"
+	" -f function Add another plot with the following functions: diff\n"
 	" -h This display\n"
 	" -g generate a gnuplot script file with data (default just data).\n"	
 	"    -g can only be used for one input file.\n"
@@ -534,8 +554,32 @@ void strip_quotes(char *n)
 		printf("Didn't find full quotes in '%s'\n",n);
 	}
 		
-		
 }
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int save_data_point(int idx, double x, double y)
+{
+	int i;
+	if( -1 == idx){
+		for (i=0; i<MAX_INPUTFILES;++i)
+			data_pt[i].idx=0;
+		return 0;
+	}
+	if(idx>= MAX_INPUTFILES)	{
+		return -1;
+	}
+	if(data_pt[idx].idx>=MAX_POINTS)
+		return -1;
+	data_pt[idx].data[data_pt[idx].idx].x=x;
+	data_pt[idx].data[data_pt[idx].idx].y=y;
+	++data_pt[idx].idx;
+	return 0;
+}
+
 /***************************************************************************/
 /** When gnuplot is specified, there is just one file, the script file, so
 write_script_file is used for all writing.
@@ -547,20 +591,21 @@ int main (int argc, char *argv[])
 {
 	char *iname[MAX_INPUTFILES],*oname, *preamble, buf[BUF_LEN], obuf[50];
 	char *fmt, *enc, *title, titles[BUF_LEN], xtitle[50], *labels[MAX_INPUTFILES];
-	char *ofnames[MAX_INPUTFILES], *trigname, *cursorfile;
-	int id, od, ret=1, c, data, idx;
+	char *ofnames[MAX_INPUTFILES], *trigname, *cursorfile, *function;
+	int id, od, ret=1, c, data, idx, func;
 	int sgn,gnuplot, datapoint, multiplot, max_yrange_plus, max_yrange_minus;
 	double yoff, ymult, xincr, trigger, xtrig, ytrig, yoff_max;
 	struct extended ext;
 	int trig;
 	
-	cursorfile=trigname=iname[0]=oname=NULL;
+	function=cursorfile=trigname=iname[0]=oname=NULL;
 	multiplot=gnuplot=0;
 	ext.smoothing=0;
 	ext.terminal=TERM_X;
 	ext.line_color="x00ff00";
 	idx=0;
-	while( -1 != (c = getopt(argc, argv, "c:d:gi:ml:o:s:t:")) ) {
+	func=0;
+	while( -1 != (c = getopt(argc, argv, "c:d:f:gi:ml:o:s:t:")) ) {
 		switch(c){
 			case 'c':
 				trigname=strdup(optarg);
@@ -568,6 +613,15 @@ int main (int argc, char *argv[])
 			case 'd':
 				cursorfile=strdup(optarg);
 				break;			
+			case 'f':
+				function=strdup(optarg);
+				if(!strcmp("diff",optarg))
+					func=FUNCTION_DIFF;
+				else{
+					printf("Unknown function '%s'\n",optarg);
+					return 1;
+				}
+				break;
 			case 'g':
 				gnuplot=1;
 				break;
@@ -619,6 +673,8 @@ int main (int argc, char *argv[])
 		usage();
 		return 1;
 	}
+	/**init our data arrays  */
+	save_data_point(-1,0,0);
 	/*find our max offset*/
 	yoff_max=0;
 	for (c=0; c<idx;++c){
@@ -766,6 +822,9 @@ int main (int argc, char *argv[])
 				i=sprintf(obuf,"%E %E\n",ext.time_mult*ext.x,ext.y);
 				write(od,obuf,i);	
 			}
+			if(FUNCTION_NONE != func){
+				save_data_point(c,ext.time_mult*ext.x,ext.y);
+			}
 			ext.x+=xincr;
 			/**we are on trigger channel, plot it, save it  */
 			if(trigfile &&datapoint==trig){
@@ -798,6 +857,41 @@ int main (int argc, char *argv[])
 		/**write the trigger.  */
 		write_script_file(&ext,NULL,NULL,0,WR_TRIGGER);	
 	}
+	/**Handle functions here, before end of script file  */
+	
+	if(FUNCTION_NONE != func){
+		/**FIX me! We are assuming the first two data files   */
+		char *fn;
+		int i;
+		if(idx<2){
+			printf("Have to have two files to use func %d\n",func);
+			goto closeid;
+		}
+		if(NULL == (fn=malloc(strlen(function)+strlen(oname)+10)) ){
+			printf("Out of memory for %s&on\n",function);
+			goto end;
+		}
+		sprintf(fn,"%s.%s",oname,function);
+		if(1>(od=open(fn,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
+			printf("Unable to open %s\n",fn);
+			goto end;
+		}				
+		printf("Writing %s\n",fn);
+		sprintf(ext.src,"%s",function);
+		write_script_file(&ext,fn,NULL,NULL,WR_MULTI_PLOT);
+		switch(func){
+			case FUNCTION_DIFF:
+				for (c=0; c< MAX_POINTS && c<data_pt[0].idx && c<data_pt[1].idx;++c){
+					double diff;
+					diff=data_pt[0].data[c].y-data_pt[1].data[c].y;
+					save_data_point(idx,data_pt[0].data[c].x,diff);
+					i=sprintf(buf,"%E %E\n",data_pt[0].data[c].x,diff);
+					write(od,buf,i);
+				}
+				break;
+		}
+	}	
+	
 	if(NULL != cursorfile){
 		double max,min,diff,center;
 		char *func;
@@ -826,6 +920,7 @@ int main (int argc, char *argv[])
 	}
 	/**close output file  */
 	write_script_file(NULL,NULL,NULL,0,WR_CLOSE);
+
 closeid:
 	if(id>2)
 		close(id);
