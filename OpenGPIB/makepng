@@ -10,7 +10,7 @@
 
 usage () {
 
-	echo "Usage for \$Revision: 1.1 $:"
+	echo "Usage for \$Revision: 1.2 $:"
 	echo "makepng -b basename <options>"
 	echo " -b bn bn is the base filename. Input files should be bn.ch1 bn.ch2, etc"
 	echo " -c process cursors file basename.cursors"
@@ -36,6 +36,7 @@ while  getopts b:cf: opt ; do
        ;;
   esac
 done
+OUTF="$BN"
 if [ "" != "$BN" ]; then
 	BN="$BN."
 fi
@@ -46,6 +47,10 @@ fi
 if [ "" != "$CURSORS" ]; then
 	CURSORS="-d $BN""cursors"
 fi
+
+if [ -e $OUTF ] ; then
+	OUTF="$OUTF.__"
+fi
 DIR=$(dirname $0)
-$DIR/tek2gplot -m -o plt -i "$BN"ch1 -i "$BN"ch2 $CURSORS $FUNC -t png  
-gnuplot plt.plot > plt.png
+$DIR/tek2gplot -m -o $OUTF -i "$BN"ch1 -i "$BN"ch2 $CURSORS $FUNC -t png  
+gnuplot $OUTF.plot > $OUTF.png
