@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.6  2008/08/12 23:03:04  dfs
+Added time/period cursors, changed to lower case
+
 Revision 1.5  2008/08/04 09:46:39  dfs
 Added handling of time cursors
 
@@ -493,7 +496,6 @@ void usage(void)
 	"    is a base name, and the filename will have a .1 or .2, etc appended\n"
 	" -o fname put output to file called fname\n"
 	" -p path set path to serial port name\n"
-	" -r read cursors and place in ofname.cursor\n"
 	
 	"");
 }
