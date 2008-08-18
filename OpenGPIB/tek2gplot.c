@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.8  2008/08/12 23:04:00  dfs
+Added diff function
+
 Revision 1.7  2008/08/03 23:31:59  dfs
 Added cursor plotting
 
@@ -72,7 +75,7 @@ struct extended {
 	int vert_div;
 	char *vert_units;
 	double vert_mult;
-	int time_div;
+	double time_div;
 	char *time_units;
 	char *line_color;
 	double time_mult;
@@ -212,6 +215,23 @@ int get_next_value (int fd, char *dst)
 /***************************************************************************/
 /** .
 \n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+double get_multiplier (char *s)
+{
+	if(!strcmp(s,"ms"))
+			return 1000;
+	else if(!strcmp(s,"us"))
+			return 1000000;
+	else if(!strcmp(s,"ns"))
+			return 1000000000;					
+	else if(!strcmp(s,"ps"))
+			return 1000000000000;
+	return 1;					
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
 \n\b Returns:   CH1 DC   5mV 500ms NORMAL"
 ****************************************************************************/
 int break_extended(char *data, struct extended *x)
@@ -253,22 +273,13 @@ int break_extended(char *data, struct extended *x)
 					++state;
 					break;
 				case _HORIZ:
-					x->time_div=strtol(buf,NULL,10);
+					x->time_div=strtof(buf,NULL);
 					for (k=0;buf[k];++k){
 						if(buf[k] >'9' || buf[k] < '0')
 							break;
 					}
 					x->time_units=strdup(&buf[k]);
-					if(!strcmp(x->time_units,"ms"))
-							x->time_mult=1000;
-					else if(!strcmp(x->time_units,"us"))
-							x->time_mult=1000000;
-					else if(!strcmp(x->time_units,"ns"))
-							x->time_mult=1000000000;					
-					else if(!strcmp(x->time_units,"ps"))
-							x->time_mult=1000000000000;
-					else 
-						x->time_mult=1;					
+					x->time_mult=get_multiplier(x->time_units);
 					/*printf("time:%d%s %E\n",x->time_div,x->time_units,x->time_mult); */
 					++state;
 					break;
@@ -335,7 +346,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		lseek(od,o,SEEK_SET);
 		return 0;
 	}
-	if(WR_CURSORS == plotno){/**write trigger  */
+	if(WR_CURSORS == plotno){/**write cursors  */
 		off_t o;
 		o=lseek(od,0,SEEK_CUR);
 		lseek(od,offset,SEEK_SET);
@@ -360,7 +371,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		write(od,buf,c);
 		c=sprintf(buf,"set xrange[0:%d]\n",ext->xrange);
 		write(od,buf,c);
-		c=sprintf(buf,"set xtics 0,%d\n",(int)round(ext->time_div));
+		c=sprintf(buf,"set xtics 0,%f\n",ext->time_div);
 		write(od,buf,c);
 		c=sprintf(buf,"set title %s\n",title);
 		write(od,buf,c);
@@ -446,7 +457,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		c=sprintf(buf,"set label 1 'T' at ");
 		write(od,buf,c);
 		offset=lseek(od,0,SEEK_CUR);
-		printf("offset at %d\n",offset);
+		/*printf("offset at %d\n",offset); */
 		/**save space for rest of line.. and possible cursor title */
 		c=sprintf(buf,"																					                  ");
 		write(od,buf,c);
@@ -502,7 +513,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.8 $\n"
+	printf("tek2gplot: $Revision: 1.9 $\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
 	"    if this is not set, the first file is assumed to have the trigger\n"
@@ -594,10 +605,10 @@ int main (int argc, char *argv[])
 	char *ofnames[MAX_INPUTFILES], *trigname, *cursorfile, *function;
 	int id, od, ret=1, c, data, idx, func;
 	int sgn,gnuplot, datapoint, multiplot, max_yrange_plus, max_yrange_minus;
-	double yoff, ymult, xincr, trigger, xtrig, ytrig, yoff_max;
+	double yoff, ymult, xincr, trigger, xtrig, ytrig, yoff_max, _xincr;
 	struct extended ext;
 	int trig;
-	
+	_xincr=0;
 	function=cursorfile=trigname=iname[0]=oname=NULL;
 	multiplot=gnuplot=0;
 	ext.smoothing=0;
@@ -701,7 +712,7 @@ int main (int argc, char *argv[])
 	
 	xtitle[0]=titles[0]=0;
 	max_yrange_minus=max_yrange_plus=0;
-	printf("idx=%d\n",idx);
+	/*printf("idx=%d\n",idx); */
 	for (c=0; c<idx;++c){
 		char *in,*bn;/**output name, input name, and base name of inputname  */
 		int i, trigfile;
@@ -752,11 +763,7 @@ int main (int argc, char *argv[])
 		trigger=get_value("PT.OFF",preamble);
 		title=get_string("WFID",preamble);
 		strip_quotes(title);
-		i=strlen(titles);
-		if(0 ==i)
-			sprintf(&titles[i],"%s",title);
-		else 
-			sprintf(&titles[i],"\\n%s",title);
+
 		if(!strcmp("RI",fmt))
 			sgn=1;
 		else if(!strcmp("RP",fmt))
@@ -771,12 +778,69 @@ int main (int argc, char *argv[])
 			goto closeid;
 		}
 		
-		printf("off=%E mult=%E inc=%E\n",yoff,ymult,xincr);
+		/*printf("off=%E mult=%E inc=%E\n",yoff,ymult,xincr); */
 		break_extended(title,&ext);
+		if(0 == _xincr){
+			_xincr=xincr;
+		}
+		
+		/**change range if over 3 digits  */
+		i=strlen(title);
+		if(ext.time_div >100){
+			int x,s,j;
+			char b[12];
+			/*printf("mult=%f Timeb=%.2f ",ext.time_mult,ext.time_div); */
+			ext.time_mult=ext.time_mult/1000;
+			x=round(ext.time_mult);
+			switch(x){
+				case 1: strcpy(ext.time_units,"s"); break;
+   			case 1000: strcpy(ext.time_units,"ms"); break;
+   			case 1000000: strcpy(ext.time_units,"us"); break;				
+   			case 1000000000: strcpy(ext.time_units,"ns"); break;
+   			default: printf("Don'k know how to handle %f multiplier\n",ext.time_mult); return 1;
+			}
+			
+			ext.time_div=ext.time_div/1000;
+			/*printf("TimeA=%.2f Title='%s'\n",ext.time_div,title); */
+			
+			for (s=x=0; x<i && s<3;++x){
+				if(' ' == title[x])
+					++s;
+			}
+			s=x;/**first char we can write  */
+			while(title[x] && ' ' != title[x])
+				++x;
+			/*printf("s=%d, x=%d, new units=%s\n",s,x,ext.time_units); */
+			/**FIXME add check here for size so we don't overwrite existing string.  */
+			j=sprintf(b,"%2g%s",ext.time_div,ext.time_units);
+			if(j>x-s){ /**realloc the string  */
+				char *p;
+				j+=i+5;
+				if(NULL ==(p=malloc(j)) ){
+					printf("OUt of mem on alloc of %d\n",j);
+					return 1;
+				}
+				title[s]=0;
+				sprintf(p,"%s %s %s",title,b,&title[x]);
+				free (title);
+				title=p;
+			}	else {/**it fits, just use old string  */
+				for (i=0;b[i] && s<x;++i,++s)
+					title[s]=b[i];	
+			}
+			
+			/*sprintf(&title[s],"%.2f%s",ext.time_div,ext.time_units); */
+		}
+		i=strlen(titles);
+		if(0 ==i)
+			sprintf(&titles[i],"%s",title);
+		else 
+			sprintf(&titles[i],"\\n%s",title);
+		/*printf("Total time = %f %f points per division, time_div %f time_mult %f\n",xincr*1024,round((ext.time_div/(ext.time_mult))/xincr),ext.time_div,ext.time_mult); */
 		i=strlen(xtitle);
 		sprintf(&xtitle[i],"%s ",ext.src);
 		labels[c]=strdup(ext.src);
-		printf("Total time = %f %f points per division\n",xincr*1024,round((ext.time_div/(ext.time_mult))/xincr));
+		
 		/*yrange=( ((int)round(ext.vert_div*8))+yoff<0?(int)(yoff*-1):(int)yoff)>>1; */
 		ext.yrange_plus=ext.yrange_minus=((int)round(ext.vert_div*8))>>1;
 		if(yoff >=0)
@@ -796,11 +860,11 @@ int main (int argc, char *argv[])
 			max_yrange_plus =ext.yrange_plus;
 				if(max_yrange_minus <ext.yrange_minus)
 			max_yrange_minus =ext.yrange_minus;
-		printf("yrange=[-%d:%d] in %s ",ext.yrange_minus,ext.yrange_plus,ext.vert_units);
+		/*printf("yrange=[-%d:%d] in %s ",ext.yrange_minus,ext.yrange_plus,ext.vert_units); */
 		ext.xrange=(int)round(xincr*1024*ext.time_mult);
 		trig=(int)round(trigger);
-		printf("Xrange=[0:%d] in %s\n",ext.xrange,ext.time_units);
-		printf("set xtics 0,%d\n",(int)round(ext.time_div));
+		/*printf("Xrange=[0:%d] in %s\n",ext.xrange,ext.time_units); */
+		/*printf("set xtics 0,%f\n",ext.time_div); */
 		ext.x=0;
 		if(gnuplot){
 			if(-1 ==write_script_file(&ext, "-", titles, xtitle,WR_SINGLE_PLOT)) {
@@ -808,6 +872,7 @@ int main (int argc, char *argv[])
 				goto end;
 			}
 		}
+		buf[0]=1;
 		for (datapoint=0; datapoint<1024 && buf[0];++datapoint) {
 			if(1> get_next_value(id,buf))	
 				break;
@@ -901,22 +966,47 @@ int main (int argc, char *argv[])
 		}
 		read(id,buf,BUF_LEN-1);
 		func=get_string("CURSOR",buf);
-		max=(get_value("MAX",buf)*1000)+(-1*yoff_max);
-		min=(get_value("MIN",buf)*1000)+(-1*yoff_max);
+		max=get_value("MAX",buf);
+		min=get_value("MIN",buf);
 		diff=get_value("DIFF",buf);
-		printf("Buf=%s\noff %F max %F,min %F,diff %F\n",buf,yoff_max,max,min,diff);
-		center=((max-min)/2)+min;
-		ext.y=center;
-		ext.x=-4;
-		diff*=1000;
-		sprintf(buf,"%dmv",(int)round(diff));
-		ext.src=buf;
-		write_script_file(&ext,NULL,NULL,0,WR_CURSORS);	
-		/**now draw the cursors  */
-		write_cursor(&ext,0,max);
-		write_cursor(&ext,ext.xrange,max);
-		write_cursor(&ext,ext.xrange,min);
-		write_cursor(&ext,0,min);
+		/*printf("Buf=%s\noff %F max %F,min %F,diff %F\n",buf,yoff_max,max,min,diff); */
+		
+		if(!strcmp(func,"VOLTS")){
+			max=(max*ext.vert_mult)+(-1*yoff_max);
+			min=(min*ext.vert_mult)+(-1*yoff_max);
+			center=((max-min)/2)+min;
+			ext.y=center;
+			ext.x=-4;
+			diff*=ext.vert_mult;
+			sprintf(buf,"%d%s",(int)round(diff),ext.vert_units);
+			ext.src=buf;
+			write_script_file(&ext,NULL,NULL,0,WR_CURSORS);	
+			/**now draw the cursors  */
+			write_cursor(&ext,0,max);
+			write_cursor(&ext,ext.xrange,max);
+			write_cursor(&ext,ext.xrange,min);
+			write_cursor(&ext,0,min);			
+		}	else if(!strcmp(func,"TIME")){
+			double len;
+			len=(max_yrange_plus+max_yrange_minus)/50;
+			ext.x=min*get_multiplier(ext.time_units);;
+			ext.y=(max_yrange_plus+len);
+			/*printf("diff=%f\n",diff); */
+			diff *=get_multiplier(ext.time_units);
+			/*diff*=1000; */
+			sprintf(buf,"%.3f%s",diff,ext.time_units);
+			ext.src=buf;
+			write_script_file(&ext,NULL,NULL,0,WR_CURSORS);	
+			/**now draw the cursors  */   
+			len*=2;
+			write_cursor(&ext,max,max_yrange_plus-len);
+			write_cursor(&ext,max,max_yrange_plus);
+			write_cursor(&ext,min,max_yrange_plus);
+			write_cursor(&ext,min,max_yrange_plus-len); /**-max_yrange_minus  */
+		}else{
+			printf("Don't know how to handle cursor function '%s'\n",func);
+		}
+		
 	}
 	/**close output file  */
 	write_script_file(NULL,NULL,NULL,0,WR_CLOSE);
