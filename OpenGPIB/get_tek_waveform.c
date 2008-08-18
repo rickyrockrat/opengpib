@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.7  2008/08/17 04:55:43  dfs
+Removed invalid -r line in usage
+
 Revision 1.6  2008/08/12 23:03:04  dfs
 Added time/period cursors, changed to lower case
 
@@ -411,7 +414,7 @@ Todo:
 int read_cursors(struct serial_port *p,int fd)
 {
 	char *t,lbuf[100], *function, *trigsrc;
-	float one,two,volts, diff,xinc;
+	float min,max,volts, diff,xinc;
 	int i, f;
 	
 	printf("Reading Cursor\n");
@@ -425,8 +428,8 @@ int read_cursors(struct serial_port *p,int fd)
 		f=FUNC_FREQ;
 	else if(!strcmp(function,"VOLTS") ){
 		f=FUNC_VOLT;
-		one=get_value("YPOS:ONE",buf);
-		two=get_value("YPOS:TWO",buf);	
+		min=get_value("YPOS:ONE",buf);
+		max=get_value("YPOS:TWO",buf);	
 		t=get_string("TARGET",buf); /**reference to  */
 		
 		/**get channel for cursor ref  */
@@ -435,35 +438,32 @@ int read_cursors(struct serial_port *p,int fd)
 		read_string(p,buf,BUF_SIZE);
 		/**get the volts/div  */
 		volts=get_value(function,buf);
-		one *=volts;
-		two *=volts;		
-		diff=one-two;
+		min *=volts;
+		max *=volts;		
 	}else{
 		printf("Don't know how to handle cursor function '%s' in\n%s\n",function, buf);
-		diff=one=two=1;
+		diff=min=max=1;
 		return 0;
 	}
 	if(FUNC_TIME ==f || FUNC_FREQ == f){
-		one=get_value("TPOS:ONE",buf);
-		two=get_value("TPOS:TWO",buf);
+		min=get_value("TPOS:ONE",buf);
+		max=get_value("TPOS:TWO",buf);
 		i=sprintf(lbuf,"WFM?\r");
 		write_string(p,lbuf,i);
 		read_string(p,buf,BUF_SIZE);
 		xinc=get_value("XINCR",buf);
-		one*=xinc;
-		two*=xinc;
-		diff=one-two;
-		if(f == FUNC_FREQ){
-			one=one;
-			two=two;
-			diff=1/diff;
-		}
+		min*=xinc;
+		max*=xinc;
 	}
-	if(diff <0){
-		diff *=-1;
-		i=1; /**swap one-two  */
-	}else
-		i=0;
+	if(min>max){
+		diff=min;
+		min=max;
+		max=diff;
+	}
+	diff=max-min;
+	if(FUNC_FREQ == f ){
+		diff=1/diff;
+	}
 	
 	/*find out trigger channel*/
 		i=sprintf(lbuf,"ATRIGGER?\r");
@@ -476,7 +476,7 @@ int read_cursors(struct serial_port *p,int fd)
 	else if(FUNC_TIME == f)
 		printf("time");
 	printf("=%E, diff=%E\n",volts,diff);
-	i=sprintf(buf,"CURSOR:%s,MAX:%E,MIN:%E,DIFF:%E\nTRIGGER:%s\n",function,i?two:one,i?one:two,diff,trigsrc);
+	i=sprintf(buf,"CURSOR:%s,MAX:%E,MIN:%E,DIFF:%E\nTRIGGER:%s\n",function,max,min,diff,trigsrc);
 	/*write(fd,buf,i); written out by loop*/
 	
 	return i;
