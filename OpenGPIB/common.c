@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.1  2008/08/03 06:18:42  dfs
+Moved functions from tek2gplot.c
+
 */
 
 #include "common.h"
@@ -24,10 +27,10 @@ double get_value( char *f, char *buf)
 	find=strstr(buf,f);
 	if(NULL==find)
 		return -1;
-	for (k=0,i=strlen(f)+1; k<10 && find[i] != ',' && find[i] != ';';++i,++k)
+	for (k=0,i=strlen(f)+1; k<49 && find[i] != ',' && find[i] != ';';++i,++k)
 		tbuf[k]=find[i];
 	tbuf[k]=0;
-	/*printf("Found %s->%s",f,tbuf); */
+	/*printf("Found %s->%s",f,tbuf);  */
 	x=strtof(tbuf, NULL);
 	/*printf(" : %f\n",x); */
 	
