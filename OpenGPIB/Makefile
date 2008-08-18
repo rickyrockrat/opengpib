@@ -13,7 +13,9 @@ CFLAGS+=-Wall
 
 all: tek2gplot get_tek_waveform
 
-common.o: CFLAGS+=-std=c99
+common.o: CFLAGS+=-std=c99 -D_COMMON_
+
+common.o: common.c common.h
 
 tek2gplot.o get_tek_waveform.o common.o: common.h
 
