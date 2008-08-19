@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.11  2008/08/19 06:43:32  dfs
+Major cleanup, added multiple function, structurized data
+
 Revision 1.10  2008/08/19 00:41:22  dfs
 Moved data to main data struct, functionality same
 
@@ -617,13 +620,13 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.11 $\n"
+	printf("tek2gplot: $Revision: 1.12 $\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
 	"    if this is not set, the first file is assumed to have the trigger\n"
 	" -d cursorname Show the cursor info from the cursors file\n"
 	" -f function Add another plot with the following functions: diff\n"
-	"		 This MUST be after all input files. Additional -i will define what\n"
+	"    This MUST be after all input files. Additional -i will define what\n"
 	"    input files the function will operate on. Assumes first two if missing.\n"
 	" -h This display\n"
 	" -g generate a gnuplot script file with data (default just data).\n"	
@@ -1297,6 +1300,17 @@ int main (int argc, char *argv[])
 		printf("Must supply at least -o, -i\n");
 		usage();
 		return 1;
+	}
+	/**check functions..use first two files if none were specified.  */
+	if(plot.f_idx){
+		for (c=0; c<plot.f_idx;++c){
+			if(0 == plot.function[c].idx){
+				int i;
+				for (i=0;i<2;++i)
+					plot.function[c].input[i]=plot.trace[i].iname;
+				plot.function[c].idx+=i;
+			}
+		}
 	}
 	/*preload data, find our max offset*/
 	if(load_data(&plot))
