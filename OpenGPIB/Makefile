@@ -17,7 +17,7 @@ common.o: CFLAGS+=-std=c99 -D_COMMON_
 
 common.o: common.c common.h
 
-tek2gplot.o get_tek_waveform.o common.o: common.h
+tek2gplot.o get_tek_waveform.o common.o: common.h tek2gplot.c
 
 tek2gplot: tek2gplot.o common.o
 	gcc  -lm -o $@ $^
