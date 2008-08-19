@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.13  2008/08/19 16:51:31  dfs
+Added description option (-a)
+
 Revision 1.12  2008/08/19 06:51:37  dfs
 Fixed minor formatting issue, default to first 2 files for func
 
@@ -629,7 +632,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.13 $\n"
+	printf("tek2gplot: $Revision: 1.14 $\n"
 	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
@@ -1336,8 +1339,8 @@ int main (int argc, char *argv[])
 	/**build function data & write the data file.  */
 	if(handle_functions(&plot))
 		return 1;
-	/**now adjust 2% per trace  */
-	c=(plot.max_yrange_plus+plot.max_yrange_minus)*4/100;
+	/**now adjust 5% per trace  */
+	c=(plot.max_yrange_plus+plot.max_yrange_minus)*5/100;
 	c*=(plot.idx+plot.f_idx);
 	plot.max_yrange_plus+=c;
 	/*printf("ymin %d , ymax %d\n",plot.max_yrange_plus, plot.max_yrange_minus); */
