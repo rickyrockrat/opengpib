@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.8  2008/08/18 21:18:33  dfs
+Fixed min,max read of cursor
+
 Revision 1.7  2008/08/17 04:55:43  dfs
 Removed invalid -r line in usage
 
@@ -413,7 +416,7 @@ Todo:
 #define FUNC_FREQ 3
 int read_cursors(struct serial_port *p,int fd)
 {
-	char *t,lbuf[100], *function, *trigsrc;
+	char *target,lbuf[100], *function, *trigsrc;
 	float min,max,volts, diff,xinc;
 	int i, f;
 	
@@ -430,10 +433,10 @@ int read_cursors(struct serial_port *p,int fd)
 		f=FUNC_VOLT;
 		min=get_value("YPOS:ONE",buf);
 		max=get_value("YPOS:TWO",buf);	
-		t=get_string("TARGET",buf); /**reference to  */
+		target=get_string("TARGET",buf); /**reference to  */
 		
 		/**get channel for cursor ref  */
-	  i=sprintf(lbuf,"%s?\r",t);
+	  i=sprintf(lbuf,"%s?\r",target);
 		write_string(p,lbuf,i);
 		read_string(p,buf,BUF_SIZE);
 		/**get the volts/div  */
@@ -476,7 +479,7 @@ int read_cursors(struct serial_port *p,int fd)
 	else if(FUNC_TIME == f)
 		printf("time");
 	printf("=%E, diff=%E\n",volts,diff);
-	i=sprintf(buf,"CURSOR:%s,MAX:%E,MIN:%E,DIFF:%E\nTRIGGER:%s\n",function,max,min,diff,trigsrc);
+	i=sprintf(buf,"CURSOR:%s,MAX:%E,MIN:%E,DIFF:%E,TARGET:%s,TRIGGER:%s\n",function,max,min,diff,target,trigsrc);
 	/*write(fd,buf,i); written out by loop*/
 	
 	return i;
