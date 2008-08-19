@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.16  2008/08/19 19:13:32  dfs
+Fixed check_xrange = 100
+
 Revision 1.15  2008/08/19 18:35:48  dfs
 Added pk-pk, min-y, max-y functions, #def r,l,b margins
 
@@ -653,7 +656,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.16 $\n"
+	printf("tek2gplot: $Revision: 1.17 $\n"
 	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
@@ -783,6 +786,7 @@ int check_xrange (char *title, struct extended *e)
 		}
 		/*sprintf(&title[s],"%.2f%s",e->time_div,e->time_units); */
 	}
+
 	return 0;
 }
 
@@ -1435,10 +1439,16 @@ int main (int argc, char *argv[])
 	sprintf(buf,"\"%s\"",plot.titles);
 	/**the offset to the trigger is set when c=0  */
 	for (c=0; c<plot.idx;++c){
-		plot.trace[c].info.yrange_plus=plot.max_yrange_plus;
-		plot.trace[c].info.yrange_minus=plot.max_yrange_minus;
-		plot.trace[c].info.src=plot.trace[c].label;
-		write_script_file(&plot.trace[c].info,plot.trace[c].oname,buf,plot.xtitle,c+1);	
+		memcpy(&e,&plot.trace[c].info, sizeof(struct extended));
+		e.yrange_plus=plot.max_yrange_plus;
+		e.yrange_minus=plot.max_yrange_minus;
+		e.src=plot.trace[c].label;
+		if(0 == c && (e.xrange/e.time_div)>10){
+			printf("r=%d div=%f ",e.xrange,e.time_div);
+			e.time_div=(double)(e.xrange)/10;
+			printf("ndiv=%f\n",e.time_div);
+		}
+		write_script_file(&e,plot.trace[c].oname,buf,plot.xtitle,c+1);	
 	}
 	plot.trace[c].info.ytrig=plot.ytrig;
 	plot.trace[c].info.xtrig=plot.xtrig;
