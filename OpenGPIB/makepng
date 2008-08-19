@@ -10,7 +10,7 @@
 
 usage () {
 
-	echo "Usage for \$Revision: 1.3 $:"
+	echo "Usage for \$Revision: 1.4 $:"
 	echo "makepng -b basename <options>"
 	echo " -b bn bn is the base filename. Input files should be bn.ch1 bn.ch2, etc"
 	echo " -c process cursors file basename.cursors"
@@ -21,6 +21,9 @@ usage () {
 add_ifexist () {
 if [ -e "$BN$1" ]; then
 	INPUT="$INPUT -i $BN$1"
+	if [ "1" = "$FAKE_FUNCS" ]; then
+		IN="$IN -i $BN$1"
+	fi
 fi
 }
 if [ $# -lt 1 ]; then
@@ -29,18 +32,26 @@ fi
 CURSORS=""
 FUNC=""
 BN=""
-while  getopts b:cf: opt ; do
+IN=""
+while  getopts b:cf:i: opt ; do
   #echo "opt=$opt arg=$OPTARG"
   case $opt in
   	b) BN="$OPTARG" ;;
     c) CURSORS="1" ;;
     f) FUNC="-f $OPTARG" ;;
+    i) IN="$IN -i $OPTARG" ;; 
     *) echo "Invalid option $OPTARG"
     	usage
        exit 1
        ;;
   esac
 done
+FAKE_FUNCS=0
+if [ -z "$IN" ]; then
+	if [ -n "$FUNC" ];then
+		FAKE_FUNCS=1
+	fi
+fi
 OUTF="$BN"
 if [ "" != "$BN" ]; then
 	BN="$BN."
@@ -59,5 +70,6 @@ fi
 DIR=$(dirname $0)
 add_ifexist ch1
 add_ifexist ch2
-$DIR/tek2gplot -m -o $OUTF $INPUT $CURSORS $FUNC -t png  
+echo "$DIR/tek2gplot -m -o $OUTF $INPUT $CURSORS $FUNC $IN -t png  "
+$DIR/tek2gplot -m -o $OUTF $INPUT $CURSORS $FUNC $IN -t png  
 gnuplot $OUTF.plot > $OUTF.png
