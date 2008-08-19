@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.12  2008/08/19 06:51:37  dfs
+Fixed minor formatting issue, default to first 2 files for func
+
 Revision 1.11  2008/08/19 06:43:32  dfs
 Major cleanup, added multiple function, structurized data
 
@@ -90,6 +93,7 @@ struct func_list func_names[]={
 #define WR_DATA				 -3
 #define WR_SETFILENAME -4
 #define WR_CURSORS     -5
+#define WR_SETDESC		 -6
 
 #define FLAGS_NONE      0
 #define FLAGS_GNUPLOT 	1
@@ -468,6 +472,11 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 			close(od);
 		return 0;
 	}
+	if(WR_SETDESC==plotno){
+		c=sprintf(buf,"set label %d \"%s\" at graph -0.1, graph -.12\n",labelno++,title);
+		write(od,buf,c);
+		return 0;
+	}
 	if(WR_DATA == plotno){	/**write data  */
 		c=sprintf(buf,"%E %E\n",ext->time_mult*ext->x,ext->y);
 		write(od,buf,c);
@@ -620,7 +629,8 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.12 $\n"
+	printf("tek2gplot: $Revision: 1.13 $\n"
+	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
 	"    if this is not set, the first file is assumed to have the trigger\n"
@@ -667,10 +677,12 @@ void strip_quotes(char *n)
 				e=i;
 		}	
 	}
+	e-=s;	/**account for leading spaces: ' "'  */
 	if(-1 != s && -1 != e)	{
 		++s;
 		for (i=0;s<len;++i,++s)
 			n[i]=n[s];
+		
 		n[e-1]=0;
 	}else{
 		printf("Didn't find full quotes in '%s'\n",n);
@@ -1192,7 +1204,7 @@ write_script_file is used for all writing.
 
 int main (int argc, char *argv[])
 {
-	char buf[BUF_LEN+1];
+	char buf[BUF_LEN+1], *desc;
 	int ret=1, c;
 	int  f_load, last_idx;
 	struct plot_data plot;
@@ -1202,8 +1214,14 @@ int main (int argc, char *argv[])
 	plot.graphy=480;
 	f_load=0;
 	last_idx=0;
-	while( -1 != (c = getopt(argc, argv, "c:d:f:gi:ml:o:s:t:x:y:")) ) {
+	desc=NULL;
+	while( -1 != (c = getopt(argc, argv, "a:c:d:f:gi:ml:o:s:t:x:y:")) ) {
 		switch(c){
+			case 'a':
+				desc=strdup(optarg);
+				/*printf("Got '%s'\n",desc); */
+				strip_quotes(desc);
+				break;
 			case 'c':
 				plot.trigname=strdup(optarg);
 				break;
@@ -1322,12 +1340,17 @@ int main (int argc, char *argv[])
 	c=(plot.max_yrange_plus+plot.max_yrange_minus)*4/100;
 	c*=(plot.idx+plot.f_idx);
 	plot.max_yrange_plus+=c;
-	printf("ymin %d , ymax %d\n",plot.max_yrange_plus, plot.max_yrange_minus);
+	/*printf("ymin %d , ymax %d\n",plot.max_yrange_plus, plot.max_yrange_minus); */
 	
 	/**set the output script name  &size*/
 	plot.trace[plot.idx].info.x=plot.graphx;
 	plot.trace[plot.idx].info.y=plot.graphy;
 	write_script_file(&plot.trace[plot.idx].info, plot.basename, NULL, NULL,WR_SETFILENAME);
+	if(NULL != desc){
+		/*printf("Setting desc to '%s'\n",desc); */
+		write_script_file(NULL, NULL, desc , NULL,WR_SETDESC);
+	}
+		
 	
 	/*printf("plot.idx=%d\n",plot.idx); */
 	if(plot.flags &FLAGS_GNUPLOT){
