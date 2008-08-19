@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.14  2008/08/19 16:55:04  dfs
+Added more headroom for labels
+
 Revision 1.13  2008/08/19 16:51:31  dfs
 Added description option (-a)
 
@@ -63,6 +66,9 @@ Initial Creation
 #include "common.h"
 
 #define CURSOR_XPERCENT 17
+#define RMARGIN 19
+#define LMARGIN 13
+#define BMARGIN	5
 
 #define MAX_INPUTFILES 10
 
@@ -70,19 +76,26 @@ Initial Creation
 #define TERM_PNG 	2
 #define TERM_DUMB 3
 
-
-#define FUNCTION_NONE 0
-#define FUNCTION_DIFF 1
-#define FUNCTION_BAD -1
+#define FUNCTION_BAD 	 -1
+#define FUNCTION_NONE 	0
+#define FUNCTION_DIFF 	1
+#define FUNCTION_MAXY 	2
+#define FUNCTION_MINY 	3
+#define FUNCTION_PK_PK 	4
 
 struct func_list {
 	int min_files;
 	int func;
+	int datafile; /**1 have data file, 0 don't  */
 	char *name;
 };
 
 struct func_list func_names[]={
-	{.name="diff",.func=FUNCTION_DIFF,.min_files=2},
+	{.name="diff",.func=FUNCTION_DIFF,.min_files=2,.datafile=1},
+	{.name="max-y",.func=FUNCTION_MAXY,.min_files=1,.datafile=0},
+	{.name="min-y",.func=FUNCTION_MINY,.min_files=1,.datafile=0},
+	{.name="pk-pk",.func=FUNCTION_PK_PK,.min_files=1,.datafile=0},
+/*	{.name=,.func=FUNCTION_,.min_files=,.datafile=}, */
 	{.name=NULL,.func=0,.min_files=0},
 };
 
@@ -96,7 +109,7 @@ struct func_list func_names[]={
 #define WR_DATA				 -3
 #define WR_SETFILENAME -4
 #define WR_CURSORS     -5
-#define WR_SETDESC		 -6
+#define WR_LABEL  		 -6
 
 #define FLAGS_NONE      0
 #define FLAGS_GNUPLOT 	1
@@ -154,35 +167,31 @@ struct func {
 	int func;				/**type of function, for convenience  */
 	int idx;				/**idx of arrays below  */
 	int min_files; /**minimun number of files for function  */
+	int datafile;	/**1 - creates data file for function 0 -creats label  */
 	struct trace_data trace;
 	char *input[MAX_FUNC_INPUT+1]; /* filename to operate on. Must match input filename */
 	int main_idx[MAX_FUNC_INPUT+1]; /**numerical offset to trace data corresponding to input, above  */
 };
 
 struct plot_data {
-	int max_yrange_plus;
-	int max_yrange_minus;
+	int max_yrange_plus;	/**positive value, represents max value above 0  */
+	int max_yrange_minus;	/**positive value, represents max value below 0  */
 	int idx;		/**location of data idx.  */
-	int ch_idx; /**value of idx before any functions are added.  */
 	int f_idx; /**function index, number of functions.  */
-	int flags;
-	int graphx;	/**size of graph in pixels, for some terminals  */
-	int graphy;
-	double maxx;
-	double minx;
-	double maxy;
-	double miny;
-	double xtrig;
-	double ytrig;
+	int flags; /**see FLAG_xxx  */
+	int graphx;	/**x size of graph in pixels, for some terminals  */
+	int graphy; /**y size of graph in pixels, for some terminals  */
+	double xtrig;	 /**x location of the trigger  */
+	double ytrig;	 /**y location of the trigger  */
 	double yoff_max;
-	char *trigname;
-	char *cursorfile;
-	char *basename;
+	char *trigname; /**file name that tigger is on  */
+	char *cursorfile;	/**cursor file name  */
+	char *basename;	/**name to base output names on  */
 	int terminal;
-	struct trace_data trace[MAX_INPUTFILES+1];
-	char titles[BUF_LEN+1];
-	char xtitle[50];
-	struct func function[MAX_INPUTFILES+1];
+	struct trace_data trace[MAX_INPUTFILES+1];  /**data for each input file  */
+	char titles[BUF_LEN+1];											/**titles at top of graph  */
+	char xtitle[50];														/**Title for X11 window  */
+	struct func function[MAX_INPUTFILES+1];			/**data for each function  */
 };
 
 struct cursors {
@@ -475,8 +484,17 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 			close(od);
 		return 0;
 	}
-	if(WR_SETDESC==plotno){
-		c=sprintf(buf,"set label %d \"%s\" at graph -0.1, graph -.12\n",labelno++,title);
+	if(WR_LABEL==plotno){
+		char *s;
+		if(NULL == ext){
+			printf("ext NULL!!\n");
+			return 1;
+		}
+		if(NULL == dfile)
+			s="graph";
+		else
+			s=dfile;
+		c=sprintf(buf,"set label %d \"%s\" at %s %f, %s %f\n",labelno++,title,s,ext->x,s, ext->y);
 		write(od,buf,c);
 		return 0;
 	}
@@ -512,7 +530,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	if(plotno <WR_MULTI_PLOT ){
 		c=sprintf(buf,"set xlabel \"%s\"\n",ext->time_units);
 		write(od,buf,c);
-		c=sprintf(buf,"set lmargin 13\nset bmargin 5\n");
+		c=sprintf(buf,"set lmargin %d\nset bmargin %d\nset rmargin %d\n",LMARGIN,BMARGIN,RMARGIN);
 		write(od,buf,c);
 		c=sprintf(buf,"set label %d \"%s\" at graph -0.15, graph .5\n",labelno++,ext->vert_units);
 		write(od,buf,c);
@@ -632,7 +650,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.14 $\n"
+	printf("tek2gplot: $Revision: 1.15 $\n"
 	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
@@ -1006,13 +1024,13 @@ void update_yrange(struct plot_data *p, double y)
 		p->max_yrange_minus= -y;
 }
 /***************************************************************************/
-/** .
+/** PK-PK, min, max, etc show up on Rt side, so space is limited.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
 int handle_functions(struct plot_data *p)
 {
-	int i,c,od;
+	int i,c,od, len;
 	char buf[50];
 	/**first, set up our indexes to the main files (if any)  */
 	for (i=0;i<p->f_idx;++i){
@@ -1030,17 +1048,23 @@ int handle_functions(struct plot_data *p)
 						f->min_files,f->name);	
 				return 1;
 			}
-			
-			if(NULL == (f->trace.oname=malloc(strlen(f->name)+strlen(p->basename)+10)) ){
+			if(0 == f->datafile) /**write a label  */
+				len=strlen(f->name)+20;
+			else
+				len=10;	
+			if(NULL == (f->trace.oname=malloc(strlen(f->name)+strlen(p->basename)+len)) ){
 				printf("Out of memory for %s&on\n",f->name);
 				return 1;
 			}
-			sprintf(f->trace.oname,"%s.%s",p->basename,f->name);
-			if(1>(od=open(f->trace.oname,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
-				printf("Unable to open %s\n",f->trace.oname);
-				return 1;
-			}				
-			printf("Writing %s\n",f->trace.oname);
+			if(f->datafile){
+				sprintf(f->trace.oname,"%s.%s",p->basename,f->name);
+				if(1>(od=open(f->trace.oname,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
+					printf("Unable to open %s\n",f->trace.oname);
+					return 1;
+				}				
+				printf("Writing %s\n",f->trace.oname);	
+			}else 
+				od=0;
 			
 			f->trace.info.src=f->name;
 			/*write_script_file(&f->trace.info,f->trace.oname,NULL,NULL,WR_MULTI_PLOT); */
@@ -1055,8 +1079,34 @@ int handle_functions(struct plot_data *p)
 						write(od,buf,i);
 					}
 					break;
-			}
-			close(od);
+				
+				case FUNCTION_PK_PK: 
+				case FUNCTION_MAXY:
+				case FUNCTION_MINY:
+				{
+					double min,max,diff;
+					struct data_point *d;
+					min=max=0;
+					d=&p->trace[f->main_idx[0]].data_pt;
+					for (c=0; c< MAX_POINTS && c< d->idx; ++c){
+						if(d->data[c].y >max)
+							max=d->data[c].y;
+						if(d->data[c].y <min)
+							min=d->data[c].y;
+					}	
+					diff=max-min;
+					switch(f->func){
+						case FUNCTION_PK_PK: diff=diff; break;
+						case FUNCTION_MAXY: diff=max; break;
+						case FUNCTION_MINY: diff=min; break;
+				}
+					sprintf(f->trace.oname,"%s %s %.1f%s",p->trace[f->main_idx[0]].label,f->name,diff,p->trace[f->main_idx[0]].info.vert_units);
+					printf("%d:%s\n",i,f->trace.oname);	
+				}
+					break;
+			}	/**end switch  */
+			if(od>2)
+				close(od);
 		}		
 	}
 	return 0;
@@ -1192,6 +1242,7 @@ int set_function(struct func *f, char *name)
 		if(!strcmp(l->name,name)){
 			f->func=l->func;
 			f->min_files=l->min_files;
+			f->datafile=l->datafile;
 			return 0;
 		}		
 	}
@@ -1211,6 +1262,7 @@ int main (int argc, char *argv[])
 	int ret=1, c;
 	int  f_load, last_idx;
 	struct plot_data plot;
+	struct extended e;
 	memset(&plot,0,sizeof(struct plot_data));
 	
 	plot.graphx=640;
@@ -1350,11 +1402,21 @@ int main (int argc, char *argv[])
 	plot.trace[plot.idx].info.y=plot.graphy;
 	write_script_file(&plot.trace[plot.idx].info, plot.basename, NULL, NULL,WR_SETFILENAME);
 	if(NULL != desc){
+		e.x=-.1;
+		e.y=-.12;
 		/*printf("Setting desc to '%s'\n",desc); */
-		write_script_file(NULL, NULL, desc , NULL,WR_SETDESC);
+		write_script_file(&e, "graph", desc , NULL,WR_LABEL);
 	}
+	/**now do functions that do not have data files  */
+	e.x=1 - ((double)RMARGIN/100 +.01);
+	e.y=.87;
+	for (c=0;c<plot.f_idx;++c){
+		if(0 == plot.function[c].datafile){
+			write_script_file(&e,"screen",plot.function[c].trace.oname,NULL,WR_LABEL);	
+			e.y-=.03;
+		}
 		
-	
+	}	
 	/*printf("plot.idx=%d\n",plot.idx); */
 	if(plot.flags &FLAGS_GNUPLOT){
 		plot.trace[0].info.yrange_plus=plot.max_yrange_plus;
@@ -1380,10 +1442,14 @@ int main (int argc, char *argv[])
 	/**write the trigger.  */
 	write_script_file(&plot.trace[c].info,NULL,NULL,0,WR_TRIGGER);	
 	
-	/**Handle functions - write the plot lines */
+	/**Handle functions with data files - write the plot lines */
 	for (c=0;c<plot.f_idx;++c){
-		plot.function[c].trace.info.src=plot.function[c].name;
-		write_script_file(&plot.function[c].trace.info,plot.function[c].trace.oname,NULL,NULL,WR_MULTI_PLOT);
+		
+		if(FUNCTION_DIFF == plot.function[c].func){
+			plot.function[c].trace.info.src=plot.function[c].name;
+			write_script_file(&plot.function[c].trace.info,plot.function[c].trace.oname,NULL,NULL,WR_MULTI_PLOT);	
+		}
+		
 	}
 	/**now handle the cursor stuff.  */
 	plot_cursor(&plot);
