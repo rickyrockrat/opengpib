@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.10  2008/08/19 00:41:22  dfs
+Moved data to main data struct, functionality same
+
 Revision 1.9  2008/08/18 22:09:26  dfs
 Added time cursor handling, fixed vert scaling, fixed horiz printing
 
@@ -49,15 +52,30 @@ Initial Creation
 #include <math.h>
 #include <inttypes.h>
 #include "common.h"
+
+#define CURSOR_XPERCENT 17
+
 #define MAX_INPUTFILES 10
 
 #define TERM_X 		1
 #define TERM_PNG 	2
 #define TERM_DUMB 3
 
+
 #define FUNCTION_NONE 0
 #define FUNCTION_DIFF 1
-#define FUNCTION_
+#define FUNCTION_BAD -1
+
+struct func_list {
+	int min_files;
+	int func;
+	char *name;
+};
+
+struct func_list func_names[]={
+	{.name="diff",.func=FUNCTION_DIFF,.min_files=2},
+	{.name=NULL,.func=0,.min_files=0},
+};
 
 #define BUF_LEN 		1024
 #define MAX_POINTS 	2048
@@ -70,7 +88,10 @@ Initial Creation
 #define WR_SETFILENAME -4
 #define WR_CURSORS     -5
 
-
+#define FLAGS_NONE      0
+#define FLAGS_GNUPLOT 	1
+#define FLAGS_MULTIPLOT 2
+#define FLAGS_FUNCTIONS 4
 
 struct extended {
 	char *src;
@@ -97,10 +118,9 @@ struct _data_point {
 	double y;
 };
 struct data_point {
-	struct _data_point data[MAX_POINTS];
+	struct _data_point data[MAX_POINTS+1];
 	int idx;
 };
-struct data_point data_pt[MAX_INPUTFILES];
 
 struct trace_data {
 	struct extended info;
@@ -109,6 +129,7 @@ struct trace_data {
 	double xincr;
 	double trigger;
 	double yoff;
+	int sgn; /**signed or unsigned  */
 	char *fmt;
 	char *enc;
 	char *title;
@@ -117,10 +138,26 @@ struct trace_data {
   char *oname;
 };
 
+#define MAX_FUNC_INPUT 4
+struct func {
+	char *name;	/**name of function  */
+	int func;				/**type of function, for convenience  */
+	int idx;				/**idx of arrays below  */
+	int min_files; /**minimun number of files for function  */
+	struct trace_data trace;
+	char *input[MAX_FUNC_INPUT+1]; /* filename to operate on. Must match input filename */
+	int main_idx[MAX_FUNC_INPUT+1]; /**numerical offset to trace data corresponding to input, above  */
+};
+
 struct plot_data {
 	int max_yrange_plus;
 	int max_yrange_minus;
-	int idx;
+	int idx;		/**location of data idx.  */
+	int ch_idx; /**value of idx before any functions are added.  */
+	int f_idx; /**function index, number of functions.  */
+	int flags;
+	int graphx;	/**size of graph in pixels, for some terminals  */
+	int graphy;
 	double maxx;
 	double minx;
 	double maxy;
@@ -130,9 +167,21 @@ struct plot_data {
 	double yoff_max;
 	char *trigname;
 	char *cursorfile;
+	char *basename;
 	int terminal;
-	struct trace_data trace[MAX_INPUTFILES];
-	
+	struct trace_data trace[MAX_INPUTFILES+1];
+	char titles[BUF_LEN+1];
+	char xtitle[50];
+	struct func function[MAX_INPUTFILES+1];
+};
+
+struct cursors {
+	double max;
+	double min;
+	double diff;
+	char *target;
+	char *trigger;
+	char *func;
 };
 
 enum {
@@ -384,14 +433,21 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 {
 	char buf[BUF_LEN];
 	int c,data;
-	static int od=0, first=1;
-	static int offset;
+	static int od=0, first=1,labelno=1;
+	static int offset, x, y;
 	static char *fname;
 	int ilinecolor;
 
 	if( WR_SETFILENAME == plotno){
 		sprintf(buf,"%s.plot",dfile);
 		fname=strdup(buf);
+		if(NULL != ext){
+			x=round(ext->x);
+			y=round(ext->y);	
+		}else{
+			x=640;
+			y=480;
+		}
 		return 0;
 	}
 	if(od<3){	
@@ -428,7 +484,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		off_t o;
 		o=lseek(od,0,SEEK_CUR);
 		lseek(od,offset,SEEK_SET);
-		c=sprintf(buf,"set label 2 '%s' at %E,%E front",ext->src,ext->x,ext->y);			
+		c=sprintf(buf,"set label %d '%s' at %E,%E front",labelno++,ext->src,ext->x,ext->y);			
 		write(od,buf,c);
 		offset=lseek(od,0,SEEK_CUR);
 		lseek(od,o,SEEK_SET);
@@ -441,9 +497,9 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	if(plotno <WR_MULTI_PLOT ){
 		c=sprintf(buf,"set xlabel \"%s\"\n",ext->time_units);
 		write(od,buf,c);
-		c=sprintf(buf,"set lmargin 10\n");
+		c=sprintf(buf,"set lmargin 13\nset bmargin 5\n");
 		write(od,buf,c);
-		c=sprintf(buf,"set label 2 \"%s\" at graph -0.06, graph .5\n",ext->vert_units);
+		c=sprintf(buf,"set label %d \"%s\" at graph -0.15, graph .5\n",labelno++,ext->vert_units);
 		write(od,buf,c);
 		c=sprintf(buf,"set yrange[%d:%d]\n",-ext->yrange_minus,ext->yrange_plus);
 		write(od,buf,c);
@@ -469,10 +525,10 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 			light blue, blue, plum and dark violet for eight plotting colors
 			*/
 			case TERM_PNG:
-				c=sprintf(buf,"set terminal png medium size 640,480 \\\n"
+				c=sprintf(buf,"set terminal png medium size %d,%d \\\n"
 	                     "xffffff x000000 x404040 \\\n"
 	                     "xff0000 %s x66cdaa xcdb5cd \\\n"
-	                     "xadd8e6 x0000ff xdda0dd x9500d3\n",ext->line_color );
+	                     "xadd8e6 x0000ff xdda0dd x9500d3\n",x, y,ext->line_color );
 				write(od,buf,c);
 				break;
 			/**  
@@ -502,7 +558,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 			ilinecolor=get_linecolor(ext->line_color);
 		}
 		else ilinecolor=2;
-		c=sprintf(buf,"set label 1 'T' at ");
+		c=sprintf(buf,"set label %d 'T' at ",labelno++);
 		write(od,buf,c);
 		offset=lseek(od,0,SEEK_CUR);
 		/*printf("offset at %d\n",offset); */
@@ -561,12 +617,14 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.10 $\n"
+	printf("tek2gplot: $Revision: 1.11 $\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
 	"    if this is not set, the first file is assumed to have the trigger\n"
 	" -d cursorname Show the cursor info from the cursors file\n"
 	" -f function Add another plot with the following functions: diff\n"
+	"		 This MUST be after all input files. Additional -i will define what\n"
+	"    input files the function will operate on. Assumes first two if missing.\n"
 	" -h This display\n"
 	" -g generate a gnuplot script file with data (default just data).\n"	
 	"    -g can only be used for one input file.\n"
@@ -579,8 +637,10 @@ void usage( void)
 	" -s val Use smoothing with value val. \n"
 	
 	" -t term, set terminal to png, ascii, or x11 (default is x11)\n"
-	"if you use -t png, gnuplot usage is:\n"
-	" gnuplot fname > image.png\n" \
+	"    if you use -t png, gnuplot usage is:\n"
+	"    gnuplot fname > image.png\n" \
+	" -x pixels Set out (png for now) X size in pixels\n"
+	" -y pixels Set out (png for now) Y size in pixels\n"
 	);
 	
 	
@@ -706,6 +766,420 @@ int build_oname(struct trace_data *t, char *oname)
 	free (in);
 	return 0;
 }
+
+/***************************************************************************/
+/** look for trace text in loaded data. The label will match the the channel
+name in the data.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int find_trace(struct plot_data *p, char *name)
+{
+	int i;
+	for (i=0;i<p->idx;++i){
+		if(!strcasecmp(name,p->trace[i].label)){
+			/**found it  */
+			return i;
+		}
+	}
+		
+	return 0;/**default to first file  */
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int read_cursor_file(char *name, struct cursors *c)
+{
+	int id;
+	char buf[BUF_LEN];
+	if(1>(id=open(name,O_RDONLY)) ){
+		printf("Unable to open %s\n",name);
+		return 1;
+	}
+	read(id,buf,BUF_LEN-1);
+	c->func=get_string("CURSOR",buf);
+	c->max=get_value("MAX",buf);
+	c->min=get_value("MIN",buf);
+	c->diff=get_value("DIFF",buf);
+	c->target=get_string("TARGET",buf);
+	c->trigger=get_string("TRIGGER", buf);
+	close (id);
+	return 0;
+}
+
+/***************************************************************************/
+/** See if our current file is the trigger file. Return 1 if it is.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int check_for_trigger_file(struct plot_data *p, int c)
+{
+	if(p->flags & FLAGS_GNUPLOT)
+		return 1;
+	else if(NULL == p->trigname){
+		if(0 == c)	/**use first file  */
+			return 1;
+		else
+			return 0;
+	}
+	else if(!strcmp(p->trigname,p->trace[c].iname))
+		return 1;
+	return 0;
+}
+
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int load_data(struct plot_data *p)
+{
+	int c,id,i,data;
+	double _xincr;
+	char buf[BUF_LEN], *preamble;
+	p->yoff_max=0;
+	for (c=0; c<p->idx;++c){
+		int trigfile, trig, dp;
+		trigfile=check_for_trigger_file(p,c);
+		if(1>(id=open(p->trace[c].iname,O_RDONLY)) ){
+			printf("Unable to open %s\n",p->trace[c].iname);
+			return 1;
+		}
+		build_oname(&p->trace[c],p->basename);
+		if(NULL == (preamble=load_preamble(id, &data))){
+			printf("Unable to load preamble for file %s\n",p->trace[c].iname);
+			goto closeid;
+		}
+		p->trace[c].info.terminal=p->terminal;
+		p->trace[c].yoff=get_value("YOFF", preamble);
+		/**PT.OFF  */
+		p->trace[c].ymult=get_value("YMULT",preamble);
+		p->trace[c].xincr=get_value("XINCR", preamble);
+		p->trace[c].fmt=get_string("BN.FMT",preamble);
+		p->trace[c].enc=get_string("ENCDG",preamble);
+		p->trace[c].trigger=get_value("PT.OFF",preamble);
+		p->trace[c].title=get_string("WFID",preamble);
+		strip_quotes(p->trace[c].title);
+
+		if(!strcmp("RI",p->trace[c].fmt))
+			p->trace[c].sgn=1;
+		else if(!strcmp("RP",p->trace[c].fmt))
+			p->trace[c].sgn=0;
+		else {
+			printf("Unknown format %s\n",p->trace[c].fmt);
+			goto closeid;
+		}
+		
+		if(strcmp(p->trace[c].enc,"ASCII")){
+			printf("Encoding %s not supportd\n",p->trace[c].enc);
+			goto closeid;
+		}
+		
+		break_extended(p->trace[c].title,&p->trace[c].info);
+		p->trace[c].label=strdup(p->trace[c].info.src);
+		p->trace[c].yoff=p->trace[c].yoff*p->trace[c].ymult*p->trace[c].info.vert_mult;
+		if(p->yoff_max > p->trace[c].yoff)
+			p->yoff_max=p->trace[c].yoff;
+		if(0 == _xincr){
+			_xincr=p->trace[c].xincr;
+		}
+		/**change range if over 3 digits  */
+		if(check_xrange(p->trace[c].title,&p->trace[c].info))
+			goto closeid;
+		
+		i=strlen(p->titles);
+		if(0 ==i)
+			sprintf(&p->titles[i],"%s",p->trace[c].title);
+		else 
+			sprintf(&p->titles[i],"\\n%s",p->trace[c].title);
+		/*printf("Total time = %f %f points per division, time_div %f time_mult %f\n",p->trace[c].xincr*1024,round((p->trace[c].info.time_div/(p->trace[c].info.time_mult))/p->trace[c].xincr),p->trace[c].info.time_div,p->trace[c].info.time_mult); */
+		i=strlen(p->xtitle);
+		sprintf(&p->xtitle[i],"%s ",p->trace[c].label);
+		
+		
+		/*yrange=( ((int)round(p->trace[c].info.vert_div*8))+p->trace[c].yoff<0?(int)(p->trace[c].yoff*-1):(int)p->trace[c].yoff)>>1; */
+		p->trace[c].info.yrange_plus=p->trace[c].info.yrange_minus=((int)round(p->trace[c].info.vert_div*8))>>1;
+		if(p->trace[c].yoff >=0)
+			p->trace[c].info.yrange_minus+=round(p->trace[c].yoff);
+		else
+			p->trace[c].info.yrange_plus+=round(-p->trace[c].yoff);
+		
+		/**now take it to the closest volt.  */
+		/** if(p->trace[c].info.yrange_minus%1000)
+			p->trace[c].info.yrange_minus+=1000;
+		if(p->trace[c].info.yrange_plus%1000)
+			p->trace[c].info.yrange_plus+=1000; */
+		/**now add a volt  
+		p->trace[c].info.yrange_plus+=1000;
+		p->trace[c].info.yrange_minus+=1000;*/
+		if(p->max_yrange_plus <p->trace[c].info.yrange_plus)
+			p->max_yrange_plus =p->trace[c].info.yrange_plus;
+		if(p->max_yrange_minus <p->trace[c].info.yrange_minus)
+			p->max_yrange_minus =p->trace[c].info.yrange_minus;
+		/*printf("yrange=[-%d:%d] in %s ",p->trace[c].info.yrange_minus,p->trace[c].info.yrange_plus,p->trace[c].info.vert_units); */
+		p->trace[c].info.xrange=(int)round(p->trace[c].xincr*1024*p->trace[c].info.time_mult);
+		trig=(int)round(p->trace[c].trigger);
+		/*printf("Xrange=[0:%d] in %s\n",p->trace[c].info.xrange,p->trace[c].info.time_units); */
+		/*printf("set xtics 0,%f\n",p->trace[c].info.time_div); */
+		p->trace[c].info.x=0;
+		buf[0]=1;
+		for (dp=0; dp<1024 && buf[0];++dp) {
+			if(1> get_next_value(id,buf))	
+				break;
+			p->trace[c].info.y=strtof(buf, NULL);
+			if(0 == p->trace[c].sgn)
+				p->trace[c].info.y=p->trace[c].info.y-128;
+			p->trace[c].info.y=(p->trace[c].info.y*p->trace[c].ymult*p->trace[c].info.vert_mult) - p->trace[c].yoff;
+			save_data_point(&p->trace[c],
+					p->trace[c].info.time_mult*p->trace[c].info.x,
+					p->trace[c].info.y);
+			p->trace[c].info.x+=p->trace[c].xincr;
+			/**we are on trigger channel, plot it, save it  */
+			if(trigfile &&dp==trig){
+				p->ytrig=p->trace[c].info.ytrig=p->trace[c].info.y;
+				p->xtrig=p->trace[c].info.xtrig=p->trace[c].info.time_mult*p->trace[c].info.x;
+			}
+		}	/**end data points  */
+		close(id);
+		id=0;
+	}	 /**END of data load  */
+	return 0;
+closeid:
+	if(id>2)
+		close(id);
+return 1;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int find_file(struct plot_data *p, char *name)
+{
+	static int x=0;
+	int i;
+	if(NULL == name){
+		return x++;
+	}
+	for (i=0;i<p->idx;++i){
+		if(NULL != p->trace[i].iname){
+			if(!strcmp(name,p->trace[i].iname))
+				return i;
+		}
+	}
+	return x++;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void update_yrange(struct plot_data *p, double y)
+{
+	if(y>p->max_yrange_plus)
+		p->max_yrange_plus=y;
+	if(y < -(p->max_yrange_minus))
+		p->max_yrange_minus= -y;
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int handle_functions(struct plot_data *p)
+{
+	int i,c,od;
+	char buf[50];
+	/**first, set up our indexes to the main files (if any)  */
+	for (i=0;i<p->f_idx;++i){
+		struct func *f;
+		f=&p->function[i];
+		if(FUNCTION_NONE != f->func){
+			/**set up the index into the main array to find parameter info.  */
+			for (c=0;c<f->idx;++c){
+				f->main_idx[c]=find_file(p,f->input[c]);
+				memcpy(&f->trace,&p->trace[f->main_idx[c]],sizeof(struct trace_data));
+			}
+		
+			if(f->idx<f->min_files){
+				printf("Have to have %d files to use func %s\n",
+						f->min_files,f->name);	
+				return 1;
+			}
+			
+			if(NULL == (f->trace.oname=malloc(strlen(f->name)+strlen(p->basename)+10)) ){
+				printf("Out of memory for %s&on\n",f->name);
+				return 1;
+			}
+			sprintf(f->trace.oname,"%s.%s",p->basename,f->name);
+			if(1>(od=open(f->trace.oname,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
+				printf("Unable to open %s\n",f->trace.oname);
+				return 1;
+			}				
+			printf("Writing %s\n",f->trace.oname);
+			
+			f->trace.info.src=f->name;
+			/*write_script_file(&f->trace.info,f->trace.oname,NULL,NULL,WR_MULTI_PLOT); */
+			switch(f->func){
+				case FUNCTION_DIFF:
+					for (c=0; c< MAX_POINTS && c< p->trace[f->main_idx[0]].data_pt.idx && c<p->trace[f->main_idx[1]].data_pt.idx;++c){
+						double diff;
+						diff=p->trace[f->main_idx[0]].data_pt.data[c].y-p->trace[f->main_idx[1]].data_pt.data[c].y;
+						update_yrange(p,diff);
+						save_data_point(&f->trace,p->trace[f->main_idx[0]].data_pt.data[c].x,diff);
+						i=sprintf(buf,"%E %E\n",p->trace[f->main_idx[0]].data_pt.data[c].x,diff);
+						write(od,buf,i);
+					}
+					break;
+			}
+			close(od);
+		}		
+	}
+	return 0;
+}
+
+
+/***************************************************************************/
+/** Write the cursor out to the plot file.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int plot_cursor(struct plot_data *p)
+{
+  struct cursors cursor;
+	double center;
+	int targ;
+	char buf[50];
+	
+	if(NULL != p->cursorfile){
+		if(read_cursor_file(p->cursorfile,&cursor)) {
+			return 1;
+		}
+		if(NULL == cursor.target)
+			targ=0; /**default to first file  */
+		else {
+			targ=find_trace(p,cursor.target);
+			/*printf("Using %d for target %s\n",targ,cursor.target); */
+		}
+		/*printf("Buf=%s\noff %F max %F,min %F,diff %F\n",buf,p->yoff_max,max,min,diff); */
+		memcpy(&p->trace[p->idx].info,&p->trace[targ].info,sizeof(struct extended));
+		targ=p->idx;
+		if(!strcmp(cursor.func,"VOLTS")){
+			cursor.max=(cursor.max*p->trace[targ].info.vert_mult)+(-1*p->yoff_max);
+			cursor.min=(cursor.min*p->trace[targ].info.vert_mult)+(-1*p->yoff_max);
+			center=((cursor.max-cursor.min)/2)+cursor.min;
+			p->trace[targ].info.y=center;
+			p->trace[targ].info.x=-(p->trace[targ].info.xrange*CURSOR_XPERCENT)/100;
+			cursor.diff*=p->trace[targ].info.vert_mult;
+			sprintf(buf,"%d%s",(int)round(cursor.diff),p->trace[targ].info.vert_units);
+			p->trace[targ].info.src=buf;
+			write_script_file(&p->trace[targ].info,NULL,NULL,0,WR_CURSORS);	
+			/**now draw the cursors  */
+			write_cursor(&p->trace[targ].info,0,cursor.max);
+			write_cursor(&p->trace[targ].info,p->trace[targ].info.xrange,cursor.max);
+			write_cursor(&p->trace[targ].info,p->trace[targ].info.xrange,cursor.min);
+			write_cursor(&p->trace[targ].info,0,cursor.min);			
+		}	else if(!strcmp(cursor.func,"TIME")){
+			double len;
+			len=(p->max_yrange_plus+p->max_yrange_minus)/50;
+			p->trace[targ].info.x=cursor.min*get_multiplier(p->trace[targ].info.time_units);;
+			p->trace[targ].info.y=(p->max_yrange_plus+len);
+			/*printf("diff=%f\n",diff); */
+			cursor.diff *=get_multiplier(p->trace[targ].info.time_units);
+			/*diff*=1000; */
+			sprintf(buf,"%.3f%s",cursor.diff,p->trace[targ].info.time_units);
+			p->trace[targ].info.src=buf;
+			write_script_file(&p->trace[targ].info,NULL,NULL,0,WR_CURSORS);	
+			/**now draw the cursors  */   
+			len*=2;
+			write_cursor(&p->trace[targ].info,cursor.max,p->max_yrange_plus-len);
+			write_cursor(&p->trace[targ].info,cursor.max,p->max_yrange_plus);
+			write_cursor(&p->trace[targ].info,cursor.min,p->max_yrange_plus);
+			write_cursor(&p->trace[targ].info,cursor.min,p->max_yrange_plus-len); /**-p->max_yrange_minus  */
+		}else{
+			printf("Don't know how to handle cursor function '%s'. Ignoring.\n",cursor.func);
+			return 0;
+		}
+	}
+	return 0;
+}
+
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int write_datafiles(struct plot_data *p)
+{
+	int c,dp,od,i;
+	for (c=0; c<p->idx;++c){
+		p->trace[c].yoff=p->yoff_max;
+		
+		if(p->flags & FLAGS_GNUPLOT){
+			if(-1 ==write_script_file(&p->trace[0].info, "-", p->titles, p->xtitle,WR_SINGLE_PLOT)) {
+				printf("Script file error\n");
+				return 1;
+			}
+		}else{
+			if(1>(od=open(p->trace[c].oname,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
+				printf("Unable to open %s\n",p->trace[c].oname);
+				return 1;
+			}	
+			printf("Writing %s\n",p->trace[c].oname);
+		}
+		
+		for (dp=0; dp<1024;++dp) {
+			char buf[50];
+			double x,y;
+			x=p->trace[c].data_pt.data[dp].x;
+			y=p->trace[c].data_pt.data[dp].y;
+			if(p->flags & FLAGS_GNUPLOT){/**write data  */
+				p->trace[c].info.x=x;
+				p->trace[c].info.y=y;
+				write_script_file(&p->trace[c].info, NULL, NULL, NULL,WR_DATA); 
+			}	
+			else {
+				/*printf("%E %E (%s)\n",x,y,buf); */
+				i=sprintf(buf,"%E %E\n",x,y);
+				write(od,buf,i);	
+			}
+		}
+		if(p->flags & FLAGS_GNUPLOT){ /**write trigger  */
+			write_script_file(&p->trace[0].info,NULL,NULL,0,WR_TRIGGER);
+		}	else {
+			close(od);
+		}
+		od=0;
+	} /**data write  */	
+	return 0;
+}
+/***************************************************************************/
+/** Set the function number and minimum files.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int set_function(struct func *f, char *name)
+{
+	struct func_list *l;
+	f->func=FUNCTION_BAD;
+	f->min_files=0;
+	for (l=func_names;NULL != l->name; ++l){
+		if(!strcmp(l->name,name)){
+			f->func=l->func;
+			f->min_files=l->min_files;
+			return 0;
+		}		
+	}
+	printf("Unknown function '%s'\n",name);
+	return 1;
+}
 /***************************************************************************/
 /** When gnuplot is specified, there is just one file, the script file, so
 write_script_file is used for all writing.
@@ -715,378 +1189,168 @@ write_script_file is used for all writing.
 
 int main (int argc, char *argv[])
 {
-	char *oname, *preamble, buf[BUF_LEN], obuf[50];
-	char  titles[BUF_LEN], xtitle[50];
-	char *function;
-	int id, od, ret=1, c, data, func;
-	int sgn,gnuplot, datapoint, multiplot, trig, last_idx;
-	double trigger, _xincr;
-	struct plot_data plots;
-	_xincr=0;
-	memset(&plots,0,sizeof(struct plot_data));
+	char buf[BUF_LEN+1];
+	int ret=1, c;
+	int  f_load, last_idx;
+	struct plot_data plot;
+	memset(&plot,0,sizeof(struct plot_data));
 	
-	function=oname=NULL;
-	multiplot=gnuplot=0;
-	
-	func=0;
+	plot.graphx=640;
+	plot.graphy=480;
+	f_load=0;
 	last_idx=0;
-	while( -1 != (c = getopt(argc, argv, "c:d:f:gi:ml:o:s:t:")) ) {
+	while( -1 != (c = getopt(argc, argv, "c:d:f:gi:ml:o:s:t:x:y:")) ) {
 		switch(c){
 			case 'c':
-				plots.trigname=strdup(optarg);
+				plot.trigname=strdup(optarg);
 				break;
 			case 'd':
-				plots.cursorfile=strdup(optarg);
+				plot.cursorfile=strdup(optarg);
 				break;			
 			case 'f':
-				function=strdup(optarg);
-				if(!strcmp("diff",optarg))
-					func=FUNCTION_DIFF;
-				else{
-					printf("Unknown function '%s'\n",optarg);
+				++f_load;
+				if(plot.f_idx>= MAX_INPUTFILES){
+					printf("Exceeded max functions of %d\n",MAX_INPUTFILES);
 					return 1;
 				}
+				plot.function[plot.f_idx].name=strdup(optarg);
+				if(set_function(&plot.function[plot.f_idx++],optarg) ) 
+					return 1;
 				break;
 			case 'g':
-				gnuplot=1;
+				plot.flags|=FLAGS_GNUPLOT;
 				break;
 			case 'h':
 				usage();
 				return 0;
 				break;
 			case 'i':
-				if(plots.idx>= MAX_INPUTFILES){
-					printf("Exceeded max input files of %d\n",MAX_INPUTFILES);
-					return 1;
+				if(f_load){
+					struct func *p;
+					if(0 == plot.f_idx){
+						printf("No -f, but loading -f with -i ??\n");
+						return 1;
+					}
+					p=&plot.function[plot.f_idx-1];
+					if(p->idx >= MAX_FUNC_INPUT){
+						printf("Exceeded function input limit of %d\n",MAX_FUNC_INPUT);
+						return 1;
+					}
+					p->input[p->idx++]=strdup(optarg);
+				}	else {
+					if(plot.idx>= MAX_INPUTFILES){
+						printf("Exceeded max input files of %d\n",MAX_INPUTFILES);
+						return 1;
+					}
+					plot.trace[plot.idx].info.smoothing=0;
+					plot.trace[plot.idx].info.terminal=TERM_X;
+					plot.trace[plot.idx].info.line_color="x00ff00";	
+					last_idx=plot.idx;
+					plot.trace[plot.idx++].iname=strdup(optarg);	
 				}
-				plots.trace[plots.idx].info.smoothing=0;
-				plots.trace[plots.idx].info.terminal=TERM_X;
-				plots.trace[plots.idx].info.line_color="x00ff00";	
-				last_idx=plots.idx;
-				plots.trace[plots.idx++].iname=strdup(optarg);
+				
 				break;
 			case 'l':
-				plots.trace[last_idx].info.line_color=strdup(&optarg[1]);
+				plot.trace[last_idx].info.line_color=strdup(&optarg[1]);
 				break;
 			case 'm':
-				multiplot=1;
+				plot.flags|=FLAGS_MULTIPLOT;
 				break;
 			case 'o':
-				oname=strdup(optarg);
+				plot.basename=strdup(optarg);
 				break;	
 			case 's':
-				plots.trace[last_idx].info.smoothing=strtol(optarg,NULL,10);
+				plot.trace[last_idx].info.smoothing=strtol(optarg,NULL,10);
 				break;
 			case 't':
 				if(!strcmp(optarg,"png"))
-					plots.terminal=TERM_PNG;
+					plot.terminal=TERM_PNG;
 				else if(!strcmp(optarg,"x11"))
-					plots.terminal=TERM_X;
+					plot.terminal=TERM_X;
 				else if(!strcmp(optarg,"ascii"))
-					plots.terminal=TERM_DUMB;				
+					plot.terminal=TERM_DUMB;				
 				else {
 					printf("Must specify X or png for -t option\n");
 					usage();
 					return 1;
 				}
 				break;
+			case 'x':
+				plot.graphx=atoi(optarg);
+				break;
+			case 'y':
+				plot.graphy=atoi(optarg);
+				break;			
 		}
 	}
-	if( multiplot && gnuplot){
-		printf("Cannot specify both -m and -g\n");
-		return 1;
-	}
-	if( 0 == plots.idx || NULL == oname){
+	if(plot.flags &FLAGS_GNUPLOT){
+		if( plot.flags &FLAGS_MULTIPLOT ){
+			printf("Cannot specify both -m and -g\n");
+			return 1;
+		}
+		if(plot.idx>1){
+			printf("Cannot plot more than one file with -g option\n");
+			return 1;
+		}
+	}	
+	if( 0 == plot.idx || NULL == plot.basename){
 		printf("Must supply at least -o, -i\n");
 		usage();
 		return 1;
 	}
-	/*find our max offset*/
-	plots.yoff_max=0;
-	for (c=0; c<plots.idx;++c){
-		if(1>(id=open(plots.trace[c].iname,O_RDONLY)) ){
-			printf("Unable to open %s\n",plots.trace[c].iname);
-			goto closeod;
-		}
-		build_oname(&plots.trace[c],oname);
-		if(NULL == (preamble=load_preamble(id, &data))){
-			printf("Unable to load preamble for file %s\n",plots.trace[c].iname);
-			goto closeid;
-		}
-		plots.trace[c].info.terminal=plots.terminal;
-		plots.trace[c].yoff=get_value("YOFF", preamble);
-		plots.trace[c].ymult=get_value("YMULT",preamble);
-		plots.trace[c].title=get_string("WFID",preamble);
-		break_extended(plots.trace[c].title,&plots.trace[c].info);
-		plots.trace[c].yoff=plots.trace[c].yoff*plots.trace[c].ymult*plots.trace[c].info.vert_mult;
-		if(plots.yoff_max > plots.trace[c].yoff)
-			plots.yoff_max=plots.trace[c].yoff;
-		close (id);
-	}
-
-	/**set the output script name  */
-	write_script_file(NULL, oname, NULL, NULL,WR_SETFILENAME);
+	/*preload data, find our max offset*/
+	if(load_data(&plot))
+		return 1;
+	/**build function data & write the data file.  */
+	if(handle_functions(&plot))
+		return 1;
+	/**now adjust 2% per trace  */
+	c=(plot.max_yrange_plus+plot.max_yrange_minus)*4/100;
+	c*=(plot.idx+plot.f_idx);
+	plot.max_yrange_plus+=c;
+	printf("ymin %d , ymax %d\n",plot.max_yrange_plus, plot.max_yrange_minus);
 	
-	xtitle[0]=titles[0]=0;
-	/*printf("plots.idx=%d\n",plots.idx); */
-	for (c=0; c<plots.idx;++c){
-		int i, trigfile;
-		if(gnuplot)
-			trigfile=1;
-		else if(NULL == plots.trigname){
-			if(0 == c)	/**use first file  */
-				trigfile=1;
-			else
-				trigfile=0;
-		}
-		else if(!strcmp(plots.trigname,plots.trace[c].iname))
-			trigfile=1;
-		else
-			trigfile=0;
-		if(0 == gnuplot){
-			if(1>(od=open(plots.trace[c].oname,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
-				printf("Unable to open %s\n",plots.trace[c].oname);
-				goto end;
-			}				
-			printf("Writing %s\n",plots.trace[c].oname);
-		}else 
-			id=0;
-
-		if(1>(id=open(plots.trace[c].iname,O_RDONLY)) ){
-			printf("Unable to open %s\n",plots.trace[c].iname);
-			goto closeod;
-		}
-		if(NULL == (preamble=load_preamble(id, &data))){
-			printf("Unable to load preamble for file %s\n",plots.trace[c].iname);
-			goto closeid;
-		}
-		/**PT.OFF  */
-		plots.trace[c].yoff=plots.yoff_max;
-		plots.trace[c].ymult=get_value("YMULT",preamble);
-		plots.trace[c].xincr=get_value("XINCR", preamble);
-		plots.trace[c].fmt=get_string("BN.FMT",preamble);
-		plots.trace[c].enc=get_string("ENCDG",preamble);
-		trigger=get_value("PT.OFF",preamble);
-		plots.trace[c].title=get_string("WFID",preamble);
-		strip_quotes(plots.trace[c].title);
-
-		if(!strcmp("RI",plots.trace[c].fmt))
-			sgn=1;
-		else if(!strcmp("RP",plots.trace[c].fmt))
-			sgn=0;
-		else {
-			printf("Unknown format %s\n",plots.trace[c].fmt);
-			goto closeid;
-		}
-		
-		if(strcmp(plots.trace[c].enc,"ASCII")){
-			printf("Encoding %s not supportd\n",plots.trace[c].enc);
-			goto closeid;
-		}
-		
-		/*printf("off=%E mult=%E inc=%E\n",plots.trace[c].yoff,plots.trace[c].ymult,plots.trace[c].xincr); */
-		break_extended(plots.trace[c].title,&plots.trace[c].info);
-		if(0 == _xincr){
-			_xincr=plots.trace[c].xincr;
-		}
-		/**change range if over 3 digits  */
-		if(check_xrange(plots.trace[c].title,&plots.trace[c].info))
-			return 1;
-		
-		i=strlen(titles);
-		if(0 ==i)
-			sprintf(&titles[i],"%s",plots.trace[c].title);
-		else 
-			sprintf(&titles[i],"\\n%s",plots.trace[c].title);
-		/*printf("Total time = %f %f points per division, time_div %f time_mult %f\n",plots.trace[c].xincr*1024,round((plots.trace[c].info.time_div/(plots.trace[c].info.time_mult))/plots.trace[c].xincr),plots.trace[c].info.time_div,plots.trace[c].info.time_mult); */
-		i=strlen(xtitle);
-		sprintf(&xtitle[i],"%s ",plots.trace[c].info.src);
-		plots.trace[c].label=strdup(plots.trace[c].info.src);
-		
-		/*yrange=( ((int)round(plots.trace[c].info.vert_div*8))+plots.trace[c].yoff<0?(int)(plots.trace[c].yoff*-1):(int)plots.trace[c].yoff)>>1; */
-		plots.trace[c].info.yrange_plus=plots.trace[c].info.yrange_minus=((int)round(plots.trace[c].info.vert_div*8))>>1;
-		if(plots.trace[c].yoff >=0)
-			plots.trace[c].info.yrange_minus+=round(plots.trace[c].yoff);
-		else
-			plots.trace[c].info.yrange_plus+=round(-plots.trace[c].yoff);
-		
-		/**now take it to the closest volt.  */
-		/** if(plots.trace[c].info.yrange_minus%1000)
-			plots.trace[c].info.yrange_minus+=1000;
-		if(plots.trace[c].info.yrange_plus%1000)
-			plots.trace[c].info.yrange_plus+=1000; */
-		/**now add a volt  
-		plots.trace[c].info.yrange_plus+=1000;
-		plots.trace[c].info.yrange_minus+=1000;*/
-		if(plots.max_yrange_plus <plots.trace[c].info.yrange_plus)
-			plots.max_yrange_plus =plots.trace[c].info.yrange_plus;
-				if(plots.max_yrange_minus <plots.trace[c].info.yrange_minus)
-			plots.max_yrange_minus =plots.trace[c].info.yrange_minus;
-		/*printf("yrange=[-%d:%d] in %s ",plots.trace[c].info.yrange_minus,plots.trace[c].info.yrange_plus,plots.trace[c].info.vert_units); */
-		plots.trace[c].info.xrange=(int)round(plots.trace[c].xincr*1024*plots.trace[c].info.time_mult);
-		trig=(int)round(trigger);
-		/*printf("Xrange=[0:%d] in %s\n",plots.trace[c].info.xrange,plots.trace[c].info.time_units); */
-		/*printf("set xtics 0,%f\n",plots.trace[c].info.time_div); */
-		plots.trace[c].info.x=0;
-		if(gnuplot){
-			if(-1 ==write_script_file(&plots.trace[c].info, "-", titles, xtitle,WR_SINGLE_PLOT)) {
-				printf("Script file error\n");
-				goto end;
-			}
-		}
-		buf[0]=1;
-		for (datapoint=0; datapoint<1024 && buf[0];++datapoint) {
-			if(1> get_next_value(id,buf))	
-				break;
-			plots.trace[c].info.y=strtof(buf, NULL);
-			if(0 == sgn)
-				plots.trace[c].info.y=plots.trace[c].info.y-128;
-			plots.trace[c].info.y=(plots.trace[c].info.y*plots.trace[c].ymult*plots.trace[c].info.vert_mult) - plots.trace[c].yoff;
-			if(gnuplot)	/**write data  */
-				write_script_file(&plots.trace[c].info, NULL, NULL, NULL,WR_DATA); 
-			else {
-				/*printf("%E %E (%s)\n",x,y,buf); */
-				i=sprintf(obuf,"%E %E\n",plots.trace[c].info.time_mult*plots.trace[c].info.x,plots.trace[c].info.y);
-				write(od,obuf,i);	
-			}
-			if(FUNCTION_NONE != func){
-				save_data_point(&plots.trace[c],
-					plots.trace[c].info.time_mult*plots.trace[c].info.x,
-					plots.trace[c].info.y);
-			}
-			plots.trace[c].info.x+=plots.trace[c].xincr;
-			/**we are on trigger channel, plot it, save it  */
-			if(trigfile &&datapoint==trig){
-				plots.ytrig=plots.trace[c].info.ytrig=plots.trace[c].info.y;
-				plots.xtrig=plots.trace[c].info.xtrig=plots.trace[c].info.time_mult*plots.trace[c].info.x;
-			}
-		}
-		if(gnuplot){ /**write trigger  */
-			write_script_file(&plots.trace[c].info,NULL,NULL,0,WR_TRIGGER);
-		}	else {
-			/*write(od,buf,i);	 */
-			close(od);
-		}
-		close(id);
-		id=od=0;
-	} /**end for loop  */	
+	/**set the output script name  &size*/
+	plot.trace[plot.idx].info.x=plot.graphx;
+	plot.trace[plot.idx].info.y=plot.graphy;
+	write_script_file(&plot.trace[plot.idx].info, plot.basename, NULL, NULL,WR_SETFILENAME);
+	
+	/*printf("plot.idx=%d\n",plot.idx); */
+	if(plot.flags &FLAGS_GNUPLOT){
+		plot.trace[0].info.yrange_plus=plot.max_yrange_plus;
+		plot.trace[0].info.yrange_minus=plot.max_yrange_minus;
+	}	
+	/**write the data  */
+	if(write_datafiles(&plot))
+		goto end;
 	
 	ret=0;
-	if(0 == gnuplot)	{
-		plots.trace[c].info.yrange_plus=plots.max_yrange_plus;
-		plots.trace[c].info.yrange_minus=plots.max_yrange_minus;
-		/**write the script file  */
-		sprintf(buf,"\"%s\"",titles);
-		/**the offset to the trigger is set when c=0  */
-		for (c=0; c<plots.idx;++c){
-			plots.trace[c].info.src=plots.trace[c].label;
-			write_script_file(&plots.trace[c].info,plots.trace[c].oname,buf,xtitle,c+1);	
-		}
-		plots.trace[c].info.ytrig=plots.ytrig;
-		plots.trace[c].info.xtrig=plots.xtrig;
-		/**write the trigger.  */
-		write_script_file(&plots.trace[c].info,NULL,NULL,0,WR_TRIGGER);	
-	}	else
-		--c;
-	/**Handle functions here, before end of script file  */
 	
-	if(FUNCTION_NONE != func){
-		/**FIX me! We are assuming the first two data files   */
-		char *fn;
-		int i;
-		if(plots.idx<2){
-			printf("Have to have two files to use func %d\n",func);
-			goto closeid;
-		}
-		if(NULL == (fn=malloc(strlen(function)+strlen(oname)+10)) ){
-			printf("Out of memory for %s&on\n",function);
-			goto end;
-		}
-		sprintf(fn,"%s.%s",oname,function);
-		if(1>(od=open(fn,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
-			printf("Unable to open %s\n",fn);
-			goto end;
-		}				
-		printf("Writing %s\n",fn);
-		
-		plots.trace[0].info.src=function;
-		write_script_file(&plots.trace[0].info,fn,NULL,NULL,WR_MULTI_PLOT);
-		switch(func){
-			case FUNCTION_DIFF:
-				for (c=0; c< MAX_POINTS && c<plots.trace[0].data_pt.idx && c<plots.trace[1].data_pt.idx;++c){
-					double diff;
-					diff=plots.trace[0].data_pt.data[c].y-plots.trace[1].data_pt.data[c].y;
-					save_data_point(&plots.trace[plots.idx],plots.trace[0].data_pt.data[c].x,diff);
-					i=sprintf(buf,"%E %E\n",plots.trace[0].data_pt.data[c].x,diff);
-					write(od,buf,i);
-				}
-				break;
-		}
-	}	
-	
-	if(NULL != plots.cursorfile){
-		double max,min,diff,center;
-		char *func, *target;
-		int targ=0;
-		if(1>(id=open(plots.cursorfile,O_RDONLY)) ){
-			printf("Unable to open %s\n",plots.cursorfile);
-			goto closeod;
-		}
-		read(id,buf,BUF_LEN-1);
-		func=get_string("CURSOR",buf);
-		max=get_value("MAX",buf);
-		min=get_value("MIN",buf);
-		diff=get_value("DIFF",buf);
-		/** FIXME - add this to get cursor info from: target=get_string("TARGET",buf);*/
-		/*printf("Buf=%s\noff %F max %F,min %F,diff %F\n",buf,plots.yoff_max,max,min,diff); */
-		memcpy(&plots.trace[plots.idx].info,&plots.trace[targ].info,sizeof(struct extended));
-		targ=plots.idx;
-		if(!strcmp(func,"VOLTS")){
-			max=(max*plots.trace[targ].info.vert_mult)+(-1*plots.yoff_max);
-			min=(min*plots.trace[targ].info.vert_mult)+(-1*plots.yoff_max);
-			center=((max-min)/2)+min;
-			plots.trace[targ].info.y=center;
-			plots.trace[targ].info.x=-4;
-			diff*=plots.trace[targ].info.vert_mult;
-			sprintf(buf,"%d%s",(int)round(diff),plots.trace[targ].info.vert_units);
-			plots.trace[targ].info.src=buf;
-			write_script_file(&plots.trace[targ].info,NULL,NULL,0,WR_CURSORS);	
-			/**now draw the cursors  */
-			write_cursor(&plots.trace[targ].info,0,max);
-			write_cursor(&plots.trace[targ].info,plots.trace[targ].info.xrange,max);
-			write_cursor(&plots.trace[targ].info,plots.trace[targ].info.xrange,min);
-			write_cursor(&plots.trace[targ].info,0,min);			
-		}	else if(!strcmp(func,"TIME")){
-			double len;
-			len=(plots.max_yrange_plus+plots.max_yrange_minus)/50;
-			plots.trace[targ].info.x=min*get_multiplier(plots.trace[targ].info.time_units);;
-			plots.trace[targ].info.y=(plots.max_yrange_plus+len);
-			/*printf("diff=%f\n",diff); */
-			diff *=get_multiplier(plots.trace[targ].info.time_units);
-			/*diff*=1000; */
-			sprintf(buf,"%.3f%s",diff,plots.trace[targ].info.time_units);
-			plots.trace[targ].info.src=buf;
-			write_script_file(&plots.trace[targ].info,NULL,NULL,0,WR_CURSORS);	
-			/**now draw the cursors  */   
-			len*=2;
-			write_cursor(&plots.trace[targ].info,max,plots.max_yrange_plus-len);
-			write_cursor(&plots.trace[targ].info,max,plots.max_yrange_plus);
-			write_cursor(&plots.trace[targ].info,min,plots.max_yrange_plus);
-			write_cursor(&plots.trace[targ].info,min,plots.max_yrange_plus-len); /**-plots.max_yrange_minus  */
-		}else{
-			printf("Don't know how to handle cursor function '%s'\n",func);
-		}
-		
+	/**write the script file  */
+	sprintf(buf,"\"%s\"",plot.titles);
+	/**the offset to the trigger is set when c=0  */
+	for (c=0; c<plot.idx;++c){
+		plot.trace[c].info.yrange_plus=plot.max_yrange_plus;
+		plot.trace[c].info.yrange_minus=plot.max_yrange_minus;
+		plot.trace[c].info.src=plot.trace[c].label;
+		write_script_file(&plot.trace[c].info,plot.trace[c].oname,buf,plot.xtitle,c+1);	
 	}
+	plot.trace[c].info.ytrig=plot.ytrig;
+	plot.trace[c].info.xtrig=plot.xtrig;
+	/**write the trigger.  */
+	write_script_file(&plot.trace[c].info,NULL,NULL,0,WR_TRIGGER);	
+	
+	/**Handle functions - write the plot lines */
+	for (c=0;c<plot.f_idx;++c){
+		plot.function[c].trace.info.src=plot.function[c].name;
+		write_script_file(&plot.function[c].trace.info,plot.function[c].trace.oname,NULL,NULL,WR_MULTI_PLOT);
+	}
+	/**now handle the cursor stuff.  */
+	plot_cursor(&plot);
+	
 	/**close output file  */
 	write_script_file(NULL,NULL,NULL,0,WR_CLOSE);
 
-closeid:
-	if(id>2)
-		close(id);
-closeod:
-	if(od>2)
-		close(od);
 end:
 	return (ret);
 	
@@ -1105,8 +1369,8 @@ use -persist to leave plot up when gnuplot exits
   plot cos(x)     ls 4 title 'ls 4'
   plot "-"
 
-		printf("set xlabel \"%s\"\n",plots.trace[c].info.time_units);
-		printf("set ylabel \"%s\"\n",plots.trace[c].info.vert_units);
+		printf("set xlabel \"%s\"\n",plot.trace[c].info.time_units);
+		printf("set ylabel \"%s\"\n",plot.trace[c].info.vert_units);
   set label 1 'Y-AXIS' at graph -0.2, graph 0.5
 
 
@@ -1123,7 +1387,7 @@ Add cursor input from get_tek_waveform:
 	Add 
 	set label 2 '545mV' at -4,2525 front
 	right after placing trigger.
-	Then add this line (based on plots.trace[c].yoff from data).:
+	Then add this line (based on plot.trace[c].yoff from data).:
 '-' title "" ls 4 with lines
 0 2810
 41 2810
