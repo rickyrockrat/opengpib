@@ -10,7 +10,7 @@
 
 usage () {
 
-	echo "Usage for \$Revision: 1.5 $:"
+	echo "Usage for \$Revision: 1.6 $:"
 	echo "makepng -b basename <options>"
 	echo " -b bn bn is the base filename. Input files should be bn.ch1 bn.ch2, etc"
 	echo " -c process cursors file basename.cursors"
@@ -40,7 +40,7 @@ while  getopts b:cd:f:i: opt ; do
   	b) BN="$OPTARG" ;;
     c) CURSORS="1" ;;
     d) DESC="-a \"$OPTARG\"" ;;																								 
-    f) FUNC="-f $OPTARG" ;;
+    f) FUNC="-f $OPTARG $FUNC" ;;
     i) IN="$IN -i $OPTARG" ;; 
     *) echo "Invalid option $OPTARG"
     	usage
