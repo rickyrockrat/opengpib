@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.9  2008/08/19 00:49:48  dfs
+Added target to dump
+
 Revision 1.8  2008/08/18 21:18:33  dfs
 Fixed min,max read of cursor
 
@@ -40,8 +43,7 @@ Initial working rev
 #include <ctype.h>
 
 
-#define MAX_CHANNELS 7
-#define CURSORS      6 /**offset into CH_LIST where cursors keyword is */
+
 #define BUF_SIZE 8096
 char buf[BUF_SIZE];
 
@@ -67,16 +69,6 @@ struct gpib_handle *open_gpib(struct gpib_port *port)
 
 #endif
 
-char *CH_LIST[MAX_CHANNELS]=\
-{
-	"ch1",
-	"ch2",
-	"ref1",
-	"ref2",
-	"ref3",
-	"ref4",
-	"cursors",
-};
 /***************************************************************************/
 /** .
 \n\b Arguments:
