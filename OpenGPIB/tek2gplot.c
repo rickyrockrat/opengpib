@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.9  2008/08/18 22:09:26  dfs
+Added time cursor handling, fixed vert scaling, fixed horiz printing
+
 Revision 1.8  2008/08/12 23:04:00  dfs
 Added diff function
 
@@ -98,6 +101,40 @@ struct data_point {
 	int idx;
 };
 struct data_point data_pt[MAX_INPUTFILES];
+
+struct trace_data {
+	struct extended info;
+	struct data_point data_pt;
+	double ymult;
+	double xincr;
+	double trigger;
+	double yoff;
+	char *fmt;
+	char *enc;
+	char *title;
+	char *label;
+	char *iname;
+  char *oname;
+};
+
+struct plot_data {
+	int max_yrange_plus;
+	int max_yrange_minus;
+	int idx;
+	double maxx;
+	double minx;
+	double maxy;
+	double miny;
+	double xtrig;
+	double ytrig;
+	double yoff_max;
+	char *trigname;
+	char *cursorfile;
+	int terminal;
+	struct trace_data trace[MAX_INPUTFILES];
+	
+};
+
 enum {
 	_SRC,
 	_COUPLE,
@@ -298,6 +335,47 @@ int break_extended(char *data, struct extended *x)
 /***************************************************************************/
 /** .
 \n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int get_linecolor( char *rgb)
+{
+	unsigned long ilinecolor;
+	char buf[256];
+	if(NULL == rgb)
+		return 2;
+	sprintf(buf,"0%s",rgb);
+	ilinecolor=strtol(buf,NULL,16);
+	switch(ilinecolor){
+		case 0xff0000: /**red  */
+			return 1;
+			break;
+		case 0x00FF00: /*green */
+			return 2;
+			break;                           
+		case 0x0000ff:  /*blue  */
+			return 3;                  
+			break;	                       
+		case 0xFF00FF:  /*magenta */
+			return 4;                  
+			break;                         
+		case 0x00FFFF:  /*cyan */
+			return 5;
+			break;
+		case 0xA0522D: /*sienna */
+			return 6;
+			break;
+		case 0xffa500: /**orange */
+			return 7;
+			break;	
+		case 0xFF7F50: /*coral */
+			return 8;
+			break;				
+	}
+	return 2;
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
 if plotno is 1 or above, we do a multi-plot.  If 0, we do a single plot.
 if plotno is -1, we close the file
 \n\b Returns:
@@ -309,7 +387,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	static int od=0, first=1;
 	static int offset;
 	static char *fname;
-	uint32_t ilinecolor;
+	int ilinecolor;
 
 	if( WR_SETFILENAME == plotno){
 		sprintf(buf,"%s.plot",dfile);
@@ -421,37 +499,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 				break;
 		}
 		if(TERM_X == ext->terminal ){
-			sprintf(buf,"0%s",ext->line_color);
-			ilinecolor=strtol(buf,NULL,16);
-			switch(ilinecolor){
-				case 0xff0000: /**red  */
-					ilinecolor=1;
-					break;
-				case 0x00FF00: /*green */
-					ilinecolor=2;
-					break;                           
-				case 0x0000ff:  /*blue  */
-					ilinecolor=3;                  
-					break;	                       
-				case 0xFF00FF:  /*magenta */
-					ilinecolor=4;                  
-					break;                         
-				case 0x00FFFF:  /*cyan */
-					ilinecolor=5;
-					break;
-				case 0xA0522D: /*sienna */
-					ilinecolor=6;
-					break;
-				case 0xffa500: /**orange */
-					ilinecolor=7;
-					break;	
-				case 0xFF7F50: /*coral */
-					ilinecolor=8;
-					break;				
-				default:
-					ilinecolor=2;
-					break;
-			}
+			ilinecolor=get_linecolor(ext->line_color);
 		}
 		else ilinecolor=2;
 		c=sprintf(buf,"set label 1 'T' at ");
@@ -513,7 +561,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.9 $\n"
+	printf("tek2gplot: $Revision: 1.10 $\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
 	"    if this is not set, the first file is assumed to have the trigger\n"
@@ -566,31 +614,98 @@ void strip_quotes(char *n)
 	}
 		
 }
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int save_data_point(struct trace_data *t, double x, double y)
+{
+	if(t->data_pt.idx>=MAX_POINTS)
+		return -1;
+	t->data_pt.data[t->data_pt.idx].x=x;
+	t->data_pt.data[t->data_pt.idx].y=y;
+	++t->data_pt.idx;
+	return 0;
+}
+
 
 /***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int save_data_point(int idx, double x, double y)
+int check_xrange (char *title, struct extended *e)
 {
 	int i;
-	if( -1 == idx){
-		for (i=0; i<MAX_INPUTFILES;++i)
-			data_pt[i].idx=0;
-		return 0;
+	/**change range if over 3 digits  */
+	i=strlen(title);
+	if(e->time_div >100){
+		int x,s,j;
+		char b[12];
+		/*printf("mult=%f Timeb=%.2f ",e->time_mult,e->time_div); */
+		e->time_mult=e->time_mult/1000;
+		x=round(e->time_mult);
+		switch(x){
+			case 1: strcpy(e->time_units,"s"); break;
+  			case 1000: strcpy(e->time_units,"ms"); break;
+  			case 1000000: strcpy(e->time_units,"us"); break;				
+  			case 1000000000: strcpy(e->time_units,"ns"); break;
+  			default: printf("Don'k know how to handle %f multiplier\n",e->time_mult); return 1;
+		}
+		
+		e->time_div=e->time_div/1000;
+		/*printf("TimeA=%.2f Title='%s'\n",e->time_div,title); */
+		
+		for (s=x=0; x<i && s<3;++x){
+			if(' ' == title[x])
+				++s;
+		}
+		s=x;/**first char we can write  */
+		while(title[x] && ' ' != title[x])
+			++x;
+		/*printf("s=%d, x=%d, new units=%s\n",s,x,e->time_units); */
+		/**FIXME add check here for size so we don't overwrite existing string.  */
+		j=sprintf(b,"%2g%s",e->time_div,e->time_units);
+		if(j>x-s){ /**realloc the string  */
+			char *p;
+			j+=i+5;
+			if(NULL ==(p=malloc(j)) ){
+				printf("OUt of mem on alloc of %d\n",j);
+				return 1;
+			}
+			title[s]=0;
+			sprintf(p,"%s %s %s",title,b,&title[x]);
+			free (title);
+			title=p;
+		}	else {/**it fits, just use old string  */
+			for (i=0;b[i] && s<x;++i,++s)
+				title[s]=b[i];	
+		}
+		/*sprintf(&title[s],"%.2f%s",e->time_div,e->time_units); */
 	}
-	if(idx>= MAX_INPUTFILES)	{
-		return -1;
-	}
-	if(data_pt[idx].idx>=MAX_POINTS)
-		return -1;
-	data_pt[idx].data[data_pt[idx].idx].x=x;
-	data_pt[idx].data[data_pt[idx].idx].y=y;
-	++data_pt[idx].idx;
 	return 0;
 }
 
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int build_oname(struct trace_data *t, char *oname)
+{
+	char *in,*bn;
+	in=strdup(t->iname); /**strdup since basename can mod path  */
+	bn=basename(in);
+	
+	if(NULL == (t->oname=malloc(strlen(bn)+strlen(oname)+10)) ){
+		printf("Out of memory for bm&on\n");
+		return 1;
+	}
+	sprintf(t->oname,"%s.%s",oname,bn);
+	free (in);
+	return 0;
+}
 /***************************************************************************/
 /** When gnuplot is specified, there is just one file, the script file, so
 write_script_file is used for all writing.
@@ -600,29 +715,28 @@ write_script_file is used for all writing.
 
 int main (int argc, char *argv[])
 {
-	char *iname[MAX_INPUTFILES],*oname, *preamble, buf[BUF_LEN], obuf[50];
-	char *fmt, *enc, *title, titles[BUF_LEN], xtitle[50], *labels[MAX_INPUTFILES];
-	char *ofnames[MAX_INPUTFILES], *trigname, *cursorfile, *function;
-	int id, od, ret=1, c, data, idx, func;
-	int sgn,gnuplot, datapoint, multiplot, max_yrange_plus, max_yrange_minus;
-	double yoff, ymult, xincr, trigger, xtrig, ytrig, yoff_max, _xincr;
-	struct extended ext;
-	int trig;
+	char *oname, *preamble, buf[BUF_LEN], obuf[50];
+	char  titles[BUF_LEN], xtitle[50];
+	char *function;
+	int id, od, ret=1, c, data, func;
+	int sgn,gnuplot, datapoint, multiplot, trig, last_idx;
+	double trigger, _xincr;
+	struct plot_data plots;
 	_xincr=0;
-	function=cursorfile=trigname=iname[0]=oname=NULL;
+	memset(&plots,0,sizeof(struct plot_data));
+	
+	function=oname=NULL;
 	multiplot=gnuplot=0;
-	ext.smoothing=0;
-	ext.terminal=TERM_X;
-	ext.line_color="x00ff00";
-	idx=0;
+	
 	func=0;
+	last_idx=0;
 	while( -1 != (c = getopt(argc, argv, "c:d:f:gi:ml:o:s:t:")) ) {
 		switch(c){
 			case 'c':
-				trigname=strdup(optarg);
+				plots.trigname=strdup(optarg);
 				break;
 			case 'd':
-				cursorfile=strdup(optarg);
+				plots.cursorfile=strdup(optarg);
 				break;			
 			case 'f':
 				function=strdup(optarg);
@@ -641,15 +755,18 @@ int main (int argc, char *argv[])
 				return 0;
 				break;
 			case 'i':
-				if(idx>= MAX_INPUTFILES){
+				if(plots.idx>= MAX_INPUTFILES){
 					printf("Exceeded max input files of %d\n",MAX_INPUTFILES);
 					return 1;
 				}
-					
-				iname[idx++]=strdup(optarg);
+				plots.trace[plots.idx].info.smoothing=0;
+				plots.trace[plots.idx].info.terminal=TERM_X;
+				plots.trace[plots.idx].info.line_color="x00ff00";	
+				last_idx=plots.idx;
+				plots.trace[plots.idx++].iname=strdup(optarg);
 				break;
 			case 'l':
-				ext.line_color=strdup(&optarg[1]);
+				plots.trace[last_idx].info.line_color=strdup(&optarg[1]);
 				break;
 			case 'm':
 				multiplot=1;
@@ -658,15 +775,15 @@ int main (int argc, char *argv[])
 				oname=strdup(optarg);
 				break;	
 			case 's':
-				ext.smoothing=strtol(optarg,NULL,10);
+				plots.trace[last_idx].info.smoothing=strtol(optarg,NULL,10);
 				break;
 			case 't':
 				if(!strcmp(optarg,"png"))
-					ext.terminal=TERM_PNG;
+					plots.terminal=TERM_PNG;
 				else if(!strcmp(optarg,"x11"))
-					ext.terminal=TERM_X;
+					plots.terminal=TERM_X;
 				else if(!strcmp(optarg,"ascii"))
-					ext.terminal=TERM_DUMB;				
+					plots.terminal=TERM_DUMB;				
 				else {
 					printf("Must specify X or png for -t option\n");
 					usage();
@@ -679,31 +796,31 @@ int main (int argc, char *argv[])
 		printf("Cannot specify both -m and -g\n");
 		return 1;
 	}
-	if( 0 == idx || NULL == oname){
+	if( 0 == plots.idx || NULL == oname){
 		printf("Must supply at least -o, -i\n");
 		usage();
 		return 1;
 	}
-	/**init our data arrays  */
-	save_data_point(-1,0,0);
 	/*find our max offset*/
-	yoff_max=0;
-	for (c=0; c<idx;++c){
-		if(1>(id=open(iname[c],O_RDONLY)) ){
-			printf("Unable to open %s\n",iname[c]);
+	plots.yoff_max=0;
+	for (c=0; c<plots.idx;++c){
+		if(1>(id=open(plots.trace[c].iname,O_RDONLY)) ){
+			printf("Unable to open %s\n",plots.trace[c].iname);
 			goto closeod;
 		}
+		build_oname(&plots.trace[c],oname);
 		if(NULL == (preamble=load_preamble(id, &data))){
-			printf("Unable to load preamble for file %s\n",iname[c]);
+			printf("Unable to load preamble for file %s\n",plots.trace[c].iname);
 			goto closeid;
 		}
-		yoff=get_value("YOFF", preamble);
-		ymult=get_value("YMULT",preamble);
-		title=get_string("WFID",preamble);
-		break_extended(title,&ext);
-		yoff=yoff*ymult*ext.vert_mult;
-		if(yoff_max > yoff)
-			yoff_max=yoff;
+		plots.trace[c].info.terminal=plots.terminal;
+		plots.trace[c].yoff=get_value("YOFF", preamble);
+		plots.trace[c].ymult=get_value("YMULT",preamble);
+		plots.trace[c].title=get_string("WFID",preamble);
+		break_extended(plots.trace[c].title,&plots.trace[c].info);
+		plots.trace[c].yoff=plots.trace[c].yoff*plots.trace[c].ymult*plots.trace[c].info.vert_mult;
+		if(plots.yoff_max > plots.trace[c].yoff)
+			plots.yoff_max=plots.trace[c].yoff;
 		close (id);
 	}
 
@@ -711,163 +828,108 @@ int main (int argc, char *argv[])
 	write_script_file(NULL, oname, NULL, NULL,WR_SETFILENAME);
 	
 	xtitle[0]=titles[0]=0;
-	max_yrange_minus=max_yrange_plus=0;
-	/*printf("idx=%d\n",idx); */
-	for (c=0; c<idx;++c){
-		char *in,*bn;/**output name, input name, and base name of inputname  */
+	/*printf("plots.idx=%d\n",plots.idx); */
+	for (c=0; c<plots.idx;++c){
 		int i, trigfile;
 		if(gnuplot)
 			trigfile=1;
-		else if(NULL == trigname){
+		else if(NULL == plots.trigname){
 			if(0 == c)	/**use first file  */
 				trigfile=1;
 			else
 				trigfile=0;
 		}
-		else if(!strcmp(trigname,iname[c]))
+		else if(!strcmp(plots.trigname,plots.trace[c].iname))
 			trigfile=1;
 		else
 			trigfile=0;
 		if(0 == gnuplot){
-			in=strdup(iname[c]);
-			bn=basename(in);
-			
-			if(NULL == (ofnames[c]=malloc(strlen(bn)+strlen(oname)+10)) ){
-				printf("Out of memory for bm&on\n");
-				goto end;
-			}
-			sprintf(ofnames[c],"%s.%s",oname,bn);
-			free (in);
-			if(1>(od=open(ofnames[c],O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
-				printf("Unable to open %s\n",ofnames[c]);
+			if(1>(od=open(plots.trace[c].oname,O_WRONLY|O_CREAT|O_TRUNC,S_IRUSR|S_IWUSR)) ){
+				printf("Unable to open %s\n",plots.trace[c].oname);
 				goto end;
 			}				
-			printf("Writing %s\n",ofnames[c]);
+			printf("Writing %s\n",plots.trace[c].oname);
 		}else 
 			id=0;
 
-		if(1>(id=open(iname[c],O_RDONLY)) ){
-			printf("Unable to open %s\n",iname[c]);
+		if(1>(id=open(plots.trace[c].iname,O_RDONLY)) ){
+			printf("Unable to open %s\n",plots.trace[c].iname);
 			goto closeod;
 		}
 		if(NULL == (preamble=load_preamble(id, &data))){
-			printf("Unable to load preamble for file %s\n",iname[c]);
+			printf("Unable to load preamble for file %s\n",plots.trace[c].iname);
 			goto closeid;
 		}
 		/**PT.OFF  */
-		yoff=yoff_max;
-		ymult=get_value("YMULT",preamble);
-		xincr=get_value("XINCR", preamble);
-		fmt=get_string("BN.FMT",preamble);
-		enc=get_string("ENCDG",preamble);
+		plots.trace[c].yoff=plots.yoff_max;
+		plots.trace[c].ymult=get_value("YMULT",preamble);
+		plots.trace[c].xincr=get_value("XINCR", preamble);
+		plots.trace[c].fmt=get_string("BN.FMT",preamble);
+		plots.trace[c].enc=get_string("ENCDG",preamble);
 		trigger=get_value("PT.OFF",preamble);
-		title=get_string("WFID",preamble);
-		strip_quotes(title);
+		plots.trace[c].title=get_string("WFID",preamble);
+		strip_quotes(plots.trace[c].title);
 
-		if(!strcmp("RI",fmt))
+		if(!strcmp("RI",plots.trace[c].fmt))
 			sgn=1;
-		else if(!strcmp("RP",fmt))
+		else if(!strcmp("RP",plots.trace[c].fmt))
 			sgn=0;
 		else {
-			printf("Unknown format %s\n",fmt);
+			printf("Unknown format %s\n",plots.trace[c].fmt);
 			goto closeid;
 		}
 		
-		if(strcmp(enc,"ASCII")){
-			printf("Encoding %s not supportd\n",enc);
+		if(strcmp(plots.trace[c].enc,"ASCII")){
+			printf("Encoding %s not supportd\n",plots.trace[c].enc);
 			goto closeid;
 		}
 		
-		/*printf("off=%E mult=%E inc=%E\n",yoff,ymult,xincr); */
-		break_extended(title,&ext);
+		/*printf("off=%E mult=%E inc=%E\n",plots.trace[c].yoff,plots.trace[c].ymult,plots.trace[c].xincr); */
+		break_extended(plots.trace[c].title,&plots.trace[c].info);
 		if(0 == _xincr){
-			_xincr=xincr;
+			_xincr=plots.trace[c].xincr;
 		}
-		
 		/**change range if over 3 digits  */
-		i=strlen(title);
-		if(ext.time_div >100){
-			int x,s,j;
-			char b[12];
-			/*printf("mult=%f Timeb=%.2f ",ext.time_mult,ext.time_div); */
-			ext.time_mult=ext.time_mult/1000;
-			x=round(ext.time_mult);
-			switch(x){
-				case 1: strcpy(ext.time_units,"s"); break;
-   			case 1000: strcpy(ext.time_units,"ms"); break;
-   			case 1000000: strcpy(ext.time_units,"us"); break;				
-   			case 1000000000: strcpy(ext.time_units,"ns"); break;
-   			default: printf("Don'k know how to handle %f multiplier\n",ext.time_mult); return 1;
-			}
-			
-			ext.time_div=ext.time_div/1000;
-			/*printf("TimeA=%.2f Title='%s'\n",ext.time_div,title); */
-			
-			for (s=x=0; x<i && s<3;++x){
-				if(' ' == title[x])
-					++s;
-			}
-			s=x;/**first char we can write  */
-			while(title[x] && ' ' != title[x])
-				++x;
-			/*printf("s=%d, x=%d, new units=%s\n",s,x,ext.time_units); */
-			/**FIXME add check here for size so we don't overwrite existing string.  */
-			j=sprintf(b,"%2g%s",ext.time_div,ext.time_units);
-			if(j>x-s){ /**realloc the string  */
-				char *p;
-				j+=i+5;
-				if(NULL ==(p=malloc(j)) ){
-					printf("OUt of mem on alloc of %d\n",j);
-					return 1;
-				}
-				title[s]=0;
-				sprintf(p,"%s %s %s",title,b,&title[x]);
-				free (title);
-				title=p;
-			}	else {/**it fits, just use old string  */
-				for (i=0;b[i] && s<x;++i,++s)
-					title[s]=b[i];	
-			}
-			
-			/*sprintf(&title[s],"%.2f%s",ext.time_div,ext.time_units); */
-		}
+		if(check_xrange(plots.trace[c].title,&plots.trace[c].info))
+			return 1;
+		
 		i=strlen(titles);
 		if(0 ==i)
-			sprintf(&titles[i],"%s",title);
+			sprintf(&titles[i],"%s",plots.trace[c].title);
 		else 
-			sprintf(&titles[i],"\\n%s",title);
-		/*printf("Total time = %f %f points per division, time_div %f time_mult %f\n",xincr*1024,round((ext.time_div/(ext.time_mult))/xincr),ext.time_div,ext.time_mult); */
+			sprintf(&titles[i],"\\n%s",plots.trace[c].title);
+		/*printf("Total time = %f %f points per division, time_div %f time_mult %f\n",plots.trace[c].xincr*1024,round((plots.trace[c].info.time_div/(plots.trace[c].info.time_mult))/plots.trace[c].xincr),plots.trace[c].info.time_div,plots.trace[c].info.time_mult); */
 		i=strlen(xtitle);
-		sprintf(&xtitle[i],"%s ",ext.src);
-		labels[c]=strdup(ext.src);
+		sprintf(&xtitle[i],"%s ",plots.trace[c].info.src);
+		plots.trace[c].label=strdup(plots.trace[c].info.src);
 		
-		/*yrange=( ((int)round(ext.vert_div*8))+yoff<0?(int)(yoff*-1):(int)yoff)>>1; */
-		ext.yrange_plus=ext.yrange_minus=((int)round(ext.vert_div*8))>>1;
-		if(yoff >=0)
-			ext.yrange_minus+=round(yoff);
+		/*yrange=( ((int)round(plots.trace[c].info.vert_div*8))+plots.trace[c].yoff<0?(int)(plots.trace[c].yoff*-1):(int)plots.trace[c].yoff)>>1; */
+		plots.trace[c].info.yrange_plus=plots.trace[c].info.yrange_minus=((int)round(plots.trace[c].info.vert_div*8))>>1;
+		if(plots.trace[c].yoff >=0)
+			plots.trace[c].info.yrange_minus+=round(plots.trace[c].yoff);
 		else
-			ext.yrange_plus+=round(-yoff);
+			plots.trace[c].info.yrange_plus+=round(-plots.trace[c].yoff);
 		
 		/**now take it to the closest volt.  */
-		if(ext.yrange_minus%1000)
-			ext.yrange_minus+=1000;
-		if(ext.yrange_plus%1000)
-			ext.yrange_plus+=1000;
+		/** if(plots.trace[c].info.yrange_minus%1000)
+			plots.trace[c].info.yrange_minus+=1000;
+		if(plots.trace[c].info.yrange_plus%1000)
+			plots.trace[c].info.yrange_plus+=1000; */
 		/**now add a volt  
-		ext.yrange_plus+=1000;
-		ext.yrange_minus+=1000;*/
-		if(max_yrange_plus <ext.yrange_plus)
-			max_yrange_plus =ext.yrange_plus;
-				if(max_yrange_minus <ext.yrange_minus)
-			max_yrange_minus =ext.yrange_minus;
-		/*printf("yrange=[-%d:%d] in %s ",ext.yrange_minus,ext.yrange_plus,ext.vert_units); */
-		ext.xrange=(int)round(xincr*1024*ext.time_mult);
+		plots.trace[c].info.yrange_plus+=1000;
+		plots.trace[c].info.yrange_minus+=1000;*/
+		if(plots.max_yrange_plus <plots.trace[c].info.yrange_plus)
+			plots.max_yrange_plus =plots.trace[c].info.yrange_plus;
+				if(plots.max_yrange_minus <plots.trace[c].info.yrange_minus)
+			plots.max_yrange_minus =plots.trace[c].info.yrange_minus;
+		/*printf("yrange=[-%d:%d] in %s ",plots.trace[c].info.yrange_minus,plots.trace[c].info.yrange_plus,plots.trace[c].info.vert_units); */
+		plots.trace[c].info.xrange=(int)round(plots.trace[c].xincr*1024*plots.trace[c].info.time_mult);
 		trig=(int)round(trigger);
-		/*printf("Xrange=[0:%d] in %s\n",ext.xrange,ext.time_units); */
-		/*printf("set xtics 0,%f\n",ext.time_div); */
-		ext.x=0;
+		/*printf("Xrange=[0:%d] in %s\n",plots.trace[c].info.xrange,plots.trace[c].info.time_units); */
+		/*printf("set xtics 0,%f\n",plots.trace[c].info.time_div); */
+		plots.trace[c].info.x=0;
 		if(gnuplot){
-			if(-1 ==write_script_file(&ext, "-", titles, xtitle,WR_SINGLE_PLOT)) {
+			if(-1 ==write_script_file(&plots.trace[c].info, "-", titles, xtitle,WR_SINGLE_PLOT)) {
 				printf("Script file error\n");
 				goto end;
 			}
@@ -876,29 +938,31 @@ int main (int argc, char *argv[])
 		for (datapoint=0; datapoint<1024 && buf[0];++datapoint) {
 			if(1> get_next_value(id,buf))	
 				break;
-			ext.y=strtof(buf, NULL);
+			plots.trace[c].info.y=strtof(buf, NULL);
 			if(0 == sgn)
-				ext.y=ext.y-128;
-			ext.y=(ext.y*ymult*ext.vert_mult) - yoff;
+				plots.trace[c].info.y=plots.trace[c].info.y-128;
+			plots.trace[c].info.y=(plots.trace[c].info.y*plots.trace[c].ymult*plots.trace[c].info.vert_mult) - plots.trace[c].yoff;
 			if(gnuplot)	/**write data  */
-				write_script_file(&ext, NULL, NULL, NULL,WR_DATA); 
+				write_script_file(&plots.trace[c].info, NULL, NULL, NULL,WR_DATA); 
 			else {
 				/*printf("%E %E (%s)\n",x,y,buf); */
-				i=sprintf(obuf,"%E %E\n",ext.time_mult*ext.x,ext.y);
+				i=sprintf(obuf,"%E %E\n",plots.trace[c].info.time_mult*plots.trace[c].info.x,plots.trace[c].info.y);
 				write(od,obuf,i);	
 			}
 			if(FUNCTION_NONE != func){
-				save_data_point(c,ext.time_mult*ext.x,ext.y);
+				save_data_point(&plots.trace[c],
+					plots.trace[c].info.time_mult*plots.trace[c].info.x,
+					plots.trace[c].info.y);
 			}
-			ext.x+=xincr;
+			plots.trace[c].info.x+=plots.trace[c].xincr;
 			/**we are on trigger channel, plot it, save it  */
 			if(trigfile &&datapoint==trig){
-				ytrig=ext.ytrig=ext.y;
-				xtrig=ext.xtrig=ext.time_mult*ext.x;
+				plots.ytrig=plots.trace[c].info.ytrig=plots.trace[c].info.y;
+				plots.xtrig=plots.trace[c].info.xtrig=plots.trace[c].info.time_mult*plots.trace[c].info.x;
 			}
 		}
 		if(gnuplot){ /**write trigger  */
-			write_script_file(&ext,NULL,NULL,0,WR_TRIGGER);
+			write_script_file(&plots.trace[c].info,NULL,NULL,0,WR_TRIGGER);
 		}	else {
 			/*write(od,buf,i);	 */
 			close(od);
@@ -906,29 +970,31 @@ int main (int argc, char *argv[])
 		close(id);
 		id=od=0;
 	} /**end for loop  */	
+	
 	ret=0;
 	if(0 == gnuplot)	{
-		ext.yrange_plus=max_yrange_plus;
-		ext.yrange_minus=max_yrange_minus;
+		plots.trace[c].info.yrange_plus=plots.max_yrange_plus;
+		plots.trace[c].info.yrange_minus=plots.max_yrange_minus;
 		/**write the script file  */
 		sprintf(buf,"\"%s\"",titles);
 		/**the offset to the trigger is set when c=0  */
-		for (c=0; c<idx;++c){
-			ext.src=labels[c];
-			write_script_file(&ext,ofnames[c],buf,xtitle,c+1);	
+		for (c=0; c<plots.idx;++c){
+			plots.trace[c].info.src=plots.trace[c].label;
+			write_script_file(&plots.trace[c].info,plots.trace[c].oname,buf,xtitle,c+1);	
 		}
-		ext.ytrig=ytrig;
-		ext.xtrig=xtrig;
+		plots.trace[c].info.ytrig=plots.ytrig;
+		plots.trace[c].info.xtrig=plots.xtrig;
 		/**write the trigger.  */
-		write_script_file(&ext,NULL,NULL,0,WR_TRIGGER);	
-	}
+		write_script_file(&plots.trace[c].info,NULL,NULL,0,WR_TRIGGER);	
+	}	else
+		--c;
 	/**Handle functions here, before end of script file  */
 	
 	if(FUNCTION_NONE != func){
 		/**FIX me! We are assuming the first two data files   */
 		char *fn;
 		int i;
-		if(idx<2){
+		if(plots.idx<2){
 			printf("Have to have two files to use func %d\n",func);
 			goto closeid;
 		}
@@ -942,26 +1008,28 @@ int main (int argc, char *argv[])
 			goto end;
 		}				
 		printf("Writing %s\n",fn);
-		sprintf(ext.src,"%s",function);
-		write_script_file(&ext,fn,NULL,NULL,WR_MULTI_PLOT);
+		
+		plots.trace[0].info.src=function;
+		write_script_file(&plots.trace[0].info,fn,NULL,NULL,WR_MULTI_PLOT);
 		switch(func){
 			case FUNCTION_DIFF:
-				for (c=0; c< MAX_POINTS && c<data_pt[0].idx && c<data_pt[1].idx;++c){
+				for (c=0; c< MAX_POINTS && c<plots.trace[0].data_pt.idx && c<plots.trace[1].data_pt.idx;++c){
 					double diff;
-					diff=data_pt[0].data[c].y-data_pt[1].data[c].y;
-					save_data_point(idx,data_pt[0].data[c].x,diff);
-					i=sprintf(buf,"%E %E\n",data_pt[0].data[c].x,diff);
+					diff=plots.trace[0].data_pt.data[c].y-plots.trace[1].data_pt.data[c].y;
+					save_data_point(&plots.trace[plots.idx],plots.trace[0].data_pt.data[c].x,diff);
+					i=sprintf(buf,"%E %E\n",plots.trace[0].data_pt.data[c].x,diff);
 					write(od,buf,i);
 				}
 				break;
 		}
 	}	
 	
-	if(NULL != cursorfile){
+	if(NULL != plots.cursorfile){
 		double max,min,diff,center;
-		char *func;
-		if(1>(id=open(cursorfile,O_RDONLY)) ){
-			printf("Unable to open %s\n",cursorfile);
+		char *func, *target;
+		int targ=0;
+		if(1>(id=open(plots.cursorfile,O_RDONLY)) ){
+			printf("Unable to open %s\n",plots.cursorfile);
 			goto closeod;
 		}
 		read(id,buf,BUF_LEN-1);
@@ -969,40 +1037,42 @@ int main (int argc, char *argv[])
 		max=get_value("MAX",buf);
 		min=get_value("MIN",buf);
 		diff=get_value("DIFF",buf);
-		/*printf("Buf=%s\noff %F max %F,min %F,diff %F\n",buf,yoff_max,max,min,diff); */
-		
+		/** FIXME - add this to get cursor info from: target=get_string("TARGET",buf);*/
+		/*printf("Buf=%s\noff %F max %F,min %F,diff %F\n",buf,plots.yoff_max,max,min,diff); */
+		memcpy(&plots.trace[plots.idx].info,&plots.trace[targ].info,sizeof(struct extended));
+		targ=plots.idx;
 		if(!strcmp(func,"VOLTS")){
-			max=(max*ext.vert_mult)+(-1*yoff_max);
-			min=(min*ext.vert_mult)+(-1*yoff_max);
+			max=(max*plots.trace[targ].info.vert_mult)+(-1*plots.yoff_max);
+			min=(min*plots.trace[targ].info.vert_mult)+(-1*plots.yoff_max);
 			center=((max-min)/2)+min;
-			ext.y=center;
-			ext.x=-4;
-			diff*=ext.vert_mult;
-			sprintf(buf,"%d%s",(int)round(diff),ext.vert_units);
-			ext.src=buf;
-			write_script_file(&ext,NULL,NULL,0,WR_CURSORS);	
+			plots.trace[targ].info.y=center;
+			plots.trace[targ].info.x=-4;
+			diff*=plots.trace[targ].info.vert_mult;
+			sprintf(buf,"%d%s",(int)round(diff),plots.trace[targ].info.vert_units);
+			plots.trace[targ].info.src=buf;
+			write_script_file(&plots.trace[targ].info,NULL,NULL,0,WR_CURSORS);	
 			/**now draw the cursors  */
-			write_cursor(&ext,0,max);
-			write_cursor(&ext,ext.xrange,max);
-			write_cursor(&ext,ext.xrange,min);
-			write_cursor(&ext,0,min);			
+			write_cursor(&plots.trace[targ].info,0,max);
+			write_cursor(&plots.trace[targ].info,plots.trace[targ].info.xrange,max);
+			write_cursor(&plots.trace[targ].info,plots.trace[targ].info.xrange,min);
+			write_cursor(&plots.trace[targ].info,0,min);			
 		}	else if(!strcmp(func,"TIME")){
 			double len;
-			len=(max_yrange_plus+max_yrange_minus)/50;
-			ext.x=min*get_multiplier(ext.time_units);;
-			ext.y=(max_yrange_plus+len);
+			len=(plots.max_yrange_plus+plots.max_yrange_minus)/50;
+			plots.trace[targ].info.x=min*get_multiplier(plots.trace[targ].info.time_units);;
+			plots.trace[targ].info.y=(plots.max_yrange_plus+len);
 			/*printf("diff=%f\n",diff); */
-			diff *=get_multiplier(ext.time_units);
+			diff *=get_multiplier(plots.trace[targ].info.time_units);
 			/*diff*=1000; */
-			sprintf(buf,"%.3f%s",diff,ext.time_units);
-			ext.src=buf;
-			write_script_file(&ext,NULL,NULL,0,WR_CURSORS);	
+			sprintf(buf,"%.3f%s",diff,plots.trace[targ].info.time_units);
+			plots.trace[targ].info.src=buf;
+			write_script_file(&plots.trace[targ].info,NULL,NULL,0,WR_CURSORS);	
 			/**now draw the cursors  */   
 			len*=2;
-			write_cursor(&ext,max,max_yrange_plus-len);
-			write_cursor(&ext,max,max_yrange_plus);
-			write_cursor(&ext,min,max_yrange_plus);
-			write_cursor(&ext,min,max_yrange_plus-len); /**-max_yrange_minus  */
+			write_cursor(&plots.trace[targ].info,max,plots.max_yrange_plus-len);
+			write_cursor(&plots.trace[targ].info,max,plots.max_yrange_plus);
+			write_cursor(&plots.trace[targ].info,min,plots.max_yrange_plus);
+			write_cursor(&plots.trace[targ].info,min,plots.max_yrange_plus-len); /**-plots.max_yrange_minus  */
 		}else{
 			printf("Don't know how to handle cursor function '%s'\n",func);
 		}
@@ -1035,8 +1105,8 @@ use -persist to leave plot up when gnuplot exits
   plot cos(x)     ls 4 title 'ls 4'
   plot "-"
 
-		printf("set xlabel \"%s\"\n",ext.time_units);
-		printf("set ylabel \"%s\"\n",ext.vert_units);
+		printf("set xlabel \"%s\"\n",plots.trace[c].info.time_units);
+		printf("set ylabel \"%s\"\n",plots.trace[c].info.vert_units);
   set label 1 'Y-AXIS' at graph -0.2, graph 0.5
 
 
@@ -1053,7 +1123,7 @@ Add cursor input from get_tek_waveform:
 	Add 
 	set label 2 '545mV' at -4,2525 front
 	right after placing trigger.
-	Then add this line (based on yoff from data).:
+	Then add this line (based on plots.trace[c].yoff from data).:
 '-' title "" ls 4 with lines
 0 2810
 41 2810
