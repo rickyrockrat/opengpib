@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.15  2008/08/19 18:35:48  dfs
+Added pk-pk, min-y, max-y functions, #def r,l,b margins
+
 Revision 1.14  2008/08/19 16:55:04  dfs
 Added more headroom for labels
 
@@ -650,7 +653,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.15 $\n"
+	printf("tek2gplot: $Revision: 1.16 $\n"
 	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
@@ -736,7 +739,7 @@ int check_xrange (char *title, struct extended *e)
 	int i;
 	/**change range if over 3 digits  */
 	i=strlen(title);
-	if(e->time_div >100){
+	if(e->time_div >=100){
 		int x,s,j;
 		char b[12];
 		/*printf("mult=%f Timeb=%.2f ",e->time_mult,e->time_div); */
