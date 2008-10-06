@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.11  2008/10/06 07:52:38  dfs
+Moved funtions to gpib
+
 Revision 1.10  2008/08/19 06:42:26  dfs
 Moved def of CH_LIST to common.h
 
@@ -105,42 +108,6 @@ void _usleep(int usec)
 	}while(r.tv_sec || r.tv_nsec);*/
 	
 }
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-char read_port (struct serial_port *p)
-{
-	int res;
-	char ch;
-	res = read(p->handle,&ch,1);
-  /*    printf("1"); */
-  if( res <1 ) {
-    if( errno == EAGAIN || res == 0) /* EAGAIN - no data avail */
-      usleep(60); /**for 15200 baud  */
-    else  {
-      printf("We had a Read Error on %s.\n",p->phys_name);
-			return -1;
-    }
-  }
-	return ch;
-}
-
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int write_port(struct serial_port *p, char b)
-{
-	if(write(p->handle,&b,1) <0) {/* error writing */
-    printf("Error Writing to %s\n",p->phys_name);
-		return -1;
-  }
-	return 0;
-}
-
 
 /***************************************************************************/
 /** .
@@ -386,7 +353,7 @@ int main(int argc, char * argv[])
 		return 1;
 	}
 	printf("Serial port opened.\n");
-	if(-1 == init_prologix(p,inst_addr)){
+	if(-1 == init_prologix(p,inst_addr,1)){
 		printf("Controller init failed\n");
 		goto closem;
 	}
