@@ -11,7 +11,7 @@
 #-std=c99
 CFLAGS+=-Wall
 
-all: tek2gplot get_tek_waveform
+all: tek2gplot get_tek_waveform get_hp_16530_waveform
 
 common.o: CFLAGS+=-std=c99 -D_COMMON_
 
@@ -25,6 +25,9 @@ tek2gplot: common.o tek2gplot.o
 serial.o get_tek_waveform.o: serial.h
 
 get_tek_waveform:	serial.o get_tek_waveform.o common.o gpib.o
+	gcc -lm -o $@ $^
+	
+get_hp_16530_waveform:	serial.o get_hp_16530_waveform.o common.o gpib.o
 	gcc -lm -o $@ $^
 
 .PHONY: clean
