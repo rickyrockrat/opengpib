@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.3  2008/08/19 06:42:18  dfs
+Moved def of CH_LIST to common.h
+
 Revision 1.2  2008/08/18 21:14:34  dfs
 Added _XOPEN_SOURCE for strdup with C99
 
@@ -40,6 +43,8 @@ char *CH_LIST[MAX_CHANNELS]=\
 
 #endif
 double get_value( char *f, char *buf);
+double get_value_col( int col, char *buf);
 char * get_string( char *f, char *buf);
+char * get_string_col( int col, char *buf);
 #endif 
 
