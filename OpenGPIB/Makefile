@@ -19,12 +19,12 @@ common.o: common.c common.h
 
 tek2gplot.o get_tek_waveform.o common.o: common.h tek2gplot.c
 
-tek2gplot: tek2gplot.o common.o
+tek2gplot: common.o tek2gplot.o 
 	gcc  -lm -o $@ $^
 
 serial.o get_tek_waveform.o: serial.h
 
-get_tek_waveform:	serial.o get_tek_waveform.o common.o
+get_tek_waveform:	serial.o get_tek_waveform.o common.o gpib.o
 	gcc -lm -o $@ $^
 
 .PHONY: clean
