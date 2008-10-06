@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.17  2008/08/19 19:40:37  dfs
+Fixed too many labels on xtics
+
 Revision 1.16  2008/08/19 19:13:32  dfs
 Fixed check_xrange = 100
 
@@ -116,6 +119,7 @@ struct func_list func_names[]={
 #define WR_SETFILENAME -4
 #define WR_CURSORS     -5
 #define WR_LABEL  		 -6
+#define WR_RMARGIN     -7
 
 #define FLAGS_NONE      0
 #define FLAGS_GNUPLOT 	1
@@ -156,6 +160,7 @@ struct trace_data {
 	struct data_point data_pt;
 	double ymult;
 	double xincr;
+	double points;
 	double trigger;
 	double yoff;
 	int sgn; /**signed or unsigned  */
@@ -459,7 +464,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	char buf[BUF_LEN];
 	int c,data;
 	static int od=0, first=1,labelno=1;
-	static int offset, x, y;
+	static int offset, x, y, rmargin=RMARGIN;
 	static char *fname;
 	int ilinecolor;
 
@@ -504,6 +509,10 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		write(od,buf,c);
 		return 0;
 	}
+	if(WR_RMARGIN == plotno){
+		rmargin=round(ext->x);
+		return 0;
+	}
 	if(WR_DATA == plotno){	/**write data  */
 		c=sprintf(buf,"%E %E\n",ext->time_mult*ext->x,ext->y);
 		write(od,buf,c);
@@ -536,7 +545,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	if(plotno <WR_MULTI_PLOT ){
 		c=sprintf(buf,"set xlabel \"%s\"\n",ext->time_units);
 		write(od,buf,c);
-		c=sprintf(buf,"set lmargin %d\nset bmargin %d\nset rmargin %d\n",LMARGIN,BMARGIN,RMARGIN);
+		c=sprintf(buf,"set lmargin %d\nset bmargin %d\nset rmargin %d\n",LMARGIN,BMARGIN,rmargin);
 		write(od,buf,c);
 		c=sprintf(buf,"set label %d \"%s\" at graph -0.15, graph .5\n",labelno++,ext->vert_units);
 		write(od,buf,c);
@@ -656,7 +665,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.17 $\n"
+	printf("tek2gplot: $Revision: 1.18 $\n"
 	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
@@ -902,6 +911,7 @@ int load_data(struct plot_data *p)
 		/**PT.OFF  */
 		p->trace[c].ymult=get_value("YMULT",preamble);
 		p->trace[c].xincr=get_value("XINCR", preamble);
+		p->trace[c].points=get_value("NR.PT", preamble);
 		p->trace[c].fmt=get_string("BN.FMT",preamble);
 		p->trace[c].enc=get_string("ENCDG",preamble);
 		p->trace[c].trigger=get_value("PT.OFF",preamble);
@@ -939,7 +949,7 @@ int load_data(struct plot_data *p)
 			sprintf(&p->titles[i],"%s",p->trace[c].title);
 		else 
 			sprintf(&p->titles[i],"\\n%s",p->trace[c].title);
-		/*printf("Total time = %f %f points per division, time_div %f time_mult %f\n",p->trace[c].xincr*1024,round((p->trace[c].info.time_div/(p->trace[c].info.time_mult))/p->trace[c].xincr),p->trace[c].info.time_div,p->trace[c].info.time_mult); */
+		/*printf("Total time = %f %f points per division, time_div %f time_mult %f\n",p->trace[c].xincr*p->trace[c].points,round((p->trace[c].info.time_div/(p->trace[c].info.time_mult))/p->trace[c].xincr),p->trace[c].info.time_div,p->trace[c].info.time_mult); */
 		i=strlen(p->xtitle);
 		sprintf(&p->xtitle[i],"%s ",p->trace[c].label);
 		
@@ -964,13 +974,13 @@ int load_data(struct plot_data *p)
 		if(p->max_yrange_minus <p->trace[c].info.yrange_minus)
 			p->max_yrange_minus =p->trace[c].info.yrange_minus;
 		/*printf("yrange=[-%d:%d] in %s ",p->trace[c].info.yrange_minus,p->trace[c].info.yrange_plus,p->trace[c].info.vert_units); */
-		p->trace[c].info.xrange=(int)round(p->trace[c].xincr*1024*p->trace[c].info.time_mult);
+		p->trace[c].info.xrange=(int)round(p->trace[c].xincr*p->trace[c].points*p->trace[c].info.time_mult);
 		trig=(int)round(p->trace[c].trigger);
 		/*printf("Xrange=[0:%d] in %s\n",p->trace[c].info.xrange,p->trace[c].info.time_units); */
 		/*printf("set xtics 0,%f\n",p->trace[c].info.time_div); */
 		p->trace[c].info.x=0;
 		buf[0]=1;
-		for (dp=0; dp<1024 && buf[0];++dp) {
+		for (dp=0; dp<p->trace[c].points && buf[0];++dp) {
 			if(1> get_next_value(id,buf))	
 				break;
 			p->trace[c].info.y=strtof(buf, NULL);
@@ -1210,7 +1220,7 @@ int write_datafiles(struct plot_data *p)
 			printf("Writing %s\n",p->trace[c].oname);
 		}
 		
-		for (dp=0; dp<1024;++dp) {
+		for (dp=0; dp<p->trace[c].points;++dp) {
 			char buf[50];
 			double x,y;
 			x=p->trace[c].data_pt.data[dp].x;
@@ -1417,13 +1427,21 @@ int main (int argc, char *argv[])
 	/**now do functions that do not have data files  */
 	e.x=1 - ((double)RMARGIN/100 +.01);
 	e.y=.87;
-	for (c=0;c<plot.f_idx;++c){
+	for (f_load=0,c=0;c<plot.f_idx;++c){
 		if(0 == plot.function[c].datafile){
 			write_script_file(&e,"screen",plot.function[c].trace.oname,NULL,WR_LABEL);	
 			e.y-=.03;
+			++f_load;
 		}
 		
 	}	
+	if(f_load){ /**adjust right margin  */
+		e.x=(double)RMARGIN;
+		write_script_file(&e,NULL,NULL,NULL,WR_RMARGIN);	
+	} else{
+		e.x=(double)2;
+		write_script_file(&e,NULL,NULL,NULL,WR_RMARGIN);	
+	}
 	/*printf("plot.idx=%d\n",plot.idx); */
 	if(plot.flags &FLAGS_GNUPLOT){
 		plot.trace[0].info.yrange_plus=plot.max_yrange_plus;
@@ -1444,8 +1462,12 @@ int main (int argc, char *argv[])
 		e.yrange_minus=plot.max_yrange_minus;
 		e.src=plot.trace[c].label;
 		if(0 == c && (e.xrange/e.time_div)>10){
+			int r;
+			r=e.xrange;
+			if(r>10)
+				r=(r/10)*10;
 			printf("r=%d div=%f ",e.xrange,e.time_div);
-			e.time_div=(double)(e.xrange)/10;
+			e.time_div=(double)(r)/10;
 			printf("ndiv=%f\n",e.time_div);
 		}
 		write_script_file(&e,plot.trace[c].oname,buf,plot.xtitle,c+1);	
