@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.1  2008/10/06 07:54:16  dfs
+moved from get_tek_waveform
+
 */
 #include "gpib.h"
 extern char buf[BUF_SIZE];
@@ -110,6 +113,7 @@ int read_string(struct serial_port *p, char *msg, int len)
 int write_string(struct serial_port *p, char *msg, int len)
 {
 	int rtn,i;
+	char *m;
 	if(NULL ==msg){
 		printf("msg null\n");
 		return -1;
@@ -118,17 +122,50 @@ int write_string(struct serial_port *p, char *msg, int len)
 		i=strlen(msg);
 	else
 		i=len;
-	if((rtn=write(p->handle,msg,i)) <0) {/* error writing */
+	
+	if('\r' != msg[i-1]){ /**Make sure we have terminator...  */
+		if(NULL == (m=malloc(i+2)) ){
+			printf("out of mem for %d\n",i+2);
+			return -1;
+		}
+		/*printf("Alloc new msg for '%s'\n",msg); */
+		i=sprintf(m,"%s\r",msg);
+	}else
+		m=msg;
+	
+	if((rtn=write(p->handle,m,i)) <0) {/* error writing */
     printf("Error Writing to %s\n",p->phys_name);
-		return -1;
+		rtn=-1;
+		goto end;
   }
 	/*printf("wrote %d bytes\n%s\n",rtn,msg); */
 	if(rtn != i)
 		printf("Write mis-match %d != %d\n",rtn,i);
-	usleep(500); 
+	usleep(500);
+end:
+	if(m!=msg)
+		free(m);
 	return rtn;	
 }
 
+/***************************************************************************/
+/** Write a string, then print error message.
+\n\b Arguments:
+\n\b Returns: 0 on fail
+****************************************************************************/
+int write_get_data (struct serial_port *p, char *cmd)
+{
+	char xbuf[100];
+	int i;
+	sprintf(xbuf,"%s\r",cmd);
+	write_string(p,xbuf,0);
+	write_string(p,"++read\r",0);
+	if(-1 == (i=read_string(p,buf,BUF_SIZE)) ){
+		printf("%s:Unable to read from port for %s\n",__func__,cmd);
+		return 0;
+	}
+	return i;
+}
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -148,13 +185,16 @@ void verify(struct serial_port *p, char *msg)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init_prologix(struct serial_port *p, int inst_addr)
+int init_prologix(struct serial_port *p, int inst_addr, int autor)
 {
 	int i;
 	printf("Init Prologix controller\n");
 	read_string(p,buf,BUF_SIZE);
 	/*make sure auto reply is on*/
-	write_string(p,"++auto 1\r",0);
+	if(autor)
+		write_string(p,"++auto 1\r",0);
+	else
+		write_string(p,"++auto 0\r",0);
 	write_string(p,"++ver\r",0);
 	/*write_string(p,"++read\r",0); */
 	
@@ -171,7 +211,7 @@ int init_prologix(struct serial_port *p, int inst_addr)
 	/*Then set to Controller mode */
 	write_string(p,"++mode 1\r",0);
 	
-	/*Set the address to talk to (2, usually) */
+	/*Set the address to talk to */
 	sprintf(buf,"++addr %d\r",inst_addr);
 	write_string(p,buf,0);
 	/*Set the eoi mode (EOI after cmd) */
