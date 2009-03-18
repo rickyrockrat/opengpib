@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.18  2008/10/06 19:20:25  dfs
+Added variable right margin, read of NR.PT for points
+
 Revision 1.17  2008/08/19 19:40:37  dfs
 Fixed too many labels on xtics
 
@@ -665,7 +668,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.18 $\n"
+	printf("tek2gplot: $Revision: 1.19 $\n"
 	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
@@ -1129,6 +1132,9 @@ int handle_functions(struct plot_data *p)
 	return 0;
 }
 
+#define CURSOR_VOLTS 1
+#define CURSOR_TIME  2
+#define CURSOR_ONE_TIME 3
 
 /***************************************************************************/
 /** Write the cursor out to the plot file.
@@ -1139,58 +1145,77 @@ int plot_cursor(struct plot_data *p)
 {
   struct cursors cursor;
 	double center;
-	int targ;
+	int targ, cursor_type;
 	char buf[50];
+	if(NULL == p ||NULL == p->cursorfile){
+		printf("plot_cursor: arg or fname NULL\n");
+		return 1;
+	}
 	
-	if(NULL != p->cursorfile){
-		if(read_cursor_file(p->cursorfile,&cursor)) {
-			return 1;
-		}
-		if(NULL == cursor.target)
-			targ=0; /**default to first file  */
-		else {
-			targ=find_trace(p,cursor.target);
-			/*printf("Using %d for target %s\n",targ,cursor.target); */
-		}
-		/*printf("Buf=%s\noff %F max %F,min %F,diff %F\n",buf,p->yoff_max,max,min,diff); */
-		memcpy(&p->trace[p->idx].info,&p->trace[targ].info,sizeof(struct extended));
-		targ=p->idx;
-		if(!strcmp(cursor.func,"VOLTS")){
-			cursor.max=(cursor.max*p->trace[targ].info.vert_mult)+(-1*p->yoff_max);
-			cursor.min=(cursor.min*p->trace[targ].info.vert_mult)+(-1*p->yoff_max);
-			center=((cursor.max-cursor.min)/2)+cursor.min;
-			p->trace[targ].info.y=center;
-			p->trace[targ].info.x=-(p->trace[targ].info.xrange*CURSOR_XPERCENT)/100;
-			cursor.diff*=p->trace[targ].info.vert_mult;
-			sprintf(buf,"%d%s",(int)round(cursor.diff),p->trace[targ].info.vert_units);
-			p->trace[targ].info.src=buf;
-			write_script_file(&p->trace[targ].info,NULL,NULL,0,WR_CURSORS);	
-			/**now draw the cursors  */
-			write_cursor(&p->trace[targ].info,0,cursor.max);
-			write_cursor(&p->trace[targ].info,p->trace[targ].info.xrange,cursor.max);
-			write_cursor(&p->trace[targ].info,p->trace[targ].info.xrange,cursor.min);
-			write_cursor(&p->trace[targ].info,0,cursor.min);			
-		}	else if(!strcmp(cursor.func,"TIME")){
-			double len;
-			len=(p->max_yrange_plus+p->max_yrange_minus)/50;
-			p->trace[targ].info.x=cursor.min*get_multiplier(p->trace[targ].info.time_units);;
-			p->trace[targ].info.y=(p->max_yrange_plus+len);
-			/*printf("diff=%f\n",diff); */
+	if(read_cursor_file(p->cursorfile,&cursor)) {
+		return 1;
+	}
+	if(NULL == cursor.target)
+		targ=0; /**default to first file  */
+	else {
+		targ=find_trace(p,cursor.target);
+		/*printf("Using %d for target %s\n",targ,cursor.target); */
+	}
+	/*printf("Buf=%s\noff %F max %F,min %F,diff %F\n",buf,p->yoff_max,max,min,diff); */
+	memcpy(&p->trace[p->idx].info,&p->trace[targ].info,sizeof(struct extended));
+	targ=p->idx;
+	if(!strcmp(cursor.func,"VOLTS"))
+		cursor_type=CURSOR_VOLTS;
+	else if(!strcmp(cursor.func,"TIME"))
+		cursor_type=CURSOR_TIME;
+	else if(!strcmp(cursor.func,"ONE/TIME") )
+		cursor_type=CURSOR_ONE_TIME;
+	else{
+		printf("Don't know how to handle cursor function '%s'. Ignoring.\n",cursor.func);
+		return 0;
+	}
+	if(CURSOR_VOLTS==cursor_type){
+		cursor.max=(cursor.max*p->trace[targ].info.vert_mult)+(-1*p->yoff_max);
+		cursor.min=(cursor.min*p->trace[targ].info.vert_mult)+(-1*p->yoff_max);
+		center=((cursor.max-cursor.min)/2)+cursor.min;
+		p->trace[targ].info.y=center;
+		p->trace[targ].info.x=-(p->trace[targ].info.xrange*CURSOR_XPERCENT)/100;
+		cursor.diff*=p->trace[targ].info.vert_mult;
+		sprintf(buf,"%d%s",(int)round(cursor.diff),p->trace[targ].info.vert_units);
+		p->trace[targ].info.src=buf;
+		write_script_file(&p->trace[targ].info,NULL,NULL,0,WR_CURSORS);	
+		/**now draw the cursors  */
+		write_cursor(&p->trace[targ].info,0,cursor.max);
+		write_cursor(&p->trace[targ].info,p->trace[targ].info.xrange,cursor.max);
+		write_cursor(&p->trace[targ].info,p->trace[targ].info.xrange,cursor.min);
+		write_cursor(&p->trace[targ].info,0,cursor.min);			
+	}	else if(CURSOR_TIME ==cursor_type|| CURSOR_ONE_TIME==cursor_type) {
+		double len;
+		len=(p->max_yrange_plus+p->max_yrange_minus)/50;
+		p->trace[targ].info.x=cursor.min*get_multiplier(p->trace[targ].info.time_units);;
+		p->trace[targ].info.y=(p->max_yrange_plus+len);
+		/*printf("diff=%f\n",diff); */
+		
+		/*diff*=1000; */
+		if(CURSOR_TIME ==cursor_type){
 			cursor.diff *=get_multiplier(p->trace[targ].info.time_units);
-			/*diff*=1000; */
 			sprintf(buf,"%.3f%s",cursor.diff,p->trace[targ].info.time_units);
-			p->trace[targ].info.src=buf;
-			write_script_file(&p->trace[targ].info,NULL,NULL,0,WR_CURSORS);	
-			/**now draw the cursors  */   
-			len*=2;
-			write_cursor(&p->trace[targ].info,cursor.max,p->max_yrange_plus-len);
-			write_cursor(&p->trace[targ].info,cursor.max,p->max_yrange_plus);
-			write_cursor(&p->trace[targ].info,cursor.min,p->max_yrange_plus);
-			write_cursor(&p->trace[targ].info,cursor.min,p->max_yrange_plus-len); /**-p->max_yrange_minus  */
-		}else{
-			printf("Don't know how to handle cursor function '%s'. Ignoring.\n",cursor.func);
-			return 0;
 		}
+		if(CURSOR_ONE_TIME==cursor_type){
+			double x;
+			int m;
+			x=format_eng_units(cursor.diff, &m);
+			sprintf(buf,"%.3f%cHz",x,m);
+		}
+			
+		p->trace[targ].info.src=buf;
+		write_script_file(&p->trace[targ].info,NULL,NULL,0,WR_CURSORS);	
+		/**now draw the cursors  */   
+		len*=2;
+		write_cursor(&p->trace[targ].info,cursor.max,p->max_yrange_plus-len);
+		write_cursor(&p->trace[targ].info,cursor.max,p->max_yrange_plus);
+		write_cursor(&p->trace[targ].info,cursor.min,p->max_yrange_plus);
+		write_cursor(&p->trace[targ].info,cursor.min,p->max_yrange_plus-len); /**-p->max_yrange_minus  */
 	}
 	return 0;
 }
