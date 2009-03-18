@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.4  2008/10/06 12:42:58  dfs
+Added get_string_col, get_value_col
+
 Revision 1.3  2008/08/19 06:42:18  dfs
 Moved def of CH_LIST to common.h
 
@@ -42,6 +45,7 @@ char *CH_LIST[MAX_CHANNELS]=\
 };
 
 #endif
+double format_eng_units(double val, int *m);
 double get_value( char *f, char *buf);
 double get_value_col( int col, char *buf);
 char * get_string( char *f, char *buf);

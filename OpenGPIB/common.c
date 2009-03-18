@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.3  2008/10/06 12:42:51  dfs
+Added get_string_col, get_value_col
+
 Revision 1.2  2008/08/18 21:14:54  dfs
 Fixed bug that truncated read
 
@@ -16,6 +19,47 @@ Moved functions from tek2gplot.c
 */
 
 #include "common.h"
+
+/***************************************************************************/
+/** find the range, divide val by range, and set m.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+double format_eng_units(double val, int *m)
+{
+	double x;
+	int i;
+	if(val >=0){/**positive  */
+		for (i=0,x=1000;val>x;){
+			++i;
+			x*=1000;
+		}
+		x/=1000;
+		printf("val=%f x=%f i=%d\n",val,x,i);
+		x=val/x;
+	}	else{
+		for (i=0,x=.001;val<x;){
+			--i;
+			x/=1000;
+		}
+		x*=1000;
+		x=val*x;
+	}
+	switch(i){
+		case 0:	break;
+		case 1: *m='K'; break;
+		case 2: *m='M'; break;
+		case 3: *m='G'; break;
+		case -1: *m='m'; break;
+		case -2: *m='u'; break;
+		case -3: *m='n'; break;
+		case -4: *m='p'; break;	
+			default:
+				printf("Unknown unit %d (power of 1000)\n",i);
+				
+	}
+	return x;
+}
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -33,7 +77,7 @@ double get_value( char *f, char *buf)
 	for (k=0,i=strlen(f)+1; k<49 && find[i] != ',' && find[i] != ';';++i,++k)
 		tbuf[k]=find[i];
 	tbuf[k]=0;
-	/*printf("Found %s->%s",f,tbuf);  */
+	/*printf("Found %s->%s",f,tbuf);   */
 	x=strtof(tbuf, NULL);
 	/*printf(" : %f\n",x); */
 	
