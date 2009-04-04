@@ -11,7 +11,7 @@
 #-std=c99
 CFLAGS+=-Wall
 
-all: tek2gplot get_tek_waveform get_hp_16530_waveform
+all: tek2gplot get_tek_waveform get_hp_16530_waveform calc_area_under_curve
 
 common.o: CFLAGS+=-std=c99 -D_COMMON_
 
@@ -21,6 +21,9 @@ tek2gplot.o get_tek_waveform.o common.o: common.h tek2gplot.c
 
 tek2gplot: common.o tek2gplot.o 
 	gcc  -lm -o $@ $^
+	
+calc_area_under_curve: calc_area_under_curve.o common.o
+	gcc -lm  -o $@ $^
 
 serial.o get_tek_waveform.o: serial.h
 
