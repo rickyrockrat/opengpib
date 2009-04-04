@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.4  2009-03-18 22:51:59  dfs
+Added format_eng_units
+
 Revision 1.3  2008/10/06 12:42:51  dfs
 Added get_string_col, get_value_col
 
@@ -19,7 +22,58 @@ Moved functions from tek2gplot.c
 */
 
 #include "common.h"
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int next_col(struct c_opts *o)
+{
+	int i;
+	for (i=0;i!=EOF && i!= o->dlm;){
+		i=fgetc(o->fd);
+	}
+	if(EOF == i){
+		printf("Got EOF while looking for '%c'\n",o->dlm);
+		return 1;
+	}
+		
+	while(i==o->dlm)
+		i=fgetc(o->fd);
+	if(EOF ==i){
+		printf("Got EOF while removing delims\n");
+		return 1;
+	}
+		
+	if(i == '\n'){
+		printf("Hit \n looking for col %d\n",o->col);
+		return 1;
+	}
+	ungetc(i,o->fd);
+	return 0;
+}
 
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int get_col(struct c_opts *o, float *f)
+{
+	int i;
+	if(o->col >1){
+		for (i=1;i<o->col;++i)	{
+			if(next_col(o))
+				return -1;
+		}
+			
+	}
+	if( EOF ==fscanf(o->fd,"%f",f))
+		return -1;
+	for (i=0;i!=EOF && i!='\n';)
+		i=fgetc(o->fd);
+	return 0;
+}
 /***************************************************************************/
 /** find the range, divide val by range, and set m.
 \n\b Arguments:

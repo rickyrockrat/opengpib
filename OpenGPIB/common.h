@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.5  2009-03-18 22:52:06  dfs
+Added format_eng_units
+
 Revision 1.4  2008/10/06 12:42:58  dfs
 Added get_string_col, get_value_col
 
@@ -45,6 +48,15 @@ char *CH_LIST[MAX_CHANNELS]=\
 };
 
 #endif
+struct c_opts {
+	FILE *fd;
+	int col;
+	int dlm;
+	float div;
+	float mul;
+};
+int next_col(struct c_opts *o);
+int get_col(struct c_opts *o, float *f);
 double format_eng_units(double val, int *m);
 double get_value( char *f, char *buf);
 double get_value_col( int col, char *buf);
