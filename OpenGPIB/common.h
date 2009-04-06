@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.6  2009-04-04 18:09:20  dfs
+Added get_col,next_col,c_opts struct
+
 Revision 1.5  2009-03-18 22:52:06  dfs
 Added format_eng_units
 
@@ -31,6 +34,7 @@ Moved functions from tek2gplot.c
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h> /**getopt  */
 
 #ifndef _COMMON_
 #define MAX_CHANNELS 7
