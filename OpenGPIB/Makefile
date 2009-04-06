@@ -17,7 +17,7 @@ common.o: CFLAGS+=-std=c99 -D_COMMON_
 
 common.o: common.c common.h
 
-tek2gplot.o get_tek_waveform.o common.o: common.h tek2gplot.c
+tek2gplot.o: get_tek_waveform.o tek2gplot.c gpib.lib
 
 tek2gplot: common.o tek2gplot.o 
 	gcc  -lm -o $@ $^
@@ -25,12 +25,15 @@ tek2gplot: common.o tek2gplot.o
 calc_area_under_curve: calc_area_under_curve.o common.o
 	gcc -lm  -o $@ $^
 
-serial.o get_tek_waveform.o: serial.h
+serial.o: serial.h serial.c
 
-get_tek_waveform:	serial.o get_tek_waveform.o common.o gpib.o
+gpib.lib: gpib.o prologixs.o serial.o common.o
+	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
+
+get_tek_waveform:	get_tek_waveform.o gpib.lib
 	gcc -lm -o $@ $^
 	
-get_hp_16530_waveform:	serial.o get_hp_16530_waveform.o common.o gpib.o
+get_hp_16530_waveform: get_hp_16530_waveform.o gpib.lib
 	gcc -lm -o $@ $^
 
 .PHONY: clean
