@@ -7,102 +7,33 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.2  2008/10/06 12:45:08  dfs
+Added write_get_data, auto to init_prologix, added \r auto term in write_string
+
 Revision 1.1  2008/10/06 07:54:16  dfs
 moved from get_tek_waveform
 
 */
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include "gpib.h"
-extern char buf[BUF_SIZE];
+#include "serial.h"
+#include "prologixs.h"
 /***************************************************************************/
 /** .
 \n\b Arguments:
 len is max_len for msg.
 \n\b Returns: number of chars read.
 ****************************************************************************/
-int read_string(struct serial_port *p, char *msg, int len)
+int read_string(struct gpib *g)
 {
-	int i,count;
-
-	fd_set rd;
-	struct timeval tm;
-	tm.tv_sec=1;
-	tm.tv_usec=0;
-	FD_ZERO(&rd);
-	FD_SET(p->handle, &rd);
-	select (p->handle+1, &rd, NULL, NULL, &tm);
-#if 0		
-	/*printf("RD\n"); */
-	
-	for (i=0; i<len;++i){
-		int x;
-
-		for (count=0;count<20;++count){
-			/*printf("Sl\n"); */
-			if(select (p->handle+1, &rd, NULL, NULL, &tm) < 0)	{
-				if ((errno != EINTR) && (errno != EAGAIN)
-				    && (errno != EINVAL)) {
-					printf("Key input err\n");
-					return (-1);
-				} 
-			}	
-			if(0 != FD_ISSET(p->handle, &rd)){
-				break;
-			}
-		}
-		if(1 != (x=read(p->handle,&msg[i],1)) )
-			perror("");
-			/*usleep(100); */
-		
-		if(x != 1 ){
-			
-			printf("Timeout waiting on char\n");
-			return -1;
-		}
-		printf("%c",msg[i]);
-		if(msg[i]=='\n' || msg[i] == '\r')/* || msg[i] == '\r') */
-			break;
+	int i;
+	if((i=g->read(g->dev,g->buf,g->buf_len))>=0){
+		g->buf[i]=0;
 	}
-#else
-		for (i=0; i<len;++i){
-		int x;
-		for (count=0;count<2000;++count){
-			if(0< (x=read(p->handle,&msg[i],len-i)) ){
-				i+=x-1;
-				break;
-			}
-				
-			usleep(100);
-		}
-		if(0 == x){	
-			if(0 == i || msg[i-1] != '\r' )	{
-				printf("Timeout waiting on char\n");
-				return -1;
-				
-			}else{
-				--i;
-				break;	
-			}
-		}	
-		/*printf("%c",msg[i]); */
-		if(msg[i]=='\n' )/* || msg[i] == '\r') */
-			break;
-	 }
-#endif
-		
-#if 0	
-	if( (rtn=read(p->handle,msg,len)) <1 ) {
-    if( errno == EAGAIN || rtn == 0) /* EAGAIN - no data avail */
-      usleep(60); /**for 15200 baud  */
-    else  {
-      printf("We had a Read Error on %s.\n",p->phys_name);
-			return -1;
-    }
-  }
-#endif
-	while(i && (buf[i]=='\r' || buf[i]=='\n'))
-		--i;
-	++i;
-	buf[i]=0;
+	
 	return i;
 }
 /***************************************************************************/
@@ -110,35 +41,31 @@ int read_string(struct serial_port *p, char *msg, int len)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int write_string(struct serial_port *p, char *msg, int len)
+int write_string(struct gpib *g, char *msg)
 {
 	int rtn,i;
 	char *m;
-	if(NULL ==msg){
+	if(NULL == msg){
 		printf("msg null\n");
 		return -1;
 	}
-	if(0 == len)
-		i=strlen(msg);
-	else
-		i=len;
+	i=strlen(msg);
 	
 	if('\r' != msg[i-1]){ /**Make sure we have terminator...  */
 		if(NULL == (m=malloc(i+2)) ){
 			printf("out of mem for %d\n",i+2);
 			return -1;
 		}
-		/*printf("Alloc new msg for '%s'\n",msg); */
+		/*printf("Alloc new msg for '%s'\n",g->buf); */
 		i=sprintf(m,"%s\r",msg);
 	}else
 		m=msg;
 	
-	if((rtn=write(p->handle,m,i)) <0) {/* error writing */
-    printf("Error Writing to %s\n",p->phys_name);
+	if((rtn=g->write(g->dev,m,i)) <0) {/* error writing */
 		rtn=-1;
 		goto end;
   }
-	/*printf("wrote %d bytes\n%s\n",rtn,msg); */
+	/*printf("wrote %d bytes\n%s\n",rtn,g->buf); */
 	if(rtn != i)
 		printf("Write mis-match %d != %d\n",rtn,i);
 	usleep(500);
@@ -149,35 +76,79 @@ end:
 }
 
 /***************************************************************************/
-/** Write a string, then print error message.
+/** Write a string, then print error message.	FIXME malloc xbuf.
 \n\b Arguments:
 \n\b Returns: 0 on fail
 ****************************************************************************/
-int write_get_data (struct serial_port *p, char *cmd)
+int write_get_data (struct gpib *g, char *cmd)
 {
 	char xbuf[100];
 	int i;
 	sprintf(xbuf,"%s\r",cmd);
-	write_string(p,xbuf,0);
-	write_string(p,"++read\r",0);
-	if(-1 == (i=read_string(p,buf,BUF_SIZE)) ){
+	write_string(g,xbuf);
+	write_string(g,"++read");
+	if(-1 == (i=read_string(g)) ){
 		printf("%s:Unable to read from port for %s\n",__func__,cmd);
 		return 0;
 	}
 	return i;
 }
+
+
 /***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-void verify(struct serial_port *p, char *msg)
+struct gpib *open_gpib(int ctype, int addr, char *dev_path)
 {
-	int i;
-	i=sprintf(buf,"%s\r",msg);
-	write_string(p,buf,i);
-	read_string(p,buf,BUF_SIZE);
-	/*printf("%s = %s\n",msg,buf);	 */
+	struct gpib *g;
+	if(NULL == (g=malloc(sizeof(struct gpib)) ) ){
+		printf("Out of mem on serial register\n");
+		return NULL;
+	}		
+	memset(g,0,sizeof(struct gpib));
+	g->addr=addr;
+	g->buf_len=BUF_SIZE;
+	/**set up the controller and interface. FIXME Replace with config file.  */
+	switch(ctype){
+		case GPIB_CTL_PROLOGIXS:
+			g->type_if=GPIB_IF_SERIAL;
+			if(register_prologixs(g))
+				goto err1;
+			break;
+		default:
+			printf("Unknown controller %d\n",ctype);
+			goto err1;
+			break;
+	}
+	g->type_ctl=ctype;
+	/**open our interface to the controller  */
+	switch(g->type_if){
+		case GPIB_IF_SERIAL:
+			if(serial_register(g)) /**load our function list  */
+				goto err1;
+			if(g->open(g,dev_path))
+				goto err;
+			break;
+		default:
+			printf("Don't know how to handle interface type %d\n",g->type_if);
+			goto err1;
+			break;
+	}
+	/**open our controller  */
+	switch(g->type_ctl){
+		case GPIB_CTL_PROLOGIXS:
+			if(g->control(g, CTL_OPEN))
+				goto err;
+			break;
+	}
+	return g;
+err:
+	g->close(g);
+err1:
+	free(g);
+	return NULL;
 }
 
 /***************************************************************************/
@@ -185,42 +156,11 @@ void verify(struct serial_port *p, char *msg)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init_prologix(struct serial_port *p, int inst_addr, int autor)
+int close_gpib (struct gpib *g)
 {
-	int i;
-	printf("Init Prologix controller\n");
-	read_string(p,buf,BUF_SIZE);
-	/*make sure auto reply is on*/
-	if(autor)
-		write_string(p,"++auto 1\r",0);
-	else
-		write_string(p,"++auto 0\r",0);
-	write_string(p,"++ver\r",0);
-	/*write_string(p,"++read\r",0); */
-	
-	if(-1 == (i=read_string(p,buf,BUF_SIZE)) ){
-		printf("%s:Unable to read from port on ver\n",__func__);
-		return -1;
-	}
-	/*printf("Got %d bytes\n",i); */
-	if(NULL == strstr(buf,"Prologix")){
-		printf("%s:Unable to find correct ver in\n%s\n",__func__,buf);
-		return -1;
-	}
-	printf("Talking to Controller '%s'\n",buf);
-	/*Then set to Controller mode */
-	write_string(p,"++mode 1\r",0);
-	
-	/*Set the address to talk to */
-	sprintf(buf,"++addr %d\r",inst_addr);
-	write_string(p,buf,0);
-	/*Set the eoi mode (EOI after cmd) */
-	write_string(p,"++eoi 1\r",0);
-	/*Set the eos mode (LF) */
-	write_string(p,"++eos 2\r",0);
-	verify(p,"++addr");
-	verify(p,"++eoi");
-	verify(p,"++eos");
-	verify(p,"++auto");
+	if(NULL != g->control)
+		g->control(g,CTL_CLOSE);
+	if(NULL != g->close)
+		g->close(g);
 	return 0;
 }

@@ -7,13 +7,18 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.1  2008/10/06 12:44:11  dfs
+Initial working revision
+
 */
 
 #include "common.h"
 #include "gpib.h"
 #include <ctype.h>
-
-char buf[BUF_SIZE];
+/**for open...  */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 /** 
 The channels correspond to Slot,channel number, so Slot D, channel 1 is D1.
 The first channel is the lowest slot, so if it starts with C1, the channels start at C1
@@ -79,26 +84,26 @@ This gives the trigger location...This is the xorigin as relates the trigger.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init_instrument(struct serial_port *p)	 
+int init_instrument(struct gpib *g)	 
 {
 	int i,s;
 	int slots[5], osc;
 	printf("Initializing Instrument\n");
-	write_string(p,"*CLS",0);
-	if(0 == write_get_data(p,"*IDN?"))
+	write_string(g,"*CLS");
+	if(0 == write_get_data(g,"*IDN?"))
 		return -1;
 	/*printf("Got %d bytes\n",i); */
-	if(NULL == strstr(buf,"HEWLETT PACKARD,16500C")){
-		printf("Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",buf);
+	if(NULL == strstr(g->buf,"HEWLETT PACKARD,16500C")){
+		printf("Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",g->buf);
 		return -1;
 	}
-	if(0 == write_get_data(p,":CARDCAGE?"))
+	if(0 == write_get_data(g,":CARDCAGE?"))
 		return -1;
-	for (s=0;buf[s];++s)
-		if(isdigit(buf[s]))
+	for (s=0;g->buf[s];++s)
+		if(isdigit(g->buf[s]))
 			break;
 	for (i=0,osc=-1;i<5;++i){
-		slots[i]=(int)get_value_col(i,&buf[s]);
+		slots[i]=(int)get_value_col(i,&g->buf[s]);
 		printf("Slot %c=%d\n",'A'+i,slots[i]);
 		if(11 == slots[i])
 			osc=i;
@@ -108,11 +113,11 @@ int init_instrument(struct serial_port *p)
 		return -1;
 	}
 	printf("Found Timbase in slot %c\n",'A'+osc);
-	sprintf(buf,":SELECT %d",osc+1);
-	write_string(p,buf,0);
-	write_get_data(p,":SELECT?");
-	printf("%s\n",buf);
-	i=write_string(p,":WAVEFORM:FORMAT ASCII",0);
+	sprintf(g->buf,":SELECT %d",osc+1);
+	write_string(g,g->buf);
+	write_get_data(g,":SELECT?");
+	printf("%s\n",g->buf);
+	i=write_string(g,":WAVEFORM:FORMAT ASCII");
 	return i;
 /*34,-1,12,12,11,1,0,5,5,5 */
 }
@@ -144,7 +149,7 @@ int check_channel(char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_preamble(struct serial_port *p,char *ch)
+int get_preamble(struct gpib *g,char *ch)
 {
 	int i;
 	if(NULL == ch)
@@ -152,24 +157,24 @@ int get_preamble(struct serial_port *p,char *ch)
 	if(0 == (i=check_channel(ch)))
 		return -1;
 		
-	i=sprintf(buf,":WAVEFORM:SOURCE CHANNEL%d;PRE?",i);
+	i=sprintf(g->buf,":WAVEFORM:SOURCE CHANNEL%d;PRE?",i);
 	
-	return write_get_data(p,buf);	
+	return write_get_data(g,g->buf);	
 }
 /***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_data(struct serial_port *p, char *ch)
+int get_data(struct gpib *g, char *ch)
 {
 	int i;
 	if(NULL == ch)
 		return -1;
 	if(0 == (i=check_channel(ch)))
 		return -1;
-	i=sprintf(buf,":WAVEFORM:SOURCE CHANNEL%d;DATA?",i);
-	return write_get_data(p,buf);	
+	i=sprintf(g->buf,":WAVEFORM:SOURCE CHANNEL%d;DATA?",i);
+	return write_get_data(g,g->buf);	
 }
 /***************************************************************************/
 /** .
@@ -198,7 +203,7 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct serial_port *p;
+	struct gpib *g;
 	char *name, *ofname, *channel[MAX_CHANNELS], *lbuf;
 	int i, c,inst_addr, rtn, ofd, ch_idx;
 	name="/dev/ttyUSB0";
@@ -249,18 +254,12 @@ int main(int argc, char * argv[])
 			}
 		}
 	}
-	
-	if(NULL == (p=open_serial_port(name,115200,0,0,0))){
+	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name))){
 		printf("Can't open %s. Fatal\n",name);
 		return 1;
 	}
-	printf("Serial port opened.\n");
-	if(-1 == init_prologix(p,inst_addr,0)){
-		printf("Controller init failed\n");
-		goto closem;
-	}
 	
-	if(-1 == init_instrument(p)){
+	if(-1 == init_instrument(g)){
 		printf("Unable to initialize instrument\n");
 		goto closem;
 	}
@@ -293,18 +292,18 @@ int main(int argc, char * argv[])
 				goto closem;
 			}
 			printf("Reading Channel %s\n",channel[c]);
-			if( 0 == (i=get_preamble(p,channel[c]))){
+			if( 0 == (i=get_preamble(g,channel[c]))){
 				printf("Preable failed on %s\n",channel[c]);
 				goto closem;
 			}
-			write(ofd,buf,i);	
-			if(-1 == (i=get_data(p,channel[c])) ){
+			write(ofd,g->buf,i);	
+			if(-1 == (i=get_data(g,channel[c])) ){
 				printf("Unable to get waveform??\n");
 				goto closem;
 			}	
 		}
 		
-		write(ofd,buf,i);	
+		write(ofd,g->buf,i);	
 		if(ofd>2){
 			close(ofd);
 			ofd=1;
@@ -314,6 +313,6 @@ int main(int argc, char * argv[])
 closem:
 	if(ofd>1)
 		close(ofd);
-	close_serial_port(p);
+	close_gpib(g);
 	return rtn;
 }

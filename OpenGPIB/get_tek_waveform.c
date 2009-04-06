@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.12  2008/10/06 12:46:23  dfs
+Removed unused write_port,read_port, fixed new call to init_prologix
+
 Revision 1.11  2008/10/06 07:52:38  dfs
 Moved funtions to gpib
 
@@ -49,30 +52,10 @@ Initial working rev
 #include <time.h>
 #include <ctype.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-char buf[BUF_SIZE];
-
-#if 0
-struct prologix_port {
-	char phys_name[MAX_PORT_NAME];  /* physical device name of this interface, i.e the /dev/xxx. */
-	
-};
-struct gpib_handle {
-	struct gpib_port port;	
-	
-};
-
-/***************************************************************************/
-/** Open the GPIB port.
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-struct gpib_handle *open_gpib(struct gpib_port *port)
-{
-	
-}
-
-#endif
 
 /***************************************************************************/
 /** .
@@ -114,7 +97,7 @@ void _usleep(int usec)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int set_channel(struct serial_port *p,char *ch)
+int set_channel(struct gpib *g,char *ch)
 {
 	int i;
 	char *c;
@@ -123,29 +106,29 @@ int set_channel(struct serial_port *p,char *ch)
 	c=strdup(ch);
 	for (i=0;0 != c[i];++i)
 		c[i]=toupper(c[i]);
-	i=sprintf(buf,"DATA SOURCE:%s\r",ch);
-	return write_string(p,buf,i);	
+	sprintf(g->buf,"DATA SOURCE:%s\r",ch);
+	return write_string(g,g->buf);	
 }
 /***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init_instrument(struct serial_port *p)	 
+int init_instrument(struct gpib *g)	 
 {
 	int i;
 	printf("Initializing Instrument\n");
-	write_string(p,"id?\r",0);
-	if(-1 == (i=read_string(p,buf,BUF_SIZE)) ){
+	write_string(g,"id?");
+	if(-1 == (i=read_string(g)) ){
 		printf("%s:Unable to read from port on id\n",__func__);
 		return -1;
 	}
 	/*printf("Got %d bytes\n",i); */
-	if(NULL == strstr(buf,"TEK/2440")){
-		printf("Unable to find 'TEK/2440' in id string '%s'\n",buf);
+	if(NULL == strstr(g->buf,"TEK/2440")){
+		printf("Unable to find 'TEK/2440' in id string '%s'\n",g->buf);
 		return -1;
 	}
-	return write_string(p,"DATA ENCDG:ASCI\r",0);
+	return write_string(g,"DATA ENCDG:ASCI");
 }
 
 /***************************************************************************/
@@ -153,11 +136,11 @@ int init_instrument(struct serial_port *p)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_data(struct serial_port *p)
+int get_data(struct gpib *g)
 {
 	int i;
-	write_string(p,"WAV?\r",0);
-	i=read_string(p,buf,BUF_SIZE);
+	write_string(g,"WAV?");
+	i=read_string(g);
 	return i;
 }
 
@@ -200,47 +183,47 @@ Todo:
 #define FUNC_VOLT 1
 #define FUNC_TIME 2
 #define FUNC_FREQ 3
-int read_cursors(struct serial_port *p,int fd)
+int read_cursors(struct gpib *g,int fd)
 {
 	char *target,lbuf[100], *function, *trigsrc;
 	float min,max,volts, diff,xinc;
 	int i, f;
 	
 	printf("Reading Cursor\n");
-	write_string(p,"CURSOR?\r",0);
-	read_string(p,buf,BUF_SIZE);
+	write_string(g,"CURSOR?");
+	read_string(g);
 	
-	function=get_string("FUNCTION",buf);
+	function=get_string("FUNCTION",g->buf);
 	if( !strcmp(function,"TIME"))
 		f=FUNC_TIME;
 	else if (!strcmp(function,"ONE/TIME") )
 		f=FUNC_FREQ;
 	else if(!strcmp(function,"VOLTS") ){
 		f=FUNC_VOLT;
-		min=get_value("YPOS:ONE",buf);
-		max=get_value("YPOS:TWO",buf);	
-		target=get_string("TARGET",buf); /**reference to  */
+		min=get_value("YPOS:ONE",g->buf);
+		max=get_value("YPOS:TWO",g->buf);	
+		target=get_string("TARGET",g->buf); /**reference to  */
 		
 		/**get channel for cursor ref  */
 	  i=sprintf(lbuf,"%s?\r",target);
-		write_string(p,lbuf,i);
-		read_string(p,buf,BUF_SIZE);
+		write_string(g,lbuf);
+		read_string(g);
 		/**get the volts/div  */
-		volts=get_value(function,buf);
+		volts=get_value(function,g->buf);
 		min *=volts;
 		max *=volts;		
 	}else{
-		printf("Don't know how to handle cursor function '%s' in\n%s\n",function, buf);
+		printf("Don't know how to handle cursor function '%s' in\n%s\n",function, g->buf);
 		diff=min=max=1;
 		return 0;
 	}
 	if(FUNC_TIME ==f || FUNC_FREQ == f){
-		min=get_value("TPOS:ONE",buf);
-		max=get_value("TPOS:TWO",buf);
+		min=get_value("TPOS:ONE",g->buf);
+		max=get_value("TPOS:TWO",g->buf);
 		i=sprintf(lbuf,"WFM?\r");
-		write_string(p,lbuf,i);
-		read_string(p,buf,BUF_SIZE);
-		xinc=get_value("XINCR",buf);
+		write_string(g,lbuf);
+		read_string(g);
+		xinc=get_value("XINCR",g->buf);
 		min*=xinc;
 		max*=xinc;
 	}
@@ -256,17 +239,17 @@ int read_cursors(struct serial_port *p,int fd)
 	
 	/*find out trigger channel*/
 		i=sprintf(lbuf,"ATRIGGER?\r");
-		write_string(p,lbuf,i);
-		read_string(p,buf,BUF_SIZE);
-		trigsrc=get_string("SOURCE",buf);
+		write_string(g,lbuf);
+		read_string(g);
+		trigsrc=get_string("SOURCE",g->buf);
 	
 	if(FUNC_VOLT ==f)
 		printf("volts");
 	else if(FUNC_TIME == f)
 		printf("time");
 	printf("=%E, diff=%E\n",volts,diff);
-	i=sprintf(buf,"CURSOR:%s,MAX:%E,MIN:%E,DIFF:%E,TARGET:%s,TRIGGER:%s\n",function,max,min,diff,target,trigsrc);
-	/*write(fd,buf,i); written out by loop*/
+	i=sprintf(g->buf,"CURSOR:%s,MAX:%E,MIN:%E,DIFF:%E,TARGET:%s,TRIGGER:%s\n",function,max,min,diff,target,trigsrc);
+	/*write(fd,g->buf,i); written out by loop*/
 	
 	return i;
 }
@@ -296,7 +279,7 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct serial_port *p;
+	struct gpib *g;
 	char *name, *ofname, *channel[MAX_CHANNELS], *lbuf;
 	int i, c,inst_addr, rtn, ofd, ch_idx;
 	name="/dev/ttyUSB0";
@@ -347,18 +330,12 @@ int main(int argc, char * argv[])
 			}
 		}
 	}
-	
-	if(NULL == (p=open_serial_port(name,115200,0,0,0))){
+	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name))){
 		printf("Can't open %s. Fatal\n",name);
 		return 1;
 	}
-	printf("Serial port opened.\n");
-	if(-1 == init_prologix(p,inst_addr,1)){
-		printf("Controller init failed\n");
-		goto closem;
-	}
 	
-	if(-1 == init_instrument(p)){
+	if(-1 == init_instrument(g)){
 		printf("Unable to initialize instrument\n");
 		goto closem;
 	}
@@ -391,18 +368,18 @@ int main(int argc, char * argv[])
 			}
 		}	
 		if(!strcmp(CH_LIST[CURSORS],channel[c])) {
-			if(-1 == (i=read_cursors(p,ofd)) )
+			if(-1 == (i=read_cursors(g,ofd)) )
 				goto closem;
 		} else {
-			set_channel(p,channel[c]);
+			set_channel(g,channel[c]);
 			printf("Reading Channel %s\n",channel[c]);
-			if(-1 == (i=get_data(p)) ){
+			if(-1 == (i=get_data(g)) ){
 				printf("Unable to get waveform??\n");
 				goto closem;
 			}	
 		}
 		
-		write(ofd,buf,i);	
+		write(ofd,g->buf,i);	
 		if(ofd>2){
 			close(ofd);
 			ofd=1;
@@ -412,6 +389,6 @@ int main(int argc, char * argv[])
 closem:
 	if(ofd>1)
 		close(ofd);
-	close_serial_port(p);
+	close_gpib(g);
 	return rtn;
 }

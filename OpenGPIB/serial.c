@@ -7,33 +7,86 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.1  2008/08/02 08:53:58  dfs
+Initial working rev
+
 */
 
 /* baudrate settings are defined in <asm/termbits.h>, which is
 included by <termios.h> */
 
 
-
+#include "gpib.h"
 #include "serial.h"
+#include <termios.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h> /* for select.... */
+#include <stdio.h>         
+#include <errno.h> /* for errno */
+#include <stdlib.h> /*for malloc, free */
+#include <string.h> /* for memset, strcpy,sprintf.... */
 
 #define FLAGS_SET 1
 #define TERMIO_SET 2
-
-
+#define SER_DEFAULT_PORT_NAME "/dev/ttyS"
+struct serial_port {               
+	int handle;                 /* handle used to talk to this interface. */
+  int port;                   /* port number,  1-256. Linux: ttyS0=port1*/
+  char *phys_name; 						/* physical device name of this interface. */	
+  int    data_bits;                  /* 5,6,7,8 */
+  int   parity;                     /* 'N', 'E', 'O' */
+  int   stop;                       /* 1, 2 */
+  char   flow;                       /* N, H, S = None, Hardware, Software (Xon/Xoff) */
+  long   baud;                       /* 110 - 115200, standard baud rates */
+  int    cr;                         /** if this is set, send a cr to terminal  */
+  int   addlinefeed;                /** if this is set, send a linefeed for each cr  */
+  int   lf;                         /** if this is set, send a lf to terminal  */
+  int   addcreturn;                 /** if this is set, send a carrige return for each lf */
+  int   linewrap;                   /** if this is set, we use this for num cols  */
+/**this is for the terminal  */	
+  struct termios old_io;
+  struct termios new_io;
+	int oldflags;
+	int newflags;	
+	int termset;										 /**1 indicates the terminal has been messed with.  */
+/**this is for the serial port  */
+  struct termios old_pio;
+  struct termios new_pio;	
+	int oldpflags;
+	int newpflags;	
+	int ptermset;
+};
+  
+int init_port_settings( struct serial_port *p, char *name);
+int _open_serial_port(struct serial_port *p);
+void restore_serial_port(struct serial_port *p);
+struct serial_port *open_serial_port(char *name, int baud, int data, int stop, int parity);
+int close_serial_port( struct serial_port *p);
 
 /****************************************************************************
 initialize the serial port information to default states.
 ****************************************************************************/
-void init_port_settings( struct serial_port *p,char *name)
+int init_port_settings( struct serial_port *p,char *name)
 {
 	
 	if( p->port == 0) p->port =1;
 	/* note: port_handle is moved to the thread struct */
 	if(name == NULL){
-		sprintf(p->phys_name,"/dev/ttyS%d",p->port);
+		if(NULL == (p->phys_name=malloc(strlen(SER_DEFAULT_PORT_NAME)+10) )){
+			printf("Out of Mem alloc serial port name!\n");
+			return 1;
+		}
+		sprintf(p->phys_name,SER_DEFAULT_PORT_NAME"%d",p->port);
 		
-	} else
-	  strcpy(p->phys_name,name);
+	} else {
+		if(NULL == (p->phys_name=strdup(name))){
+			printf("Out of Mem strdup serial port name!\n");
+			return 1;
+		}
+	}
+		
 	
 	p->lf=p->cr=1;
 	p->addlinefeed=0;
@@ -46,6 +99,7 @@ void init_port_settings( struct serial_port *p,char *name)
 	if( p->data_bits ==0) p->data_bits =  8;
 	if( p->stop ==0)      p->stop =       1;
 	if( p->flow ==0)      p->flow =       'N';
+	return 0;
 }
 
 /****************************************************************************
@@ -282,48 +336,9 @@ struct serial_port *open_serial_port(char *name, int baud, int data, int stop, i
 	p->stop=stop;
 	p->data_bits=data;
 	p->parity=parity;
-	init_port_settings(p,name);	
-#if 0	
-/**setup the current terminal window  */	
-	if(0>(p->oldflags = fcntl(0,F_GETFL)) ){
-		printf("Unable to Read stdin FLAGS!\n");
+	if(init_port_settings(p,name))
 		goto error;
-	}
-  p->termset|=FLAGS_SET;
-	
-  p->newflags = p->oldflags;
 
-  p->newflags &= ~(O_NONBLOCK);
-  p->newflags |= O_ASYNC;
-
-  if(fcntl(0,F_SETFL,p->newflags) < 0)
-    {
-    
-    printf("Unable to Change keyboard input to Non-Blocking\n");
-		goto error;
-    }
-	tcgetattr(0,&p->old_io); /* save current terminal settings */
-  tcgetattr(0,&p->new_io); /* start with current terminal settings */
-
-  /*   newin.c_iflag &= ~(IGNBRK | IGNCR | INLCR | ICRNL | IUCLC |
-  		IXANY | IXON | IXOFF | INPCK | ISTRIP);*/
-
-  p->new_io.c_iflag &= ~(IGNBRK | IGNCR |  ICRNL | IUCLC |
-  		IXANY | IXON | IXOFF | INPCK | ISTRIP);
-  p->new_io.c_iflag |= INLCR;
-
-  p->new_io.c_iflag |= (BRKINT | IGNPAR);
-  /*	p->new_io.c_oflag &= ~OPOST; */
-  /*	p->new_io.c_lflag &= ~(XCASE|ECHONL|NOFLSH); */
-  p->new_io.c_lflag &= ~(ICANON | ISIG | ECHO);
-  p->new_io.c_cflag |= CREAD;
-  p->new_io.c_cc[VTIME] = 0;
-  p->new_io.c_cc[VMIN] = 0;
-
-  tcsetattr(0,TCSANOW,&p->new_io);  /* set it up... */
-	p->termset|=TERMIO_SET;
-	/**now open it  */
-#endif
   if( -1 ==  _open_serial_port(p) ) {
 		goto error;
 	}	
@@ -351,5 +366,115 @@ int close_serial_port( struct serial_port *p)
 		p->handle=-1;
 	}
 	free (p);
+	return 0;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns: -1 on failure, number of byte read otherwise
+****************************************************************************/
+int _serial_read(void *dev, void *buf, int len)
+{
+	struct serial_port *p;
+	int i,count;
+	char *msg;
+	fd_set rd;
+	struct timeval tm;
+	
+	p=(struct serial_port *)dev;	
+	msg=(char *)buf;
+	
+	tm.tv_sec=1;
+	tm.tv_usec=0;
+	FD_ZERO(&rd);
+	FD_SET(p->handle, &rd);
+	select (p->handle+1, &rd, NULL, NULL, &tm);
+
+		for (i=0; i<len;++i){
+		int x;
+		for (count=0;count<2000;++count){
+			if(0< (x=read(p->handle,&msg[i],len-i)) ){
+				i+=x-1;
+				break;
+			}
+				
+			usleep(100);
+		}
+		if(0 == x){	
+			if(0 == i || msg[i-1] != '\r' )	{
+				printf("Timeout waiting on char\n");
+				return -1;
+				
+			}else{
+				--i;
+				break;	
+			}
+		}	
+		/*printf("%c",msg[i]); */
+		if(msg[i]=='\n' )/* || msg[i] == '\r') */
+			break;
+	 }
+	while(i && (msg[i]=='\r' || msg[i]=='\n'))
+		--i;
+	++i;
+	return i;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns: -1 on failure, number bytes written otherwise
+****************************************************************************/
+int _serial_write(void *dev, void *buf, int len)
+{
+	struct serial_port *p;
+	int i;
+	p=(struct serial_port *)dev;
+	if((i=write(p->handle,buf,len))<0)
+		printf("Error Writing to %s\n",p->phys_name);
+	return i;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int _serial_close(struct gpib *g)
+{
+	return close_serial_port((struct serial_port *)g->dev);
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns: 1 on failure, 0 on success
+****************************************************************************/
+int _serial_open(struct gpib *g, char *path)
+{
+	if(NULL ==g){
+		printf("serial open: gpib null\n");
+		return 1;
+	}
+	if(NULL == (g->dev=(void *)open_serial_port(path,115200,0,0,0))){
+		printf("Can't open %s. Fatal\n",path);
+		return 1;
+	}
+	printf("Serial port opened.\n");
+
+	return 0; 
+}
+
+/***************************************************************************/
+/** allocate and fill in our function structure.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int serial_register(struct gpib *g)
+{
+	g->read=	_serial_read;
+	g->write=	_serial_write;
+	g->open=	_serial_open;
+	g->close=	_serial_close;
 	return 0;
 }
