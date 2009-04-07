@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.3  2009-04-07 07:05:42  dfs
+Added serial interface functions
+
 Revision 1.2  2009-04-06 20:57:26  dfs
 Major re-write for new gpib API
 
@@ -21,11 +24,15 @@ struct serial_dev {
 	int (*write)(struct serial_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
 	int (*open)(struct serial_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
 	int (*close)(struct serial_dev *d);									/**closes interface  */
-	int (*control)(struct serial_dev *d, int cmd); 			/**controller-interface control. Set addr, etc.  */
+	int (*control)(struct serial_dev *d, int cmd,int data); 			/**controller-interface control. Set addr, etc.  */
 	void *dev;            												/**interface-specific structure  */
 	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
 };
 
+enum {
+	SERIAL_CMD_SET_CHAR_TIMEOUT=0,
+	SERIAL_CMD_NONE,
+};
 int serial_register(struct serial_dev *d);
 #endif
 
