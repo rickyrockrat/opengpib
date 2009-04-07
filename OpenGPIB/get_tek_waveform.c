@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.15  2009-04-07 07:03:49  dfs
+Fixed NULL check for new buffered io
+
 Revision 1.14  2009-04-07 04:46:03  dfs
 Changed to buffered IO
 
@@ -123,6 +126,9 @@ int init_instrument(struct gpib *g)
 {
 	int i;
 	printf("Initializing Instrument\n");
+	g->control(g,CTL_SET_TIMEOUT,1000);
+	while(read_string(g));
+	g->control(g,CTL_SET_TIMEOUT,500000);
 	write_string(g,"id?");
 	if(-1 == (i=read_string(g)) ){
 		printf("%s:Unable to read from port on id\n",__func__);
@@ -133,6 +139,7 @@ int init_instrument(struct gpib *g)
 		printf("Unable to find 'TEK/2440' in id string '%s'\n",g->buf);
 		return -1;
 	}
+	printf("Talking to addr %d: '%s'\n",g->addr,g->buf);
 	return write_string(g,"DATA ENCDG:ASCI");
 }
 
@@ -381,9 +388,13 @@ int main(int argc, char * argv[])
 				printf("Unable to get waveform??\n");
 				goto closem;
 			}	
+			while(i>0){	/**suck out all data from cmd above  */
+				fwrite(g->buf,1,i,ofd);
+				i=read_string(g);
+			}
 		}
 		
-		fwrite(g->buf,1,i,ofd);	
+		/*fwrite(g->buf,1,i,ofd);	 */
 		if(NULL != ofd){
 			fclose(ofd);
 			ofd=NULL;
