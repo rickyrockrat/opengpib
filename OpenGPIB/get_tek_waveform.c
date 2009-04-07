@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.13  2009-04-06 20:57:26  dfs
+Major re-write for new gpib API
+
 Revision 1.12  2008/10/06 12:46:23  dfs
 Removed unused write_port,read_port, fixed new call to init_prologix
 
@@ -52,10 +55,9 @@ Initial working rev
 #include <time.h>
 #include <ctype.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-
+#define FUNC_VOLT 1
+#define FUNC_TIME 2
+#define FUNC_FREQ 3
 
 /***************************************************************************/
 /** .
@@ -180,10 +182,8 @@ Todo:
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-#define FUNC_VOLT 1
-#define FUNC_TIME 2
-#define FUNC_FREQ 3
-int read_cursors(struct gpib *g,int fd)
+
+int read_cursors(struct gpib *g)
 {
 	char *target,lbuf[100], *function, *trigsrc;
 	float min,max,volts, diff,xinc;
@@ -249,7 +249,6 @@ int read_cursors(struct gpib *g,int fd)
 		printf("time");
 	printf("=%E, diff=%E\n",volts,diff);
 	i=sprintf(g->buf,"CURSOR:%s,MAX:%E,MIN:%E,DIFF:%E,TARGET:%s,TRIGGER:%s\n",function,max,min,diff,target,trigsrc);
-	/*write(fd,g->buf,i); written out by loop*/
 	
 	return i;
 }
@@ -281,7 +280,8 @@ int main(int argc, char * argv[])
 {
 	struct gpib *g;
 	char *name, *ofname, *channel[MAX_CHANNELS], *lbuf;
-	int i, c,inst_addr, rtn, ofd, ch_idx;
+	FILE *ofd;
+	int i, c,inst_addr, rtn, ch_idx;
 	name="/dev/ttyUSB0";
 	inst_addr=2;
 	channel[0]="ch1";
@@ -317,7 +317,7 @@ int main(int argc, char * argv[])
 		}
 	}
 	if(NULL == ofname){
-		ofd=1;
+		ofd=fdopen(1,"w+");
 	}
 		
 	if(0 == ch_idx)	/**Use default, and one channel  */
@@ -362,13 +362,13 @@ int main(int argc, char * argv[])
 	for (c=0;c<ch_idx && NULL != channel[c];++c){
 		if(NULL != ofname && NULL != lbuf ){ /**we have valid filename & channel, open  */
 			sprintf(lbuf,"%s.%s",ofname,channel[c]);
-			if(0>(ofd=open(lbuf,O_RDWR|O_CREAT,S_IROTH|S_IRGRP|S_IWUSR|S_IRUSR))) {
+			if(0>(ofd=fopen(lbuf,"w+"))) {
 				printf("Unable to open '%s' for writing\n",lbuf);
 				goto closem;
 			}
 		}	
 		if(!strcmp(CH_LIST[CURSORS],channel[c])) {
-			if(-1 == (i=read_cursors(g,ofd)) )
+			if(-1 == (i=read_cursors(g)) )
 				goto closem;
 		} else {
 			set_channel(g,channel[c]);
@@ -379,16 +379,16 @@ int main(int argc, char * argv[])
 			}	
 		}
 		
-		write(ofd,g->buf,i);	
-		if(ofd>2){
-			close(ofd);
-			ofd=1;
+		fwrite(g->buf,1,i,ofd);	
+		if(NULL != ofd){
+			fclose(ofd);
+			ofd=NULL;
 		}
 	}
 	rtn=0;
 closem:
-	if(ofd>1)
-		close(ofd);
+	if(NULL != ofd)
+		fclose(ofd);
 	close_gpib(g);
 	return rtn;
 }
