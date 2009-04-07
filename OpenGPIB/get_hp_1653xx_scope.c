@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.2  2009-04-06 20:57:26  dfs
+Major re-write for new gpib API
+
 Revision 1.1  2008/10/06 12:44:11  dfs
 Initial working revision
 
@@ -89,7 +92,7 @@ int init_instrument(struct gpib *g)
 	int i,s;
 	int slots[5], osc;
 	printf("Initializing Instrument\n");
-	write_string(g,"*CLS");
+	/*write_string(g,"*CLS"); */
 	if(0 == write_get_data(g,"*IDN?"))
 		return -1;
 	/*printf("Got %d bytes\n",i); */
@@ -113,10 +116,17 @@ int init_instrument(struct gpib *g)
 		return -1;
 	}
 	printf("Found Timbase in slot %c\n",'A'+osc);
-	sprintf(g->buf,":SELECT %d",osc+1);
-	write_string(g,g->buf);
+	
 	write_get_data(g,":SELECT?");
-	printf("%s\n",g->buf);
+	/*sleep(5); */
+	if(osc+1 == (g->buf[0]-0x30)){
+		printf("Timebase %s already selected\n",g->buf);
+	}	else{
+		sprintf(g->buf,":SELECT %d",osc+1);
+		write_string(g,g->buf);	
+	}
+	write_get_data(g,":SELECT?");
+	printf("Selected Card %s to talk to.\n",g->buf);
 	i=write_string(g,":WAVEFORM:FORMAT ASCII");
 	return i;
 /*34,-1,12,12,11,1,0,5,5,5 */
@@ -156,9 +166,8 @@ int get_preamble(struct gpib *g,char *ch)
 		return -1;
 	if(0 == (i=check_channel(ch)))
 		return -1;
-		
-	i=sprintf(g->buf,":WAVEFORM:SOURCE CHANNEL%d;PRE?",i);
-	
+/*	printf("GetPre %d\n",i);	 */
+	i=sprintf(g->buf,":WAV:SOUR CHAN%d;PRE?",i);
 	return write_get_data(g,g->buf);	
 }
 /***************************************************************************/
@@ -173,8 +182,11 @@ int get_data(struct gpib *g, char *ch)
 		return -1;
 	if(0 == (i=check_channel(ch)))
 		return -1;
-	i=sprintf(g->buf,":WAVEFORM:SOURCE CHANNEL%d;DATA?",i);
-	return write_get_data(g,g->buf);	
+/*	printf("GetData %d\n",i); */
+	sprintf(g->buf,":WAV:SOUR CHAN%d;DATA?",i);
+	i=write_get_data(g,g->buf);	
+	return i;
+	
 }
 /***************************************************************************/
 /** .
@@ -204,8 +216,9 @@ void usage(void)
 int main(int argc, char * argv[])
 {
 	struct gpib *g;
+	FILE *ofd;
 	char *name, *ofname, *channel[MAX_CHANNELS], *lbuf;
-	int i, c,inst_addr, rtn, ofd, ch_idx;
+	int i, c,inst_addr, rtn, ch_idx;
 	name="/dev/ttyUSB0";
 	inst_addr=7;
 	channel[0]="ch1";
@@ -215,6 +228,7 @@ int main(int argc, char * argv[])
 	ch_idx=0;
 	rtn=1;
 	ofname=NULL;
+	ofd=NULL;
 	while( -1 != (c = getopt(argc, argv, "a:c:ho:p:")) ) {
 		switch(c){
 			case 'a':
@@ -241,7 +255,7 @@ int main(int argc, char * argv[])
 		}
 	}
 	if(NULL == ofname){
-		ofd=1;
+		ofd=fdopen(1,"w+");
 	}
 		
 	if(0 == ch_idx)	/**Use default, and one channel  */
@@ -255,14 +269,17 @@ int main(int argc, char * argv[])
 		}
 	}
 	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name))){
-		printf("Can't open %s. Fatal\n",name);
+		printf("Can't open/init controller at %s. Fatal\n",name);
 		return 1;
 	}
 	
 	if(-1 == init_instrument(g)){
-		printf("Unable to initialize instrument\n");
+		printf("Unable to initialize instrument.\n");
+		printf("Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
 		goto closem;
 	}
+	printf("Sleep 5\n");
+	/*sleep(5); */
 	if(NULL != ofname){
 		/**find max strlen of channel name.  */
 		for (i=c=0;c<ch_idx;++c){
@@ -287,7 +304,7 @@ int main(int argc, char * argv[])
 	for (c=0;c<ch_idx && NULL != channel[c];++c){
 		if(NULL != ofname && NULL != lbuf ){ /**we have valid filename & channel, open  */
 			sprintf(lbuf,"%s.%s",ofname,channel[c]);
-			if(0>(ofd=open(lbuf,O_RDWR|O_CREAT,S_IROTH|S_IRGRP|S_IWUSR|S_IRUSR))) {
+			if(NULL == (ofd=fopen(lbuf,"w+"))) {
 				printf("Unable to open '%s' for writing\n",lbuf);
 				goto closem;
 			}
@@ -296,23 +313,27 @@ int main(int argc, char * argv[])
 				printf("Preable failed on %s\n",channel[c]);
 				goto closem;
 			}
-			write(ofd,g->buf,i);	
+			fwrite(g->buf,1,i,ofd);	
 			if(-1 == (i=get_data(g,channel[c])) ){
 				printf("Unable to get waveform??\n");
 				goto closem;
 			}	
+			while(i>0){	/**suck out all data from cmd above  */
+				fwrite(g->buf,1,i,ofd);
+				i=read_string(g);
+			}
 		}
 		
-		write(ofd,g->buf,i);	
-		if(ofd>2){
-			close(ofd);
-			ofd=1;
+		/*fwrite(g->buf,1,i,ofd);	 */
+		if(NULL != ofd){
+			fclose(ofd);
+			ofd=NULL;
 		}
 	}
 	rtn=0;
 closem:
-	if(ofd>1)
-		close(ofd);
+	if(NULL != ofd)
+		fclose(ofd);
 	close_gpib(g);
 	return rtn;
 }
