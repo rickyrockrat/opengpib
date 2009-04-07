@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.3  2009-04-07 07:05:16  dfs
+Changed to more encapsulated interface code
+
 Revision 1.2  2009-04-06 20:57:26  dfs
 Major re-write for new gpib API
 
@@ -60,6 +63,7 @@ struct serial_port {
 	int oldpflags;
 	int newpflags;	
 	int ptermset;
+	int timeout; /**inter char timeout in uS  */
 };
   
 int init_port_settings( struct serial_port *p, char *name);
@@ -345,6 +349,7 @@ struct serial_port *open_serial_port(char *name, int baud, int data, int stop, i
   if( -1 ==  _open_serial_port(p) ) {
 		goto error;
 	}	
+	p->timeout=50000;
 	return p;
 error:
 	restore_serial_port(p);
@@ -388,39 +393,44 @@ int _serial_read(struct serial_dev *d, void *buf, int len)
 	p=(struct serial_port *)d->dev;	 
 	msg=(char *)buf;
 	
-	tm.tv_sec=0;
-	tm.tv_usec=5000;
 	FD_ZERO(&rd);
 	FD_SET(p->handle, &rd);
-	select (p->handle+1, &rd, NULL, NULL, &tm);
 
-		for (i=0; i<len;++i){
+	for (i=0; i<len;){
 		int x;
-		for (count=0;count<2000;++count){
-			if(0< (x=read(p->handle,&msg[i],len-i)) ){
-				i+=x-1;
+		tm.tv_usec=p->timeout;
+		tm.tv_sec=0;
+		/*printf("!"); */
+		if(select (p->handle+1, &rd, NULL, NULL, &tm)<1){
+			break;
+		}
+		for (count=0;count<100;++count){
+			if( (x=read(p->handle,&msg[i],len-i)) >0 ){
+		/*		printf("%02X ",msg[i]); */
+				i+=x;
 				break;
 			}
-				
-			usleep(100);
 		}
 		if(0 == x){	
 			if(0 == i || msg[i-1] != '\r' )	{
 				printf("Timeout waiting on char\n");
 				return -1;
-				
 			}else{
-				--i;
 				break;	
 			}
 		}	
 		/*printf("%c",msg[i]); */
 		if(msg[i]=='\n' )/* || msg[i] == '\r') */
 			break;
-	 }
-	while(i && (msg[i]=='\r' || msg[i]=='\n'))
-		--i;
-	++i;
+	}
+	if(i){
+		while(i>=0 && (msg[i]=='\r' || msg[i]=='\n'))
+			--i;
+		++i;	
+	}
+/*	else printf("No Chars\n"); */
+	
+/*	printf("sr%d ",i); */
 	return i;
 }
 
@@ -464,11 +474,28 @@ int _serial_open(struct serial_dev *d, char *path)
 		printf("Can't open %s. Fatal\n",path);
 		return 1;
 	}
+	
 	printf("Serial port opened.\n");
 
 	return 0; 
 }
 
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int _serial_control(struct serial_dev *d, int cmd, int data)
+{
+	struct serial_port *p;
+	p=(struct serial_port *)d->dev;
+	switch(cmd){
+		case SERIAL_CMD_SET_CHAR_TIMEOUT:
+			p->timeout=data;
+			break;
+	}
+	return 0;
+}
 /***************************************************************************/
 /** allocate and fill in our function structure.
 \n\b Arguments:
@@ -476,10 +503,11 @@ int _serial_open(struct serial_dev *d, char *path)
 ****************************************************************************/
 int serial_register(struct serial_dev *d)
 {
-	d->read=	_serial_read;
-	d->write=	_serial_write;
-	d->open=	_serial_open;
-	d->close=	_serial_close;
+	d->read=		_serial_read;
+	d->write=		_serial_write;
+	d->open=		_serial_open;
+	d->close=		_serial_close;
+	d->control= _serial_control;
 	d->dev=NULL;
 	return 0;
 }
