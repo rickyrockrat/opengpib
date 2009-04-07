@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.3  2009-04-06 20:57:26  dfs
+Major re-write for new gpib API
+
 Revision 1.2  2008/10/06 12:45:08  dfs
 Added write_get_data, auto to init_prologix, added \r auto term in write_string
 
@@ -29,11 +32,13 @@ len is max_len for msg.
 ****************************************************************************/
 int read_string(struct gpib *g)
 {
-	int i;
-	if((i=g->read(g->dev,g->buf,g->buf_len))>=0){
-		g->buf[i]=0;
+	int i,j;
+	i=0;
+	while( (j=g->read(g->ctl,&g->buf[i],g->buf_len-i)) >0){
+		i+=j;
 	}
-	
+	g->buf[i]=0;
+	/*printf("Got %d bytes\n'%s'\n",i,g->buf); */
 	return i;
 }
 /***************************************************************************/
@@ -43,36 +48,14 @@ int read_string(struct gpib *g)
 ****************************************************************************/
 int write_string(struct gpib *g, char *msg)
 {
-	int rtn,i;
-	char *m;
+	int i;
 	if(NULL == msg){
 		printf("msg null\n");
 		return -1;
 	}
+	/*printf("WS:%s",msg); */
 	i=strlen(msg);
-	
-	if('\r' != msg[i-1]){ /**Make sure we have terminator...  */
-		if(NULL == (m=malloc(i+2)) ){
-			printf("out of mem for %d\n",i+2);
-			return -1;
-		}
-		/*printf("Alloc new msg for '%s'\n",g->buf); */
-		i=sprintf(m,"%s\r",msg);
-	}else
-		m=msg;
-	
-	if((rtn=g->write(g->dev,m,i)) <0) {/* error writing */
-		rtn=-1;
-		goto end;
-  }
-	/*printf("wrote %d bytes\n%s\n",rtn,g->buf); */
-	if(rtn != i)
-		printf("Write mis-match %d != %d\n",rtn,i);
-	usleep(500);
-end:
-	if(m!=msg)
-		free(m);
-	return rtn;	
+	return g->write(g->ctl,msg,i);
 }
 
 /***************************************************************************/
@@ -82,20 +65,20 @@ end:
 ****************************************************************************/
 int write_get_data (struct gpib *g, char *cmd)
 {
-	char xbuf[100];
 	int i;
-	sprintf(xbuf,"%s\r",cmd);
-	write_string(g,xbuf);
-	write_string(g,"++read");
+	/*printf("Write... "); */
+	write_string(g,cmd);
+	/*printf("Read..."); */
 	if(-1 == (i=read_string(g)) ){
 		printf("%s:Unable to read from port for %s\n",__func__,cmd);
 		return 0;
 	}
+	/*printf("WGD rtn\n"); */
 	return i;
 }
 
 
-/***************************************************************************/
+/***************************************************************************/													
 /** .
 \n\b Arguments:
 \n\b Returns:
@@ -110,37 +93,18 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path)
 	memset(g,0,sizeof(struct gpib));
 	g->addr=addr;
 	g->buf_len=BUF_SIZE;
+	g->type_ctl=ctype;
 	/**set up the controller and interface. FIXME Replace with config file.  */
 	switch(ctype){
 		case GPIB_CTL_PROLOGIXS:
-			g->type_if=GPIB_IF_SERIAL;
 			if(register_prologixs(g))
-				goto err1;
-			break;
-		default:
-			printf("Unknown controller %d\n",ctype);
-			goto err1;
-			break;
-	}
-	g->type_ctl=ctype;
-	/**open our interface to the controller  */
-	switch(g->type_if){
-		case GPIB_IF_SERIAL:
-			if(serial_register(g)) /**load our function list  */
 				goto err1;
 			if(g->open(g,dev_path))
 				goto err;
 			break;
 		default:
-			printf("Don't know how to handle interface type %d\n",g->type_if);
+			printf("Unknown controller %d\n",ctype);
 			goto err1;
-			break;
-	}
-	/**open our controller  */
-	switch(g->type_ctl){
-		case GPIB_CTL_PROLOGIXS:
-			if(g->control(g, CTL_OPEN))
-				goto err;
 			break;
 	}
 	return g;
@@ -159,8 +123,9 @@ err1:
 int close_gpib (struct gpib *g)
 {
 	if(NULL != g->control)
-		g->control(g,CTL_CLOSE);
+		g->control(g,CTL_CLOSE,0);
 	if(NULL != g->close)
 		g->close(g);
 	return 0;
 }
+
