@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.3  2009-04-06 20:57:26  dfs
+Major re-write for new gpib API
+
 Revision 1.2  2008/10/06 12:45:23  dfs
 Added write_get_data, auto to init_prologix
 
@@ -45,10 +48,8 @@ enum {
 
 struct gpib {
 	int addr; 																		/**instrument address  */
-	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
-	int type_ctl;					 												/**controller type  */
 	void *ctl;																		/**controller-specific structure, if any  */
-	void *dev;            												/**interface-specific structure  */
+	int type_ctl;					 												/**controller type  */
 	int (*read)(void *dev, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
 	int (*write)(void *dev, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
 	int (*open)(struct gpib *g, char *path);			/** Returns: 1 on failure, 0 on success */
