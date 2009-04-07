@@ -8,6 +8,9 @@ scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.14  2009-04-07 04:46:03  dfs
+Changed to buffered IO
+
 Revision 1.13  2009-04-06 20:57:26  dfs
 Major re-write for new gpib API
 
@@ -291,6 +294,7 @@ int main(int argc, char * argv[])
 	ch_idx=0;
 	rtn=1;
 	ofname=NULL;
+	ofd=NULL;
 	while( -1 != (c = getopt(argc, argv, "a:c:ho:p:")) ) {
 		switch(c){
 			case 'a':
@@ -362,7 +366,7 @@ int main(int argc, char * argv[])
 	for (c=0;c<ch_idx && NULL != channel[c];++c){
 		if(NULL != ofname && NULL != lbuf ){ /**we have valid filename & channel, open  */
 			sprintf(lbuf,"%s.%s",ofname,channel[c]);
-			if(0>(ofd=fopen(lbuf,"w+"))) {
+			if(NULL == (ofd=fopen(lbuf,"w+"))) {
 				printf("Unable to open '%s' for writing\n",lbuf);
 				goto closem;
 			}
