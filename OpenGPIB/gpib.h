@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.4  2009-04-07 07:04:46  dfs
+Moved dev to interface code
+
 Revision 1.3  2009-04-06 20:57:26  dfs
 Major re-write for new gpib API
 
@@ -26,6 +29,8 @@ other controllers.
 #define _GPIB_H_ 1
 
 #include <sys/time.h>
+#include <unistd.h> /**for usleep  */
+
 #define BUF_SIZE 8096
 /**interface types  */
 enum {
@@ -54,7 +59,7 @@ struct gpib {
 	int (*write)(void *dev, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
 	int (*open)(struct gpib *g, char *path);			/** Returns: 1 on failure, 0 on success */
 	int (*close)(struct gpib *g);									/**closes interface  */
-	int (*control)(struct gpib *g, int cmd); 			/**controller-interface control. Set addr, etc.  */
+	int (*control)(struct gpib *g, int cmd, int data); 			/**controller-interface control. Set addr, etc.  */
 	char buf[BUF_SIZE];														/**GPIB buffer  */
 	int buf_len;													/**buffer length  */
 };
