@@ -109,6 +109,9 @@ int control_prologixs(struct gpib *g, int cmd, int data)
 		case CTL_CLOSE:
 			printf("Closing gpib\n");
 			break;
+		case CTL_SET_TIMEOUT:
+			return c->serial.control(&c->serial,SERIAL_CMD_SET_CHAR_TIMEOUT,data);
+			break;
 	}
 	return 0;
 }

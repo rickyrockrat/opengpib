@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.5  2009-04-07 18:14:13  dfs
+Changed control prototype
+
 Revision 1.4  2009-04-07 07:04:46  dfs
 Moved dev to interface code
 
@@ -47,6 +50,7 @@ enum {
 	CTL_OPEN=0,
 	CTL_CLOSE,
 	CTL_SET_ADDR,
+	CTL_SET_TIMEOUT,
 	CTL_NONE,
 };
 
