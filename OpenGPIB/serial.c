@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.2  2009-04-06 20:57:26  dfs
+Major re-write for new gpib API
+
 Revision 1.1  2008/08/02 08:53:58  dfs
 Initial working rev
 
@@ -374,19 +377,19 @@ int close_serial_port( struct serial_port *p)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number of byte read otherwise
 ****************************************************************************/
-int _serial_read(void *dev, void *buf, int len)
+int _serial_read(struct serial_dev *d, void *buf, int len)
 {
-	struct serial_port *p;
+	struct serial_port *p; 				 
 	int i,count;
 	char *msg;
 	fd_set rd;
 	struct timeval tm;
 	
-	p=(struct serial_port *)dev;	
+	p=(struct serial_port *)d->dev;	 
 	msg=(char *)buf;
 	
-	tm.tv_sec=1;
-	tm.tv_usec=0;
+	tm.tv_sec=0;
+	tm.tv_usec=5000;
 	FD_ZERO(&rd);
 	FD_SET(p->handle, &rd);
 	select (p->handle+1, &rd, NULL, NULL, &tm);
@@ -426,11 +429,11 @@ int _serial_read(void *dev, void *buf, int len)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-int _serial_write(void *dev, void *buf, int len)
+int _serial_write(struct serial_dev *d, void *buf, int len)
 {
-	struct serial_port *p;
 	int i;
-	p=(struct serial_port *)dev;
+	struct serial_port *p;
+	p=(struct serial_port *)d->dev;
 	if((i=write(p->handle,buf,len))<0)
 		printf("Error Writing to %s\n",p->phys_name);
 	return i;
@@ -441,22 +444,23 @@ int _serial_write(void *dev, void *buf, int len)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _serial_close(struct gpib *g)
+int _serial_close(struct serial_dev *d)
 {
-	return close_serial_port((struct serial_port *)g->dev);
+	return close_serial_port((struct serial_port *)d->dev);
 }
 /***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns: 1 on failure, 0 on success
 ****************************************************************************/
-int _serial_open(struct gpib *g, char *path)
+int _serial_open(struct serial_dev *d, char *path)
 {
-	if(NULL ==g){
-		printf("serial open: gpib null\n");
+	if(NULL == d){
+		printf("serial open: dev null\n");
 		return 1;
 	}
-	if(NULL == (g->dev=(void *)open_serial_port(path,115200,0,0,0))){
+	
+	if(NULL == (d->dev=open_serial_port(path,115200,0,0,0))){
 		printf("Can't open %s. Fatal\n",path);
 		return 1;
 	}
@@ -470,11 +474,12 @@ int _serial_open(struct gpib *g, char *path)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int serial_register(struct gpib *g)
+int serial_register(struct serial_dev *d)
 {
-	g->read=	_serial_read;
-	g->write=	_serial_write;
-	g->open=	_serial_open;
-	g->close=	_serial_close;
+	d->read=	_serial_read;
+	d->write=	_serial_write;
+	d->open=	_serial_open;
+	d->close=	_serial_close;
+	d->dev=NULL;
 	return 0;
 }
