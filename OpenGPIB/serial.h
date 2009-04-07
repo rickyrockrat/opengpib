@@ -7,13 +7,25 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.2  2009-04-06 20:57:26  dfs
+Major re-write for new gpib API
+
 Revision 1.1  2008/08/02 08:53:58  dfs
 Initial working rev
 
 */
 #ifndef _SERIAL_H_
 #define _SERIAL_H_ 1
+struct serial_dev {
+	int (*read)(struct serial_dev *d, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
+	int (*write)(struct serial_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
+	int (*open)(struct serial_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
+	int (*close)(struct serial_dev *d);									/**closes interface  */
+	int (*control)(struct serial_dev *d, int cmd); 			/**controller-interface control. Set addr, etc.  */
+	void *dev;            												/**interface-specific structure  */
+	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
+};
 
-int serial_register(struct gpib *g);
+int serial_register(struct serial_dev *d);
 #endif
 
