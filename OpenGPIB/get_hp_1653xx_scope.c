@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.3  2009-04-07 18:15:33  dfs
+Initial working get waveform
+
 Revision 1.2  2009-04-06 20:57:26  dfs
 Major re-write for new gpib API
 
@@ -64,6 +67,7 @@ This gives the trigger location...This is the xorigin as relates the trigger.
 :WAVEFORM:XORIGIN -5.07444E-06
 
 :WAVEFORM:RECORD FULL
+:WAV:REC FULL
 :WAVEFORM:RECORD WINDOW
 :WAVEFORM:FORMAT ASCII
 
@@ -73,13 +77,25 @@ This gives the trigger location...This is the xorigin as relates the trigger.
 :WAVEFORM:SOURCE CHANNEL3;DATA?
 
 
-
+									FMT,TYPE,Points,Count,Xinc,Xorigin,Xref,Yinc,Yorigin,Yref
 :WAVEFORM:PREAMBLE 0,1,500,1,+1.00000E-09,-2.51937E-07,0,+9.76562E-05,+1.10000E-01,8192
 
 
 :MEASURE:SOURCE CHANNEL3;VPP?
 :WAVEFORM:SOURCE CHANNEL1;PRE?
 :WAVEFORM:PREAMBLE 0,1,500,1,+1.00000E-09,-2.51802E-07,0,+4.88281E-04,+2.80000E+00,8192
+
+The ASC data format is same as WORD, which is as follows: 
+TYPE						MSB									LSB
+NORMAL NU|OV|M5|M4|M3|M2|M1|M0 	 00|00|00|00|00|00|00|00
+AVE		 NU|OV|M5|M4|M3|M2|M1|M0	 A7|A6|A5|A4|A3|A2|A1|A0
+BYTE is 
+	NU|OV|M5|M4|M3|M2|M1|M0
+	
+Data conversion:
+Voltage=(Value-Yreference)*Yinc +Yorigin
+Time= (point# -Xref)*Xinc + Xorigin
+
 */
 
 /***************************************************************************/
@@ -118,18 +134,20 @@ int init_instrument(struct gpib *g)
 	printf("Found Timbase in slot %c\n",'A'+osc);
 	
 	write_get_data(g,":SELECT?");
-	/*sleep(5); */
+
 	if(osc+1 == (g->buf[0]-0x30)){
 		printf("Timebase %s already selected\n",g->buf);
 	}	else{
 		sprintf(g->buf,":SELECT %d",osc+1);
 		write_string(g,g->buf);	
 	}
-	write_get_data(g,":SELECT?");
+	
+	i=write_get_data(g,":WAV:REC FULL;:WAV:FORM ASC;:SELECT?");
 	printf("Selected Card %s to talk to.\n",g->buf);
-	i=write_string(g,":WAVEFORM:FORMAT ASCII");
+
 	return i;
 /*34,-1,12,12,11,1,0,5,5,5 */
+	/** :WAV:REC FULL;:WAV:FORM ASC;:SELECT? */
 }
 
 /***************************************************************************/
@@ -278,8 +296,6 @@ int main(int argc, char * argv[])
 		printf("Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
 		goto closem;
 	}
-	printf("Sleep 5\n");
-	/*sleep(5); */
 	if(NULL != ofname){
 		/**find max strlen of channel name.  */
 		for (i=c=0;c<ch_idx;++c){
