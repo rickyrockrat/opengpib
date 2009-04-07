@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.4  2009-04-07 18:14:40  dfs
+Added control, timeout, fixed read
+
 Revision 1.3  2009-04-07 07:05:16  dfs
 Changed to more encapsulated interface code
 
@@ -402,6 +405,7 @@ int _serial_read(struct serial_dev *d, void *buf, int len)
 		tm.tv_sec=0;
 		/*printf("!"); */
 		if(select (p->handle+1, &rd, NULL, NULL, &tm)<1){
+			/**no chars avail.  */
 			break;
 		}
 		for (count=0;count<100;++count){
@@ -411,26 +415,7 @@ int _serial_read(struct serial_dev *d, void *buf, int len)
 				break;
 			}
 		}
-		if(0 == x){	
-			if(0 == i || msg[i-1] != '\r' )	{
-				printf("Timeout waiting on char\n");
-				return -1;
-			}else{
-				break;	
-			}
-		}	
-		/*printf("%c",msg[i]); */
-		if(msg[i]=='\n' )/* || msg[i] == '\r') */
-			break;
 	}
-	if(i){
-		while(i>=0 && (msg[i]=='\r' || msg[i]=='\n'))
-			--i;
-		++i;	
-	}
-/*	else printf("No Chars\n"); */
-	
-/*	printf("sr%d ",i); */
 	return i;
 }
 
