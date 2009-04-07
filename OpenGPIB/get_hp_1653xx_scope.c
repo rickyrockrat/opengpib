@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.4  2009-04-07 19:02:09  dfs
+Added docs, fixed unterm string, added rec
+
 Revision 1.3  2009-04-07 18:15:33  dfs
 Initial working get waveform
 
@@ -108,6 +111,9 @@ int init_instrument(struct gpib *g)
 	int i,s;
 	int slots[5], osc;
 	printf("Initializing Instrument\n");
+	g->control(g,CTL_SET_TIMEOUT,500);
+	while(read_string(g));
+	g->control(g,CTL_SET_TIMEOUT,50000);
 	/*write_string(g,"*CLS"); */
 	if(0 == write_get_data(g,"*IDN?"))
 		return -1;
