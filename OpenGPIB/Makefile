@@ -15,7 +15,7 @@ all: tek2gplot get_tek_waveform get_hp_16530_waveform calc_area_under_curve
 
 common.o: CFLAGS+=-std=c99 -D_COMMON_
 
-common.o: common.c common.h
+common.o: common.c common.h Makefile
 
 tek2gplot.o: get_tek_waveform.o tek2gplot.c gpib.lib
 
@@ -25,7 +25,9 @@ tek2gplot: common.o tek2gplot.o
 calc_area_under_curve: calc_area_under_curve.o common.o
 	gcc -lm  -o $@ $^
 
-serial.o: serial.h serial.c
+serial.o: serial.h serial.c	Makefile
+
+gpib.o: gpib.c gpib.h	Makefile
 
 gpib.lib: gpib.o prologixs.o serial.o common.o
 	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
