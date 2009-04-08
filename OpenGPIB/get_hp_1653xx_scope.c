@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.5  2009-04-07 19:13:07  dfs
+Added timeout control setting
+
 Revision 1.4  2009-04-07 19:02:09  dfs
 Added docs, fixed unterm string, added rec
 
@@ -94,13 +97,47 @@ NORMAL NU|OV|M5|M4|M3|M2|M1|M0 	 00|00|00|00|00|00|00|00
 AVE		 NU|OV|M5|M4|M3|M2|M1|M0	 A7|A6|A5|A4|A3|A2|A1|A0
 BYTE is 
 	NU|OV|M5|M4|M3|M2|M1|M0
+ASC is 0
+BYTE is 1
+WORD is 2
 	
 Data conversion:
 Voltage=(Value-Yreference)*Yinc +Yorigin
 Time= (point# -Xref)*Xinc + Xorigin
 
 */
+struct hp_preamble {
+	float xinc;
+	float xorg;
+	float xref;
+	float yinc;
+	float yorg;
+	float yref;
+	int points;
+	int fmt;
+};
 
+#define HP_FMT_ASC 	0
+#define HP_FMT_BYTE 1
+#define HP_FMT_WORD 2
+
+/***************************************************************************/
+/** FMT,TYPE,Points,Count,Xinc,Xorigin,Xref,Yinc,Yorigin,Yref.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int parse_preamble(struct gpib *g, struct hp_preamble *h)
+{
+	h->fmt=get_value_col(0,g->buf);
+	h->points=get_value_col(2,g->buf);
+	h->xinc=get_value_col(4,g->buf);
+	h->xorg=get_value_col(5,g->buf);
+	h->xref=get_value_col(6,g->buf);
+	h->yinc=get_value_col(7,g->buf);
+	h->yorg=get_value_col(8,g->buf);
+	h->yref=get_value_col(9,g->buf);
+	return 0;
+}
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -148,7 +185,7 @@ int init_instrument(struct gpib *g)
 		write_string(g,g->buf);	
 	}
 	
-	i=write_get_data(g,":WAV:REC FULL;:WAV:FORM ASC;:SELECT?");
+	i=write_get_data(g,":WAV:REC FULL;:WAV:FORM BYTE;:SELECT?");
 	printf("Selected Card %s to talk to.\n",g->buf);
 
 	return i;
@@ -183,16 +220,22 @@ int check_channel(char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_preamble(struct gpib *g,char *ch)
+int get_preamble(struct gpib *g,char *ch, struct hp_preamble *h)
 {
 	int i;
 	if(NULL == ch)
 		return -1;
 	if(0 == (i=check_channel(ch)))
 		return -1;
-/*	printf("GetPre %d\n",i);	 */
-	i=sprintf(g->buf,":WAV:SOUR CHAN%d;PRE?",i);
-	return write_get_data(g,g->buf);	
+	/*printf("GetPre %d\n",i);	  */
+	sprintf(g->buf,":WAV:SOUR CHAN%d;PRE?",i);
+	if( write_get_data(g,g->buf) <=0){
+		printf("No data from preamble (%d)\n",i);
+		return 0; 
+	}
+		
+	parse_preamble(g,h);
+	return 1;
 }
 /***************************************************************************/
 /** .
@@ -224,8 +267,10 @@ void usage(void)
 	" -c n Use channel n for data (ch1). ch1-ch?\n"
 	"    The -c option can be used multiple times. In this case, the fname\n"
 	"    is a base name, and the filename will have a .ch1 or .ch2, etc appended\n"
+	" -g set gnuplot mode, with x,y (time volts), one point per line\n"
 	" -o fname put output to file called fname\n"
 	" -p path set path to serial port name\n"
+	" -r set raw mode (don't convert data to volts)\n"
 	"\n Channels are set up such that for C1 C2 D1 D2, C1= ch1, C2=ch2, D1=ch3, and D2=ch4\n"
 	" So if you want C1 use ch1 as the -c option.\n"
 	
@@ -240,9 +285,10 @@ void usage(void)
 int main(int argc, char * argv[])
 {
 	struct gpib *g;
+	struct hp_preamble h;
 	FILE *ofd;
 	char *name, *ofname, *channel[MAX_CHANNELS], *lbuf;
-	int i, c,inst_addr, rtn, ch_idx;
+	int i, c,inst_addr, rtn, ch_idx, raw,xy;
 	name="/dev/ttyUSB0";
 	inst_addr=7;
 	channel[0]="ch1";
@@ -253,7 +299,8 @@ int main(int argc, char * argv[])
 	rtn=1;
 	ofname=NULL;
 	ofd=NULL;
-	while( -1 != (c = getopt(argc, argv, "a:c:ho:p:")) ) {
+	raw=xy=0;
+	while( -1 != (c = getopt(argc, argv, "a:gc:ho:p:r")) ) {
 		switch(c){
 			case 'a':
 				inst_addr=atoi(optarg);
@@ -267,11 +314,17 @@ int main(int argc, char * argv[])
 			case 'h':
 				usage();
 				return 1;
+			case 'g':
+				xy=1;
+				break;
 			case 'o':
 				ofname=strdup(optarg);
 				break;
 			case 'p':
 				name=strdup(optarg);
+				break;
+			case 'r':
+				raw=1;
 				break;
 			default:
 				usage();
@@ -324,6 +377,7 @@ int main(int argc, char * argv[])
 	printf("Channel loop\n");
 	/**channel loop. Open file, dump data, close file, repeat  */
 	for (c=0;c<ch_idx && NULL != channel[c];++c){
+		int point;
 		if(NULL != ofname && NULL != lbuf ){ /**we have valid filename & channel, open  */
 			sprintf(lbuf,"%s.%s",ofname,channel[c]);
 			if(NULL == (ofd=fopen(lbuf,"w+"))) {
@@ -331,17 +385,42 @@ int main(int argc, char * argv[])
 				goto closem;
 			}
 			printf("Reading Channel %s\n",channel[c]);
-			if( 0 == (i=get_preamble(g,channel[c]))){
+			if( 0 >= (i=get_preamble(g,channel[c],&h))){
 				printf("Preable failed on %s\n",channel[c]);
 				goto closem;
 			}
+	/** Voltage=(Value-Yreference)*Yinc +Yorigin
+			Time= (point# -Xref)*Xinc + Xorigin */
 			fwrite(g->buf,1,i,ofd);	
 			if(-1 == (i=get_data(g,channel[c])) ){
 				printf("Unable to get waveform??\n");
 				goto closem;
 			}	
+			point=0;
+			h.xinc*=1000000000;
 			while(i>0){	/**suck out all data from cmd above  */
-				fwrite(g->buf,1,i,ofd);
+				int x;
+				for (x=0;x<i;++x){
+					float volts;
+					float time;
+					time=h.xinc*(float)point;
+					if(0==point)
+						printf("%d %f %f \n",point,h.xinc,time); 
+					volts=(g->buf[x]-h.yref)*h.yinc + h.yorg;
+					if(xy){
+						if(raw)
+							fprintf(ofd,"%f %d\n",time,g->buf[x]);
+						else
+							fprintf(ofd,"%f %f\n",time,volts);	
+					}	else {
+						if(raw)
+							fprintf(ofd,"%d,",g->buf[x]);
+						else
+							fprintf(ofd,"%f,",volts);	
+					}
+					++point;
+				}
+				/*fwrite(g->buf,1,i,ofd); */
 				i=read_string(g);
 			}
 		}
