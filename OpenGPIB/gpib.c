@@ -3,19 +3,25 @@
 \n\b Author:      Doug Springer
 \n\b Company:     DNK Designs Inc.
 \n\b Date:        10/06/2008  1:44 am
-\n\b Description: common gpib functions...to talk to prologix.
+\n\b Description: common gpib functions...
 */ /************************************************************************
 Change Log: \n
-$Log: not supported by cvs2svn $
-Revision 1.3  2009-04-06 20:57:26  dfs
-Major re-write for new gpib API
+ This file is part of OpenGPIB.
 
-Revision 1.2  2008/10/06 12:45:08  dfs
-Added write_get_data, auto to init_prologix, added \r auto term in write_string
+    OpenGPIB is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-Revision 1.1  2008/10/06 07:54:16  dfs
-moved from get_tek_waveform
+    OpenGPIB is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
+    You should have received a copy of the GNU General Public License
+    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+    
+		The License should be in the file called COPYING.
 */
 #include <string.h>
 #include <stdio.h>

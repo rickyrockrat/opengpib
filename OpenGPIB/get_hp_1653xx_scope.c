@@ -6,22 +6,22 @@
 \n\b Description: Get waveforms from the HP 16530 timebase card.
 */ /************************************************************************
 Change Log: \n
-$Log: not supported by cvs2svn $
-Revision 1.5  2009-04-07 19:13:07  dfs
-Added timeout control setting
+ This file is part of OpenGPIB.
 
-Revision 1.4  2009-04-07 19:02:09  dfs
-Added docs, fixed unterm string, added rec
+    OpenGPIB is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-Revision 1.3  2009-04-07 18:15:33  dfs
-Initial working get waveform
+    OpenGPIB is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-Revision 1.2  2009-04-06 20:57:26  dfs
-Major re-write for new gpib API
-
-Revision 1.1  2008/10/06 12:44:11  dfs
-Initial working revision
-
+    You should have received a copy of the GNU General Public License
+    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+    
+		The License should be in the file called COPYING.
 */
 
 #include "common.h"

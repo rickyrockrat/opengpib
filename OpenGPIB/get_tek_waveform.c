@@ -7,52 +7,22 @@
 scope, then dump that into a file.
 */ /************************************************************************
 Change Log: \n
-$Log: not supported by cvs2svn $
-Revision 1.15  2009-04-07 07:03:49  dfs
-Fixed NULL check for new buffered io
+ This file is part of OpenGPIB.
 
-Revision 1.14  2009-04-07 04:46:03  dfs
-Changed to buffered IO
+    OpenGPIB is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-Revision 1.13  2009-04-06 20:57:26  dfs
-Major re-write for new gpib API
+    OpenGPIB is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-Revision 1.12  2008/10/06 12:46:23  dfs
-Removed unused write_port,read_port, fixed new call to init_prologix
-
-Revision 1.11  2008/10/06 07:52:38  dfs
-Moved funtions to gpib
-
-Revision 1.10  2008/08/19 06:42:26  dfs
-Moved def of CH_LIST to common.h
-
-Revision 1.9  2008/08/19 00:49:48  dfs
-Added target to dump
-
-Revision 1.8  2008/08/18 21:18:33  dfs
-Fixed min,max read of cursor
-
-Revision 1.7  2008/08/17 04:55:43  dfs
-Removed invalid -r line in usage
-
-Revision 1.6  2008/08/12 23:03:04  dfs
-Added time/period cursors, changed to lower case
-
-Revision 1.5  2008/08/04 09:46:39  dfs
-Added handling of time cursors
-
-Revision 1.4  2008/08/03 23:31:39  dfs
-Changed format of cursors file to match waveform preable
-
-Revision 1.3  2008/08/03 22:21:40  dfs
-Added trigger to cursors info
-
-Revision 1.2  2008/08/03 06:19:59  dfs
-Added multiple channel reads and cursor reads
-
-Revision 1.1  2008/08/02 08:53:58  dfs
-Initial working rev
-
+    You should have received a copy of the GNU General Public License
+    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+    
+		The License should be in the file called COPYING.
 */
  
 

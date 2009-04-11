@@ -6,19 +6,22 @@
 \n\b Description: Common functions.
 */ /************************************************************************
 Change Log: \n
-$Log: not supported by cvs2svn $
-Revision 1.4  2009-03-18 22:51:59  dfs
-Added format_eng_units
+ This file is part of OpenGPIB.
 
-Revision 1.3  2008/10/06 12:42:51  dfs
-Added get_string_col, get_value_col
+    OpenGPIB is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-Revision 1.2  2008/08/18 21:14:54  dfs
-Fixed bug that truncated read
+    OpenGPIB is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-Revision 1.1  2008/08/03 06:18:42  dfs
-Moved functions from tek2gplot.c
-
+    You should have received a copy of the GNU General Public License
+    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+    
+		The License should be in the file called COPYING.
 */
 
 #include "common.h"
@@ -159,9 +162,11 @@ char * get_string( char *f, char *buf)
 	return(strdup(tbuf));	 
 }
 /***************************************************************************/
-/** Get the string at column number
+/** Get the string at column number. 
 \n\b Arguments:
-\n\b Returns:
+col - zero-based column number
+buf - buffer to parse
+\n\b Returns: allocated string for column value
 ****************************************************************************/
 char * get_string_col( int col, char *buf)
 {
