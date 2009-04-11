@@ -207,3 +207,21 @@ double get_value_col( int col, char *buf)
 	free(v);
 	return(x );	 
 }
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void _usleep(int usec)
+{
+	struct timespec t,r;
+	r.tv_sec=usec/1000;
+	usec/=1000;
+	r.tv_nsec=usec*1000;
+	nanosleep(&t,&r);	
+	/** do{
+		memcpy(&t,&r, sizeof(struct timespec));
+	
+	}while(r.tv_sec || r.tv_nsec);*/
+	
+}

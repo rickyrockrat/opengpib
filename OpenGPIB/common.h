@@ -63,5 +63,6 @@ double get_value( char *f, char *buf);
 double get_value_col( int col, char *buf);
 char * get_string( char *f, char *buf);
 char * get_string_col( int col, char *buf);
+void _usleep(int usec);
 #endif 
 
