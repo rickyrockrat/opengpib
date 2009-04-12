@@ -11,7 +11,7 @@
 #-std=c99
 CFLAGS+=-Wall
 
-all: tek2gplot get_tek_waveform get_hp_16530_waveform calc_area_under_curve
+all: tek2gplot get_tek_waveform get_hp_16530_waveform calc_area_under_curve networkanalyzer
 
 common.o: CFLAGS+=-std=c99 -D_COMMON_
 
@@ -36,6 +36,9 @@ get_tek_waveform:	get_tek_waveform.o gpib.lib
 	gcc -lm -o $@ $^
 	
 get_hp_16530_waveform: get_hp_16530_waveform.o gpib.lib
+	gcc -lm -o $@ $^
+
+networkanalyzer: networkanalyzer.o gpib.lib
 	gcc -lm -o $@ $^
 
 .PHONY: clean
