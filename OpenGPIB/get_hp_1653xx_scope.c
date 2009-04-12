@@ -267,9 +267,10 @@ void usage(void)
 	" -c n Use channel n for data (ch1). ch1-ch?\n"
 	"    The -c option can be used multiple times. In this case, the fname\n"
 	"    is a base name, and the filename will have a .ch1 or .ch2, etc appended\n"
+	" -d dev set path to device name\n"
 	" -g set gnuplot mode, with x,y (time volts), one point per line\n"
 	" -o fname put output to file called fname\n"
-	" -p path set path to serial port name\n"
+
 	" -r set raw mode (don't convert data to volts)\n"
 	"\n Channels are set up such that for C1 C2 D1 D2, C1= ch1, C2=ch2, D1=ch3, and D2=ch4\n"
 	" So if you want C1 use ch1 as the -c option.\n"
@@ -300,7 +301,7 @@ int main(int argc, char * argv[])
 	ofname=NULL;
 	ofd=NULL;
 	raw=xy=0;
-	while( -1 != (c = getopt(argc, argv, "a:gc:ho:p:r")) ) {
+	while( -1 != (c = getopt(argc, argv, "a:d:gc:ho:r")) ) {
 		switch(c){
 			case 'a':
 				inst_addr=atoi(optarg);
@@ -311,6 +312,9 @@ int main(int argc, char * argv[])
 				}
 				channel[ch_idx++]=strdup(optarg);
 				break;
+			case 'd':
+				name=strdup(optarg);
+				break;
 			case 'h':
 				usage();
 				return 1;
@@ -320,9 +324,7 @@ int main(int argc, char * argv[])
 			case 'o':
 				ofname=strdup(optarg);
 				break;
-			case 'p':
-				name=strdup(optarg);
-				break;
+
 			case 'r':
 				raw=1;
 				break;
