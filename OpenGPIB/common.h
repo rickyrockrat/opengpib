@@ -32,7 +32,7 @@ Change Log: \n
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h> /**getopt  */
-
+#include <time.h> /**timespec  */
 #ifndef _COMMON_
 #define MAX_CHANNELS 7
 /**We use the below for figuring out which channel the target is on.  */
