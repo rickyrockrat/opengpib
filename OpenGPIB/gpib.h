@@ -56,9 +56,9 @@ enum {
 	CTL_NONE,
 };
 
-
+/**structure to talk to the host controller  */
 struct gpib {
-	int addr; 																		/**instrument address  */
+	int addr; 																		/**instrument address. Check against inst addr  */
 	void *ctl;																		/**controller-specific structure, if any  */
 	int type_ctl;					 												/**controller type  */
 	int (*read)(void *dev, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
@@ -68,12 +68,21 @@ struct gpib {
 	int (*control)(struct gpib *g, int cmd, int data); 			/**controller-interface control. Set addr, etc.  */
 	char buf[BUF_SIZE];														/**GPIB buffer  */
 	int buf_len;													/**buffer length  */
+	char *dev_path;																/**physical device path.  */
 };
 
+/**structure to talk to the instrument  */
+struct ginstrument {
+	struct gpib *g;
+	int type;
+	int addr;																							  /**instrument address.  */
+	int (*init)(struct ginstrument *inst);									/**function to call to initialize instrument.  */
+};
 
 int read_string(struct gpib *g);
 int write_string(struct gpib *g, char *msg);
 int write_get_data (struct gpib *g, char *cmd);
+int write_wait_for_data(char *msg, int sec, struct gpib *g);
 struct gpib *open_gpib(int ctype, int addr, char *dev_path); /**opens and inits GPIB interface, interface,and controller  */
 int close_gpib (struct gpib *g);
 #endif
