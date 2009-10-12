@@ -216,7 +216,7 @@ void _usleep(int usec)
 {
 	struct timespec t,r;
 	r.tv_sec=usec/1000;
-	usec/=1000;
+	usec-=r.tv_sec*1000;
 	r.tv_nsec=usec*1000;
 	nanosleep(&t,&r);	
 	/** do{
