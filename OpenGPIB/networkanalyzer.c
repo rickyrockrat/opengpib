@@ -8,11 +8,29 @@ analyze a circuit over frequency. Initally calculate the gain.
 MKTYPE PSN;SNGLS;RB 100 Hz;SP 1 KHz;ST 1 S
 CF MHz;TS;MKPK HI;MKA?
 */ /************************************************************************
-Change Log: \n
-$Log: not supported by cvs2svn $
+ This file is part of OpenGPIB.
+
+    OpenGPIB is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    OpenGPIB is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+    
+		The License should be in the file called COPYING.
 */
 #include "common.h"
 #include "gpib.h"
+
+/** Modes...  */
+#define CAL 1
+#define GAIN 2
 
 #define PSG2400L_IDN_STR "Wayne Kerr PSG2400L"
 #define HP8595E_IDN_STR "HP8595E"
@@ -62,7 +80,7 @@ struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct gpib *g
 	gi->addr=addr;
 	printf("Initializing Instrument\n");
 	write_string(gi->g,"*CLS");
-	if(0 == write_get_data(gi->g,"*IDN?")){
+	if(0 == write_wait_for_data("*IDN?",3,gi->g)){
 		printf("No data for id for '%s'\n",PSG2400L_IDN_STR);
 		return NULL;
 	}
@@ -119,10 +137,10 @@ struct ginstrument *init_HP8595E(char *path, int type, int addr, struct gpib *g)
 void usage(void)
 {
 	printf("networkanalyzer <options>\n"
-	" -a gaddr set signal generator addr.(9)\n"
+	" -a saddr set signal generator addr.(9)\n"
 	" -a aaddr set analyzer addr.(18)\n"
 	" -c fname set cal in/out file to cal\n"
-	" -d gpath set signal generator controller device name.(defaults to last device)\n"
+	" -d spath set signal generator controller device name.(defaults to last device)\n"
 	" -d apath set spectrum analyzer controller device name.(defaults to last device\n"
 	"  at least one -d must be specified. If the second is not specified, it is assumed there\n"
 	"  is only one controller, and the second defaults to the first\n"
@@ -136,27 +154,7 @@ void usage(void)
 	"");
 	
 }
-#define CAL 1
-#define GAIN 2
 
-
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int write_wait_for_data(char *msg, int sec, struct gpib *g)
-{
-	int i,rtn;
-	rtn =0;
-	write_string(g,msg);
-	for (i=0; i<sec;++i){
-		if((rtn=read_string(g)))
-			break;
-		sleep(1);
-	}
-	return rtn;
-}
 /***************************************************************************/
 /** .       GPIB_CTL_PROLOGIXS
 \n\b Arguments:
@@ -165,17 +163,17 @@ HP8595E
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct ginstrument *gi,*si;
-	char *gdev, *sdev;
-	int gaddr,saddr, mode,c;
-	float start, stop, inc, iter,slevel;
+	struct ginstrument *signalgen_inst,*analyzer_inst;
+	char *signalgen_dev, *analyzer_dev;
+	int signalgen_addr,analyzer_addr, mode,c;
+	float start, stop, inc, iter,slevel, last_f;
 	char *calname, *dname, lbuf[100];
 	FILE *cal, *data;
-	gi=si=NULL;
-	gdev=sdev=calname=dname=NULL;
+	signalgen_inst=analyzer_inst=NULL;
+	signalgen_dev=analyzer_dev=calname=dname=NULL;
 	cal=data=NULL;
-	gaddr=9;
-	saddr=18;
+	signalgen_addr=9;
+	analyzer_addr=18;
 	mode=GAIN;
 	start=stop=inc=0;
 	slevel=-30;
@@ -183,11 +181,11 @@ int main(int argc, char * argv[])
 		switch(c){
 			case 'a':
 				switch(optarg[0]){
-					case 'g':
-						gaddr=atoi(&optarg[1]);
-						break;
 					case 's':
-						saddr=atoi(&optarg[1]);
+						signalgen_addr=atoi(&optarg[1]);
+						break;
+					case 'a':
+						analyzer_addr=atoi(&optarg[1]);
 						break;
 					default:
 						printf("Unknown -a option '%c' in %s\n",optarg[1], optarg);
@@ -199,14 +197,14 @@ int main(int argc, char * argv[])
 				break;
 			case 'd':
 				switch(optarg[0]){
-					case 'g':
-						gdev=strdup(&optarg[1]);
-						break;
 					case 's':
-						sdev=strdup(&optarg[1]);
+						signalgen_dev=strdup(&optarg[1]);
+						break;
+					case 'a':
+						analyzer_dev=strdup(&optarg[1]);
 						break;
 					default:
-						printf("Unknown -p option '%c' in %s\n",optarg[1], optarg);
+						printf("Unknown -d option '%c' in %s\n",optarg[1], optarg);
 						return 1;
 				}
 				break;
@@ -228,6 +226,7 @@ int main(int argc, char * argv[])
 				return 1;
 			case 'i':
 				sscanf(optarg,"%f",&inc);
+				inc/=1000;
 				break;
 			case 'l':
 				switch(optarg[0]){
@@ -265,20 +264,20 @@ int main(int argc, char * argv[])
 		printf("Not allowing level %f\n",slevel);
 		return 1;
 	}
-	if(NULL ==sdev && NULL == gdev){
+	if(NULL ==analyzer_dev && NULL == signalgen_dev){
 		printf("Must specify a controller device path (-p\n");
 		usage();
 		return 1;
 	}
 	/**set up device names  */
-	if(NULL == gdev && NULL != sdev){
+	if(NULL == signalgen_dev && NULL != analyzer_dev){
 		printf("Using generator controller for spectrum analyzer\n");
-		gdev=sdev;
+		signalgen_dev=analyzer_dev;
 	}
 		
-	if(NULL == sdev && NULL != gdev){
+	if(NULL == analyzer_dev && NULL != signalgen_dev){
 		printf("Using spectrum analyzer controller for generator\n");
-		sdev=gdev;
+		analyzer_dev=signalgen_dev;
 	}
 	if(CAL == mode){
 		if(NULL ==calname){
@@ -290,32 +289,36 @@ int main(int argc, char * argv[])
 			return 1;
 		}
 	}
-	if(NULL == (si=init_HP8595E(sdev, GPIB_CTL_PROLOGIXS, saddr, NULL))) {
+	if(NULL == (analyzer_inst=init_HP8595E(analyzer_dev, GPIB_CTL_PROLOGIXS, analyzer_addr, NULL))) {
 		return -1;
 	}
-	if(NULL == (gi=init_PSG2400L(gdev, GPIB_CTL_PROLOGIXS, gaddr, sdev==gdev?si->g:NULL))) {
+	if(NULL == (signalgen_inst=init_PSG2400L(signalgen_dev, GPIB_CTL_PROLOGIXS, signalgen_addr, analyzer_dev==signalgen_dev?analyzer_inst->g:NULL))) {
 		return -1;
 	}
 	
 	sprintf(lbuf,"MKTYPE PSN;SNGLS;RB 100 Hz;SP 1 KHz;ST 1 S");
-	write_string(si->g,lbuf);
+	write_string(analyzer_inst->g,lbuf);
 	sprintf(lbuf,"CL %f dbM\n",slevel);
-	write_string(gi->g,lbuf);
+	write_string(signalgen_inst->g,lbuf);
 	printf("Start = %f Mhz, Stop = %f Mhz, inc= %f Mhz\n",start,stop,inc);
-	for (iter=start; iter<=stop; iter+=inc){
+	for (iter=start,last_f=start; iter<=stop; iter+=inc){
 		char lbuf[100];
 		float level,freq;
 		sprintf(lbuf,"CF %f Mhz",iter);
-
-		write_string(gi->g,lbuf);
-		sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",iter);
-		write_wait_for_data(lbuf,10,si->g);
-		sscanf(si->g->buf,"%f",&level);
-		printf("%s ",si->g->buf);
+		
+		write_string(signalgen_inst->g,lbuf);
+		printf("Using %f for cf ",last_f);
+		sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",last_f);
+		write_wait_for_data(lbuf,10,analyzer_inst->g);
+		sscanf(analyzer_inst->g->buf,"%f",&level);
+		printf("%s ",analyzer_inst->g->buf);
 		sprintf(lbuf,"MKF?");
-		write_wait_for_data(lbuf,10,si->g);
-		sscanf(si->g->buf,"%f",&freq);
-		printf("%s\n",si->g->buf);
+		write_wait_for_data(lbuf,10,analyzer_inst->g);
+		sscanf(analyzer_inst->g->buf,"%f",&freq);
+		/**use the last peak to estimate where the next one will be - the signal generator may be off or not accurate enough...  */
+		last_f=freq/1000000; /**convert to Mhz  */
+		last_f +=inc;				/**set up for next measurement.  */
+		printf("%s (%f, %fMhz)\n",analyzer_inst->g->buf,freq,last_f);
 		switch(mode){
 			case CAL:
 				fprintf(cal,"%f %f %f %f\n",iter,slevel,freq,level);
