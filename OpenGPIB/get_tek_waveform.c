@@ -28,7 +28,7 @@ Change Log: \n
 
 #include "common.h"
 #include "gpib.h"
-#include <time.h>
+
 #include <ctype.h>
 
 #define FUNC_VOLT 1
