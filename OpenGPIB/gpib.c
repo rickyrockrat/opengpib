@@ -30,6 +30,8 @@ Change Log: \n
 #include "gpib.h"
 #include "serial.h"
 #include "prologixs.h"
+
+
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -42,6 +44,7 @@ int read_string(struct gpib *g)
 	i=0;
 	while( (j=g->read(g->ctl,&g->buf[i],g->buf_len-i)) >0){
 		i+=j;
+		usleep(1000);
 	}
 	g->buf[i]=0;
 	/*printf("Got %d bytes\n'%s'\n",i,g->buf); */
@@ -83,7 +86,44 @@ int write_get_data (struct gpib *g, char *cmd)
 	return i;
 }
 
-
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int write_wait_for_data(char *msg, int sec, struct gpib *g)
+{
+	int i,rtn;
+	rtn =0;
+	write_string(g,msg);
+	for (i=0; i<sec;++i){
+		if((rtn=read_string(g)))
+			break;
+		usleep(500000);
+	}
+	return rtn;
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns: -1 on error or bytes written on success.
+****************************************************************************/
+int write_cmd(struct ginstrument *gi, char *cmd)
+{
+	if(gi->addr != gi->g->addr){
+		if(NULL !=gi->g->control){
+			if(0 != gi->g->control(gi->g,CTL_SET_ADDR,gi->addr)){
+				printf("Unable to set instrument address %d\n",gi->addr);
+				return -1;
+			}
+			
+		}else{
+			printf("Unable to set instrument address (%d!=%d). device control not set\n",gi->addr,gi->g->addr);
+		}
+	}
+	return write_string(gi->g,cmd);
+		
+}
 /***************************************************************************/													
 /** .
 \n\b Arguments:
@@ -113,6 +153,7 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path)
 			goto err1;
 			break;
 	}
+	g->dev_path=strdup(dev_path);
 	return g;
 err:
 	g->close(g);
@@ -120,6 +161,7 @@ err1:
 	free(g);
 	return NULL;
 }
+
 
 /***************************************************************************/
 /** .
@@ -132,6 +174,8 @@ int close_gpib (struct gpib *g)
 		g->control(g,CTL_CLOSE,0);
 	if(NULL != g->close)
 		g->close(g);
+	if(NULL != g->dev_path)
+		free(g->dev_path);
 	return 0;
 }
 
