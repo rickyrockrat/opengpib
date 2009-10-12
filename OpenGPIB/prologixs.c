@@ -98,19 +98,28 @@ int prologixs_init(struct gpib *g)
 ****************************************************************************/
 int control_prologixs(struct gpib *g, int cmd, int data)
 {
-	int action;
+	int i;
 	struct prologixs_ctl *c; 
+	char cmdbuf[100];
 	if(NULL == g){
 		printf("prologixs: gpib null\n");
-		return 1;
+		return 0;
 	}
 	c=(struct prologixs_ctl *)g->ctl;
 	switch(cmd){
 		case CTL_CLOSE:
 			printf("Closing gpib\n");
+			
 			break;
 		case CTL_SET_TIMEOUT:
 			return c->serial.control(&c->serial,SERIAL_CMD_SET_CHAR_TIMEOUT,data);
+			break;
+		case CTL_SET_ADDR: /**send command, check result, then set gpib addr.  */
+			i=sprintf(cmdbuf,"++addr %d\n",data);
+			if(c->serial.write(&c->serial,cmdbuf,i) == i){
+				g->addr=data;
+				return 1;
+			}
 			break;
 	}
 	return 0;
