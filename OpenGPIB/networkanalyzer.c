@@ -27,10 +27,12 @@ CF MHz;TS;MKPK HI;MKA?
 */
 #include "common.h"
 #include "gpib.h"
+#include <math.h>
 
 /** Modes...  */
 #define CAL 1
 #define GAIN 2
+#define PEAK_SEARCH 0x8000 
 
 #define PSG2400L_IDN_STR "Wayne Kerr PSG2400L"
 #define HP8595E_IDN_STR "HP8595E"
@@ -78,7 +80,7 @@ struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct gpib *g
 	if(NULL == gi->g)
 		gi->g=g;
 	gi->addr=addr;
-	printf("Initializing Instrument\n");
+	printf("Initializing PSG2400L\n");
 	write_string(gi->g,"*CLS");
 	if(0 == write_wait_for_data("*IDN?",3,gi->g)){
 		printf("No data for id for '%s'\n",PSG2400L_IDN_STR);
@@ -139,6 +141,7 @@ void usage(void)
 	printf("networkanalyzer <options>\n"
 	" -a saddr set signal generator addr.(9)\n"
 	" -a aaddr set analyzer addr.(18)\n"
+	" -b bw Set Analyzer bandwidth in Hz (100).\n"
 	" -c fname set cal in/out file to cal\n"
 	" -d spath set signal generator controller device name.(defaults to last device)\n"
 	" -d apath set spectrum analyzer controller device name.(defaults to last device\n"
@@ -150,7 +153,10 @@ void usage(void)
 	" -l slevel set start dBm to level (-30dBm)\n"
 	" -m mode set mode to mode. c=cal, g=gain.(g)\n"
 	" -o fname put output to file called fname\n"
-	
+	" -p set mode to peak finding before cal, does +/- 10*span on either side of start freq.\n"
+	" -s span set analyzer span in Hz (1000)\n"
+	" -t time set sweep time in miliseconds (1000)\n"
+	" -v set verbose mode (off)\n"
 	"");
 	
 }
@@ -165,8 +171,9 @@ int main(int argc, char * argv[])
 {
 	struct ginstrument *signalgen_inst,*analyzer_inst;
 	char *signalgen_dev, *analyzer_dev;
-	int signalgen_addr,analyzer_addr, mode,c;
-	float start, stop, inc, iter,slevel, last_f;
+	int signalgen_addr,analyzer_addr, mode,c, verbose;
+	float start, stop, inc, iter,slevel, rbw, span, sweeptime;
+ 	float level,freq, last_l, last_f,delta, x;
 	char *calname, *dname, lbuf[100];
 	FILE *cal, *data;
 	signalgen_inst=analyzer_inst=NULL;
@@ -177,7 +184,11 @@ int main(int argc, char * argv[])
 	mode=GAIN;
 	start=stop=inc=0;
 	slevel=-30;
-	while( -1 != (c = getopt(argc, argv, "a:c:d:f:hi:l:m:o:")) ) {
+	rbw=100;
+	span=1000;
+	sweeptime=1000;
+	verbose=0;
+	while( -1 != (c = getopt(argc, argv, "a:b:c:d:f:hi:l:m:o:ps:t:v")) ) {
 		switch(c){
 			case 'a':
 				switch(optarg[0]){
@@ -191,6 +202,9 @@ int main(int argc, char * argv[])
 						printf("Unknown -a option '%c' in %s\n",optarg[1], optarg);
 						return 1;
 				}
+				break;
+			case 'b':
+				rbw=atoi(optarg);
 				break;
 			case 'c':
 				calname=strdup(optarg);
@@ -241,6 +255,9 @@ int main(int argc, char * argv[])
 			case 'o':
 				dname=strdup(optarg);
 				break;
+			case 'p':
+				mode|=PEAK_SEARCH;
+				break;
 			case 'm':
 				switch(optarg[0]){
 					case 'c':
@@ -253,6 +270,15 @@ int main(int argc, char * argv[])
 						printf("Unknown option to -m:'%s'\n",optarg);
 						return 1;
 				}
+				break;
+			case 's':
+				span=atoi(optarg);
+				break;
+			case 't':
+				sscanf(optarg,"%f",&sweeptime);
+				break;
+			case 'v':
+				verbose=OPTION_DEBUG;
 				break;
 			default:
 				printf("Unknown option %c\n",c);
@@ -289,21 +315,54 @@ int main(int argc, char * argv[])
 			return 1;
 		}
 	}
-	if(NULL == (analyzer_inst=init_HP8595E(analyzer_dev, GPIB_CTL_PROLOGIXS, analyzer_addr, NULL))) {
+	if(NULL == (analyzer_inst=init_HP8595E(analyzer_dev, GPIB_CTL_PROLOGIXS|verbose, analyzer_addr, NULL))) {
 		return -1;
 	}
-	if(NULL == (signalgen_inst=init_PSG2400L(signalgen_dev, GPIB_CTL_PROLOGIXS, signalgen_addr, analyzer_dev==signalgen_dev?analyzer_inst->g:NULL))) {
+	if(NULL == (signalgen_inst=init_PSG2400L(signalgen_dev, GPIB_CTL_PROLOGIXS|verbose, signalgen_addr, analyzer_dev==signalgen_dev?analyzer_inst->g:NULL))) {
 		return -1;
 	}
 	
-	sprintf(lbuf,"MKTYPE PSN;SNGLS;RB 100 Hz;SP 1 KHz;ST 1 S");
+	sprintf(lbuf,"MKTYPE PSN;SNGLS;RB %f Hz;SP %f Hz;ST %f mS",rbw,span,sweeptime);
 	write_string(analyzer_inst->g,lbuf);
 	sprintf(lbuf,"CL %f dbM\n",slevel);
 	write_string(signalgen_inst->g,lbuf);
-	printf("Start = %f Mhz, Stop = %f Mhz, inc= %f Mhz\n",start,stop,inc);
-	for (iter=start,last_f=start; iter<=stop; iter+=inc){
-		char lbuf[100];
-		float level,freq;
+	printf("Resolution BW = %f Hz, span = %f Hz.",rbw,span);
+	if( mode & PEAK_SEARCH){
+	
+		printf("Finding peak for start freq %f and level %f.\n",start,slevel);
+		
+		sprintf(lbuf,"CF %f Mhz",start);
+		write_string(signalgen_inst->g,lbuf);
+		x=span/1000000;
+		printf("Span = %f Mhz, starting at %f\n",x,start-(x*10));
+		for ( iter=start-(x*10),last_l=delta=1000,last_f=0; iter< start+(x*10); iter+=x){
+			float y;
+			sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",iter);
+			printf("Looking at %f ",iter); 
+			write_wait_for_data(lbuf,10,analyzer_inst->g);
+			sscanf(analyzer_inst->g->buf,"%f",&level);
+			printf("%s ",analyzer_inst->g->buf); 
+			sprintf(lbuf,"MKF?");
+			write_wait_for_data(lbuf,10,analyzer_inst->g);
+			sscanf(analyzer_inst->g->buf,"%f",&freq);
+			printf(" Peak at %f",freq);
+			y=fabs(fabs(level)-fabs(slevel));
+			if(y <delta){
+				last_f=freq/1000000;
+				last_l=level;
+				delta=y;
+				printf("*");
+			}
+			printf("\n");
+		}
+	}	else{
+		last_f=start;
+		printf("\n");
+	}
+		
+	printf("Start = %f Mhz, Stop = %f Mhz, inc= %f Mhz. Offset=%f\n",start,stop,inc,last_f);
+	for (iter=start; iter<=stop; iter+=inc){
+		
 		sprintf(lbuf,"CF %f Mhz",iter);
 		
 		write_string(signalgen_inst->g,lbuf);
