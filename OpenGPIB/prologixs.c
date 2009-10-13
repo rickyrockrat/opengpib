@@ -53,7 +53,7 @@ int prologixs_init(struct gpib *g)
 	int i;
 	struct prologixs_ctl *c;
 	c=(struct prologixs_ctl *)g->ctl;
-	printf("Init Prologix controller\n");
+	if(g->type_ctl&OPTION_DEBUG)printf("Init Prologix controller\n");
 	read_string(g);
 	/*make sure auto reply is on*/
 	if(c->autor)
@@ -72,7 +72,7 @@ int prologixs_init(struct gpib *g)
 		printf("%s:Unable to find correct ver in\n%s\n",__func__,g->buf);
 		return -1;
 	}
-	printf("Talking to Controller '%s'\n",g->buf);
+	if(g->type_ctl&OPTION_DEBUG) printf("Talking to Controller '%s'\n",g->buf);
 	/*Then set to Controller mode */
 	write_string(g,"++mode 1");
 	
@@ -84,10 +84,13 @@ int prologixs_init(struct gpib *g)
 	write_string(g,"++eoi 1");
 	/*Set the eos mode (LF) */
 	write_string(g,"++eos 2");
-	verify(g,"++addr");
-	verify(g,"++eoi");
-	verify(g,"++eos");
-	verify(g,"++auto");
+	if(g->type_ctl&OPTION_DEBUG){
+		verify(g,"++addr");
+		verify(g,"++eoi");
+		verify(g,"++eos");
+		verify(g,"++auto");	
+	}
+	
 	return 0;
 }
 
@@ -106,9 +109,13 @@ int control_prologixs(struct gpib *g, int cmd, int data)
 		return 0;
 	}
 	c=(struct prologixs_ctl *)g->ctl;
+	if(NULL == c){
+		printf("proligixs_clt null\n");
+		return 1;
+	}
 	switch(cmd){
 		case CTL_CLOSE:
-			printf("Closing gpib\n");
+			if(c->serial.debug) printf("Closing gpib\n");
 			
 			break;
 		case CTL_SET_TIMEOUT:
@@ -120,6 +127,12 @@ int control_prologixs(struct gpib *g, int cmd, int data)
 				g->addr=data;
 				return 1;
 			}
+			break;
+		case CTL_SET_DEBUG:
+			if(data)
+				c->serial.debug=1;
+			else
+				c->serial.debug=0;
 			break;
 	}
 	return 0;
@@ -233,6 +246,10 @@ int _prologixs_open(struct gpib *g, char *path)
 	}
 	if(serial_register(&c->serial)) /**load our function list  */
 		return 1;
+	if(OPTION_DEBUG&g->type_ctl) 
+		c->serial.debug=1;
+	else
+		c->serial.debug=0;
 	if(c->serial.open(&c->serial,path))
 		return 1;
 	c->serial.control(&c->serial,SERIAL_CMD_SET_CHAR_TIMEOUT,50000);

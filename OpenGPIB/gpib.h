@@ -53,14 +53,17 @@ enum {
 	CTL_CLOSE,
 	CTL_SET_ADDR,
 	CTL_SET_TIMEOUT,
+	CTL_SET_DEBUG,
 	CTL_NONE,
 };
 
+#define CONTROLLER_TYPEMASK 0xFF
+#define OPTION_DEBUG 0x100
 /**structure to talk to the host controller  */
 struct gpib {
 	int addr; 																		/**instrument address. Check against inst addr  */
 	void *ctl;																		/**controller-specific structure, if any  */
-	int type_ctl;					 												/**controller type  */
+	int type_ctl;					 												/**controller type, options at top.  */
 	int (*read)(void *dev, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
 	int (*write)(void *dev, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
 	int (*open)(struct gpib *g, char *path);			/** Returns: 1 on failure, 0 on success */

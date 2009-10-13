@@ -141,7 +141,7 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path)
 	g->buf_len=BUF_SIZE;
 	g->type_ctl=ctype;
 	/**set up the controller and interface. FIXME Replace with config file.  */
-	switch(ctype){
+	switch(ctype&CONTROLLER_TYPEMASK){
 		case GPIB_CTL_PROLOGIXS:
 			if(register_prologixs(g))
 				goto err1;

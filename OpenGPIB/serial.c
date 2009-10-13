@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.5  2009-04-07 19:01:39  dfs
+Moved string massage to prologixs
+
 Revision 1.4  2009-04-07 18:14:40  dfs
 Added control, timeout, fixed read
 
@@ -67,12 +70,12 @@ struct serial_port {
 	int newpflags;	
 	int ptermset;
 	int timeout; /**inter char timeout in uS  */
+	int debug; /**if set, turn on prints  */
 };
   
 int init_port_settings( struct serial_port *p, char *name);
 int _open_serial_port(struct serial_port *p);
 void restore_serial_port(struct serial_port *p);
-struct serial_port *open_serial_port(char *name, int baud, int data, int stop, int parity);
 int close_serial_port( struct serial_port *p);
 
 /****************************************************************************
@@ -191,32 +194,32 @@ int _open_serial_port(struct serial_port *p)
 	tcflag_t  stop_bits;
 	tcflag_t  parity;
 	
-	printf("Checking baud %ld ",p->baud);
-	  if ((baud = get_baud(p->baud)) == B4000000) {
-	    printf("Can't handle baud=%ld\n",p->baud);
-	    return(-1);
-	  }
+	if(p->debug) printf("Checking baud %ld ",p->baud);
+  if ((baud = get_baud(p->baud)) == B4000000) {
+    printf("Can't handle baud=%ld\n",p->baud);
+    return(-1);
+  }
 	
 	
-	printf("Checking Data Width %d ",p->data_bits);
-	  if(-1 == (data_bits = get_data_bits(p->data_bits)) ) {
-	    printf("Can't handle bits=%d. Must be 5,6,7,8\n",p->data_bits);
-	    return(-1);
-	  }
+	if(p->debug) printf("Checking Data Width %d ",p->data_bits);
+	if(-1 == (data_bits = get_data_bits(p->data_bits)) ) {
+	  printf("Can't handle bits=%d. Must be 5,6,7,8\n",p->data_bits);
+	  return(-1);
+	}
 	
-	printf("Checking Stop %d\n",p->stop);
+	if(p->debug) printf("Checking Stop %d\n",p->stop);
 	  if(-1 == (stop_bits = get_stop_bits(p->stop)) ) {
 	    printf("Can't handle stop bits=%d. Must be 1,2\n",p->stop);
 	    return(-1);
 	  }
 	
-	printf("Checking Parity %c ",p->parity);
+	if(p->debug) printf("Checking Parity %c ",p->parity);
 	  if ( -1 == (parity = get_parity(p->parity)) ) {
 	    printf("Can't handle parity=%c. Must be N,E,O\n",p->parity);
 	    return(-1);
 	  }
 	
-	printf("Opening Port '%s'\n",p->phys_name);
+	if(p->debug) printf("Opening Port '%s'\n",p->phys_name);
 		
 	/* FIXME:  add software, hardware flow... */
 	
@@ -302,9 +305,9 @@ int _open_serial_port(struct serial_port *p)
 	/*
 	  now clean the modem line and activate the settings for the port
 	*/
-	printf("\nFlushing Serial Line\n");
+	if(p->debug) printf("\nFlushing Serial Line\n");
 	tcflush(p->handle, TCIOFLUSH);
-	printf("Activating Settings.\n");
+	if(p->debug) printf("Activating Settings.\n");
 	tcsetattr(p->handle,TCSANOW,&(p->new_pio));
 	p->ptermset|=TERMIO_SET;
 	/* set overall connect flag */
@@ -333,7 +336,7 @@ void restore_serial_port(struct serial_port *p)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct serial_port *open_serial_port(char *name, int baud, int data, int stop, int parity)
+struct serial_port *open_serial_port(char *name, int baud, int data, int stop, int parity, int debug)
 {
 	struct serial_port *p;
 	if(NULL == (p=malloc(sizeof(struct serial_port))) ){
@@ -341,6 +344,7 @@ struct serial_port *open_serial_port(char *name, int baud, int data, int stop, i
 		return NULL;
 	}
 	bzero(p,sizeof(struct serial_port));
+	p->debug=debug;
 	p->handle=-1;
 	p->baud=baud;
 	p->stop=stop;
@@ -454,13 +458,12 @@ int _serial_open(struct serial_dev *d, char *path)
 		printf("serial open: dev null\n");
 		return 1;
 	}
-	
-	if(NULL == (d->dev=open_serial_port(path,115200,0,0,0))){
+	if(NULL == (d->dev=open_serial_port(path,115200,0,0,0,d->debug))){
 		printf("Can't open %s. Fatal\n",path);
 		return 1;
 	}
 	
-	printf("Serial port opened.\n");
+	if(d->debug) printf("Serial port opened.\n");
 
 	return 0; 
 }
@@ -474,10 +477,19 @@ int _serial_control(struct serial_dev *d, int cmd, int data)
 {
 	struct serial_port *p;
 	p=(struct serial_port *)d->dev;
+	if(NULL == p){
+		printf("serial_port is null\n");
+		return 1;
+	}
 	switch(cmd){
 		case SERIAL_CMD_SET_CHAR_TIMEOUT:
 			p->timeout=data;
 			break;
+		case SERIAL_CMD_SET_DEBUG:
+			if(data)
+				p->debug=1;
+			else
+				p->debug=0;
 	}
 	return 0;
 }

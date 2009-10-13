@@ -7,6 +7,9 @@
 */ /************************************************************************
 Change Log: \n
 $Log: not supported by cvs2svn $
+Revision 1.4  2009-04-07 18:15:06  dfs
+Changed control proto, added SERIAL_CMD enum
+
 Revision 1.3  2009-04-07 07:05:42  dfs
 Added serial interface functions
 
@@ -27,10 +30,12 @@ struct serial_dev {
 	int (*control)(struct serial_dev *d, int cmd,int data); 			/**controller-interface control. Set addr, etc.  */
 	void *dev;            												/**interface-specific structure  */
 	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
+	int debug;
 };
 
 enum {
 	SERIAL_CMD_SET_CHAR_TIMEOUT=0,
+	SERIAL_CMD_SET_DEBUG,
 	SERIAL_CMD_NONE,
 };
 int serial_register(struct serial_dev *d);
