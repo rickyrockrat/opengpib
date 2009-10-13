@@ -96,7 +96,7 @@ int write_wait_for_data(char *msg, int sec, struct gpib *g)
 	int i,rtn;
 	rtn =0;
 	write_string(g,msg);
-	for (i=0; i<sec;++i){
+	for (i=0; i<sec*2;++i){
 		if((rtn=read_string(g)))
 			break;
 		usleep(500000);
