@@ -139,16 +139,17 @@ struct ginstrument *init_HP8595E(char *path, int type, int addr, struct gpib *g)
 void usage(void)
 {
 	printf("networkanalyzer <options>\n"
-	" -a saddr set signal generator addr.(9)\n"
-	" -a aaddr set analyzer addr.(18)\n"
+	" -a saddr set signal generator addr. ex. -a s9 (9)\n"
+	" -a aaddr set analyzer addr. ex. -a a18 (18)\n"
 	" -b bw Set Analyzer bandwidth in Hz (100).\n"
 	" -c fname set cal in/out file to cal\n"
-	" -d spath set signal generator controller device name.(defaults to last device)\n"
+	" -d spath set signal generator controller device name. ex. -d s/dev/ttyUSB0 (defaults to last device)\n"
 	" -d apath set spectrum analyzer controller device name.(defaults to last device\n"
 	"  at least one -d must be specified. If the second is not specified, it is assumed there\n"
 	"  is only one controller, and the second defaults to the first\n"
-	" -f efreq set end frequency to freq (in Mhz)\n"
-	" -f sfreq set start frequency to freq(in Mhz)\n"
+	" -f efreq set end frequency to freq (in Mhz). ex. -f e2000 (2000)\n"
+	" -f sfreq set start frequency to freq(in Mhz). ex -f s1 (1)\n"
+	" -f f set follow mode. Uses last peak to increment from\n"
 	" -i inc set frequency to inc. (in Khz)\n"
 	" -l slevel set start dBm to level (-30dBm)\n"
 	" -m mode set mode to mode. c=cal, g=gain.(g)\n"
@@ -171,7 +172,7 @@ int main(int argc, char * argv[])
 {
 	struct ginstrument *signalgen_inst,*analyzer_inst;
 	char *signalgen_dev, *analyzer_dev;
-	int signalgen_addr,analyzer_addr, mode,c, verbose;
+	int signalgen_addr,analyzer_addr, mode,c, verbose, follow;
 	float start, stop, inc, iter,slevel, rbw, span, sweeptime;
  	float level,freq, last_l, last_f,delta, x;
 	char *calname, *dname, lbuf[100];
@@ -188,6 +189,10 @@ int main(int argc, char * argv[])
 	span=1000;
 	sweeptime=1000;
 	verbose=0;
+	follow=0;
+	
+	/**Handle options  */
+	
 	while( -1 != (c = getopt(argc, argv, "a:b:c:d:f:hi:l:m:o:ps:t:v")) ) {
 		switch(c){
 			case 'a':
@@ -226,6 +231,9 @@ int main(int argc, char * argv[])
 				switch(optarg[0]){
 					case 'e':
 						sscanf(&optarg[1],"%f",&stop);
+						break;
+					case 'f':
+						follow=1;
 						break;
 					case 's':
 						sscanf(&optarg[1],"%f",&start);
@@ -286,6 +294,9 @@ int main(int argc, char * argv[])
 				return 1;
 		}
 	}
+	
+	/** Sanity checks  */
+	
 	if(slevel>10){
 		printf("Not allowing level %f\n",slevel);
 		return 1;
@@ -315,69 +326,82 @@ int main(int argc, char * argv[])
 			return 1;
 		}
 	}
+/**INIT  */
 	if(NULL == (analyzer_inst=init_HP8595E(analyzer_dev, GPIB_CTL_PROLOGIXS|verbose, analyzer_addr, NULL))) {
 		return -1;
 	}
 	if(NULL == (signalgen_inst=init_PSG2400L(signalgen_dev, GPIB_CTL_PROLOGIXS|verbose, signalgen_addr, analyzer_dev==signalgen_dev?analyzer_inst->g:NULL))) {
 		return -1;
 	}
-	
+/**set up analyzer to base   */	
 	sprintf(lbuf,"MKTYPE PSN;SNGLS;RB %f Hz;SP %f Hz;ST %f mS",rbw,span,sweeptime);
 	write_string(analyzer_inst->g,lbuf);
+/**set the signal generator level  */
 	sprintf(lbuf,"CL %f dbM\n",slevel);
 	write_string(signalgen_inst->g,lbuf);
-	printf("Resolution BW = %f Hz, span = %f Hz.",rbw,span);
+/** PEAK search, if set  */
+	printf("Resolution BW = %f Hz, span = %f Hz.\n",rbw,span);
 	if( mode & PEAK_SEARCH){
 	
 		printf("Finding peak for start freq %f and level %f.\n",start,slevel);
 		
 		sprintf(lbuf,"CF %f Mhz",start);
 		write_string(signalgen_inst->g,lbuf);
-		x=span/1000000;
+		x=((span-10)/1000000);
+		
 		printf("Span = %f Mhz, starting at %f\n",x,start-(x*10));
+		
 		for ( iter=start-(x*10),last_l=delta=1000,last_f=0; iter< start+(x*10); iter+=x){
 			float y;
+			if(verbose) printf("Looking at %f ",iter); 
 			sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",iter);
-			printf("Looking at %f ",iter); 
 			write_wait_for_data(lbuf,10,analyzer_inst->g);
 			sscanf(analyzer_inst->g->buf,"%f",&level);
-			printf("%s ",analyzer_inst->g->buf); 
+			if(verbose) printf("%s ",analyzer_inst->g->buf); 
 			sprintf(lbuf,"MKF?");
 			write_wait_for_data(lbuf,10,analyzer_inst->g);
 			sscanf(analyzer_inst->g->buf,"%f",&freq);
-			printf(" Peak at %f",freq);
-			y=fabs(fabs(level)-fabs(slevel));
+			if(verbose) printf(" Peak at %f",freq);
+			y=fabs(fabs(level)-fabs(slevel/1000));
+			/*printf("l=%f sl=%f y= %f d= %f ",level,slevel,y,delta); */
 			if(y <delta){
-				last_f=freq/1000000;
-				last_l=level;
 				delta=y;
-				printf("*");
+				last_f=freq;
+				last_l=level;
+				
+				if(verbose) printf("*%f",last_f);
 			}
-			printf("\n");
+			if(verbose) printf("\n");
 		}
+		last_f/=1000000;
 	}	else{
 		last_f=start;
-		printf("\n");
 	}
-		
+/**Start Main Loop  */		
 	printf("Start = %f Mhz, Stop = %f Mhz, inc= %f Mhz. Offset=%f\n",start,stop,inc,last_f);
 	for (iter=start; iter<=stop; iter+=inc){
 		
 		sprintf(lbuf,"CF %f Mhz",iter);
 		
 		write_string(signalgen_inst->g,lbuf);
-		printf("Using %f for cf ",last_f);
+		if(verbose) printf("Using %f for cf ",last_f);
 		sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",last_f);
 		write_wait_for_data(lbuf,10,analyzer_inst->g);
 		sscanf(analyzer_inst->g->buf,"%f",&level);
-		printf("%s ",analyzer_inst->g->buf);
+		if(verbose)printf("%s ",analyzer_inst->g->buf);
 		sprintf(lbuf,"MKF?");
 		write_wait_for_data(lbuf,10,analyzer_inst->g);
 		sscanf(analyzer_inst->g->buf,"%f",&freq);
-		/**use the last peak to estimate where the next one will be - the signal generator may be off or not accurate enough...  */
-		last_f=freq/1000000; /**convert to Mhz  */
-		last_f +=inc;				/**set up for next measurement.  */
-		printf("%s (%f, %fMhz)\n",analyzer_inst->g->buf,freq,last_f);
+		freq/=1000000; /**convert to Mhz  */
+		if( follow){
+			/**use the last peak to estimate where the next one will be - 
+			the signal generator may be off or not accurate enough...  */
+			last_f=freq; /**convert to Mhz  */
+			last_f +=inc;				/**set up for next measurement.  */			
+		}else
+			last_f+=inc;
+
+		if(verbose)printf("%s (%f, %fMhz)\n",analyzer_inst->g->buf,freq,last_f);
 		switch(mode){
 			case CAL:
 				fprintf(cal,"%f %f %f %f\n",iter,slevel,freq,level);
