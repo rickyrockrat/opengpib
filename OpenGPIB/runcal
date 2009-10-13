@@ -1,0 +1,9 @@
+analyzer_dev=/dev/ttyUSB1
+signal_dev=/dev/ttyUSB0
+analyzer_addr=18
+signal_addr=9
+
+for a in -30 -20 -10 0; do
+	echo "Running $a dbM Amplitude plot"
+	./networkanalyzer -a s$signal_addr -a a$analyzer_addr -d s$signal_dev -d a$analyzer_dev -f s1 -f e2000 -i 1000 -m c -l s$a  -f f -c cablecal$a.cal
+done
