@@ -67,7 +67,7 @@ int prologixs_init(struct gpib *g)
 		printf("%s:Unable to read from port on ver\n",__func__);
 		return -1;
 	}
-	/*printf("Got %d bytes\n",i); */
+	/*printf("Got %d bytes\n%s\n",i,g->buf);  */
 	if(NULL == strstr(g->buf,"Prologix")){
 		printf("%s:Unable to find correct ver in\n%s\n",__func__,g->buf);
 		return -1;
