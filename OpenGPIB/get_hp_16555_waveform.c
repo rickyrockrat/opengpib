@@ -1,9 +1,9 @@
 /** \file ******************************************************************
-\n\b File:        get_hp_16530_waveform.c
+\n\b File:        get_hp_16555_waveform.c
 \n\b Author:      Doug Springer
 \n\b Company:     DNK Designs Inc.
 \n\b Date:        10/06/2008  6:43 am
-\n\b Description: Get waveforms from the HP 16530 timebase card.
+\n\b Description: Get waveforms from the HP 1655x logic analizer cards.
 */ /************************************************************************
 Change Log: \n
  This file is part of OpenGPIB.
