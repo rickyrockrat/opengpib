@@ -310,6 +310,89 @@ void show_pre(struct data_preamble *p)
 	/*print_data( */
 }
 
+
+/***************************************************************************/
+/** Find the start of the trace.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+char *get_trace_start(struct section *sec)
+{
+	char *s;
+	struct data_preamble *lp;
+	
+	lp=(struct data_preamble *)sec->data;
+	
+	s=((char *)&lp->rtc.sec - sec->data)+sec->data+1; 
+	printf("start %p last %p %ld (0x%lx) @%p\n",sec->data,&lp->rtc.sec,(long int)(&lp->rtc.sec)-(long int)sec->data,(long int)(&lp->rtc.sec)-(long int)sec->data,s); 
+	return s;
+}
+/***************************************************************************/
+/** Given a pod and a bit, find all states & times.
+\n\b Arguments:
+pod - 1-4
+state  bit fields to look for that match this state
+mask -  bits to look at, 1 means look for it
+\n\b Returns:
+****************************************************************************/
+void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask,struct data_preamble *pre, struct section *sec)
+{
+	struct one_card_data *d;
+	char *s;
+	long int  ps;
+	int inc,c,p;
+	int cmatch, pmatch;
+	ps=0;
+	c=0;
+	cmatch=pmatch=0;
+	if(0 == clkmask)
+		cmatch=-1;
+	if(0==mask)
+		pmatch=-1;
+	if(-1 == cmatch && -1== pmatch){
+		printf("Must have either clock or pod mask set\n");
+		return;
+	}
+	if(pod>=4 || pod<1){
+		printf("Valid pod numbers are 1-4, not %d\n",pod);
+		return;
+	}
+	p=((pod-1)*2);
+	p=6-p;
+	s=get_trace_start(sec);
+	inc = ONE_CARD_ROWSIZE;
+	while(s<sec->data + sec->sz){
+		uint16 val,_clk,x;
+		
+		d=(struct one_card_data *)s;
+		_clk=d->clklo|(d->clkhi<<8);
+		if(clkmask){
+			x=_clk&clkmask;
+			if(x==clk)
+				cmatch=1;
+			else cmatch=0;
+		}
+		val=d->pdata[p+1]|d->pdata[p]<<8;
+		if(mask){
+			x=val&mask;
+			if(x == state)
+				pmatch=1;
+			else 
+				pmatch=0;
+		}
+		if(1 == pmatch || 1 == cmatch) {
+			printf("c%04x pod %04x %ldns\n",_clk,val,ps/1000);
+			++c;
+			if(c>10 )
+				break;
+		}
+		
+		ps+=pre->a1.sampleperiod;
+		
+		s+=inc;
+		
+	}	
+}
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -317,7 +400,6 @@ void show_pre(struct data_preamble *p)
 ****************************************************************************/
 void print_data(struct data_preamble *p, struct section *sec)
 {
-	struct data_preamble *lp;
 	struct one_card_data *d;
 	char *dstart;
 	long int ps;
@@ -326,12 +408,10 @@ void print_data(struct data_preamble *p, struct section *sec)
 	c=0;
 	ps=0;
 	inc = ONE_CARD_ROWSIZE;
-	lp=(struct data_preamble *)sec->data;
 	
-	dstart=((char *)&lp->rtc.sec - sec->data)+sec->data+1; 
+	dstart=get_trace_start(sec);
 /*	dstart = (void *)((char *)(&lp->rtc.sec) - (char *)sec->data);  */
 	
-	printf("start %p last %p %ld (0x%lx) @%p\n",sec->data,&lp->rtc.sec,(long int)(&lp->rtc.sec)-(long int)sec->data,(long int)(&lp->rtc.sec)-(long int)sec->data,dstart); 
 	while (dstart < sec->data + sec->sz){
 		int i;
 		d=(struct one_card_data *)dstart;
@@ -346,11 +426,12 @@ void print_data(struct data_preamble *p, struct section *sec)
 			printf("%c%c%02x ",x,y,d->pdata[i]);
 			
 		}
-		ps+=p->a1.sampleperiod;
+		
 		printf(" %ldns\n",ps/1000);
+		ps+=p->a1.sampleperiod;
 		dstart+=inc;
 		++c;
-		if(c>1000)
+		if(c>20)
 			break;
 	}
 	
@@ -390,6 +471,7 @@ void parse_data( char *cfname)
 	show_pre(&pre);
 	
 	print_data(&pre,sec);
+	search_state(1,0,0,0x800,0x800,&pre,sec);
 	
 closem:
 	if(NULL != cfd)
