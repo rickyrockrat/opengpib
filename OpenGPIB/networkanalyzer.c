@@ -36,6 +36,12 @@ CF MHz;TS;MKPK HI;MKA?
 
 #define PSG2400L_IDN_STR "Wayne Kerr PSG2400L"
 #define HP8595E_IDN_STR "HP8595E"
+
+struct freq_off {
+	float frequency;
+	float offset;
+	float level;
+};
 /***************************************************************************/
 /** CF? carrier frequency	Ghz, Mhz, KHz, Hz
 		CF-SS (carrier step size)
@@ -71,7 +77,7 @@ struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct gpib *g
 	}
 	memset(gi,0,sizeof(struct ginstrument));
 	if(NULL == g){
-		if(NULL == (gi->g=open_gpib(type,addr,path))){
+		if(NULL == (gi->g=open_gpib(type,addr,path,-1))){
 			printf("Can't open %s. Fatal\n",path);
 			free(gi);
 			return NULL;
@@ -109,7 +115,7 @@ struct ginstrument *init_HP8595E(char *path, int type, int addr, struct gpib *g)
 	}
 	memset(gi,0,sizeof(struct ginstrument));
 	if(NULL == g){
-		if(NULL == (gi->g=open_gpib(type,addr,path))){
+		if(NULL == (gi->g=open_gpib(type,addr,path,-1))){
 			printf("Can't open %s. Fatal\n",path);
 			free(gi);
 			return NULL;
