@@ -113,86 +113,7 @@ number of valid rows.
 
 */
 
-struct block_spec {
-	uint8 blockstart[2]; /**should be #8  */
-	uint8 blocklen[8];	 /**decimal len of block, stored in ascii  */
-}__attribute__((__packed__));	
 
-struct section_hdr {
-	char name[11]; /**the last byte is reserved, but usally 0  */
-	uint8 module_id;
-	uint32 block_len; /**lsb is most significant byte, i.e 0x100 is stored as 10 0, not 0 10  */
-}__attribute__((__packed__));	
-
-struct analyzer_data {
-	uint32 data_mode;
-	uint32 pods; /**bit 21-clock pod, bit 1-12=pod 1-12, all other bits unused.  */
-	uint32 masterchip;
-	uint32 maxmem;
-	uint32 unused1;
-	uint64 sampleperiod;
-	uint32 tag_type; /**0-off,1=time, 2=state tags.  */
-	uint64 trig_off;
-	uint8 unused2[30];
-}__attribute__((__packed__));	
-
-struct data_preamble {
-		uint32 instid;
-	uint32 rev_code;
-	uint32 chips;
-	uint32 analyzer_id;
-	struct analyzer_data a1;
-	struct analyzer_data a2;
-	uint8 unused1[40];
-	/**number of valid rows of data... offset 173 */
-	uint32 data_pod4_hi;
-	uint32 data_pod3_hi;
-	uint32 data_pod2_hi;
-	uint32 data_pod1_hi;
-	uint32 data_pod4_mid;
-	uint32 data_pod3_mid;
-	uint32 data_pod2_mid;
-	uint32 data_pod1_mid;
-	uint32 data_pod4_master;
-	uint32 data_pod3_master;
-	uint32 data_pod2_master;
-	uint32 data_pod1_master;
-	/**trigger position?? offset 261 */
-	uint8 unused2[40];
-	uint32 trig_pod4_hi;
-	uint32 trig_pod3_hi;
-	uint32 trig_pod2_hi;
-	uint32 trig_pod1_hi;
-	uint32 trig_pod4_mid;
-	uint32 trig_pod3_mid;
-	uint32 trig_pod2_mid;
-	uint32 trig_pod1_mid;
-	uint32 trig_pod4_master;
-	uint32 trig_pod3_master;
-	uint32 trig_pod2_master;
-	uint32 trig_pod1_master;
-	/** offset 349  */
-	uint8 unused3[234];
-	/**  acquision time*/
-	uint16 rtc_year; /**RTC=year-1990  */
-	uint16 rtc_month;
-	uint8 rtc_day;
-	uint8 rtc_dow;
-	uint8 rtc_hour;
-	uint8 rtc_min;
-	uint8 rtc_sec;
-}__attribute__((__packed__));	
-
-struct hp_data_block {
-	struct block_spec bs;
-	struct section_hdr shdr;
-	struct data_preamble preamble;
-}__attribute__((__packed__));	
-
-struct hp_config_block {
-	struct block_spec bs;
-	char *data;
-}__attribute__((__packed__));	
 
 /***************************************************************************/
 /** FMT,TYPE,Points,Count,Xinc,Xorigin,Xref,Yinc,Yorigin,Yref.
@@ -356,10 +277,13 @@ void usage(void)
 {
 	printf("get_hp_16555_waveform <options>\n"
 	" -a addr set instrument address to addr (7)\n"
+	" -c fname put config data to fname\n"
 	" -d dev set path to device name\n"
 	" -g set gnuplot mode, with x,y (time volts), one point per line\n"
-	" -o fname put output to file called fname\n"
+	" -o fname put config lfDATAlf data to file called fname\n"
 	" -p set packed mode to packed (unpacked)\n"
+	" -t fname put trace(data) to fname\n"
+	
 	
 	"");
 }
@@ -372,22 +296,25 @@ void usage(void)
 int main(int argc, char * argv[])
 {
 	struct gpib *g;
-	struct hp_scope_preamble h;
-	FILE *ofd;
+	FILE *ofd,*cfd,*tfd;
 	char *name, *ofname;
+	char *tname,*cname;
 	int i, c,inst_addr, rtn, raw,xy;
 	long int total,sz;
 	name="/dev/ttyUSB0";
 	inst_addr=7;
 	rtn=1;
-	ofname=NULL;
-	ofd=NULL;
+	ofname=tname=cname=NULL;
+	tfd=cfd=ofd=NULL;
 	raw=0;
 	xy=0;
-	while( -1 != (c = getopt(argc, argv, "a:d:gho:p")) ) {
+	while( -1 != (c = getopt(argc, argv, "a:c:d:gho:pt:")) ) {
 		switch(c){
 			case 'a':
 				inst_addr=atoi(optarg);
+				break;
+			case 'c':
+				cname=strdup(optarg);
 				break;
 			case 'd':
 				name=strdup(optarg);
@@ -405,14 +332,24 @@ int main(int argc, char * argv[])
 			case 'p':
 				raw=1;
 				break;
+			case 't':
+				tname=strdup(optarg);
+				break;
 			default:
 				usage();
 				return 1;
 		}
 	}
-	if(NULL == ofname){
-		ofd=fdopen(1,"w+");
+	if(NULL != ofname && (NULL != tname || NULL != cname)){
+		printf("-o and -t/-c are mutually exclusive\n");
+		usage();
+		return 1;
 	}
+	if(NULL == ofname && NULL == tname && NULL == cname){
+		printf("must specify -t/-c or -o\n");
+		usage();
+		return 1;
+	} 
 		
 	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,-1))){
 		printf("Can't open/init controller at %s. Fatal\n",name);
@@ -429,47 +366,73 @@ int main(int argc, char * argv[])
 				printf("Unable to open '%s' for writing\n",ofname);
 				goto closem;
 			}
+	}	else{
+		if(NULL !=cname){
+			if(NULL == (cfd=fopen(cname,"w+"))) {
+				printf("Unable to open '%s' for writing\n",cname);
+				goto closem;
+			}
+		}
+		if(NULL !=tname){
+			if(NULL == (tfd=fopen(tname,"w+"))) {
+				printf("Unable to open '%s' for writing\n",tname);
+				goto closem;
+			}
+		}
+	}
+	if(cfd>0 ||ofd>0){ /**grab config  */
+		printf("Retreiving Setup\n");
+		sprintf(g->buf,":SYSTEM:SETUP?");
+		i=write_string(g,g->buf);	
+		total=0;
+		while(i){
+			i=read_raw(g);
+			if(0 == total){
+				sz=get_datsize(g->buf);
+				printf("Len %ld Got %d ",sz,i);
+			}else
+				printf("%ld ",sz-total);
+			fflush(NULL);
+			fwrite(g->buf,1,i,ofd?ofd:cfd);	
+			total+=i;
+		}	
+		if(ofd>0){
+			i=sprintf(g->buf,"\nDATA\n");
+			fwrite(g->buf,1,i,ofd);		
+		}
+		printf("\nWrote %ld config + %d datahdr.\n",total,i);
+	}
+	
+	
+	
+	if(tfd>0 ||ofd>0){ /**grab data  */
+		printf("Retreiving Data\n");
+	/*	goto closem; */
+		sprintf(g->buf,":DBLOCK %s;:SYSTEM:DATA?",raw?"PACKED":"UNPACKED");
+		i=write_string(g,g->buf);	
+		usleep(10000000);
+		total=0;
+		while(i){
+			i=read_raw(g);
+			if(0 == total){
+				sz=get_datsize(g->buf);
+				printf("Len %ld Got %d ",sz,i);
+			}else
+				printf("%ld ",sz-total);
+			fflush(NULL);
+			fwrite(g->buf,1,i,ofd?ofd:tfd);	
+			total+=i;
+		}
+		printf("Done. Wrote %ld bytes\n",total);
 	}	
-	printf("Retreiving Setup\n");
-	sprintf(g->buf,":SYSTEM:SETUP?");
-	i=write_string(g,g->buf);	
-	total=0;
-	while(i){
-		i=read_raw(g);
-		if(0 == total){
-			sz=get_datsize(g->buf);
-			printf("Len %ld Got %d ",sz,i);
-		}else
-			printf("%ld ",sz-total);
-		fflush(NULL);
-		fwrite(g->buf,1,i,ofd);	
-		total+=i;
-	}
-	i=sprintf(g->buf,"\nDATA\n");
-	fwrite(g->buf,1,i,ofd);	
-	printf("\nWrote %ld config + %d datahdr. Retreiving Data\n",total,i);
-	goto closem;
-	sprintf(g->buf,":DBLOCK %s;:SYSTEM:DATA?",raw?"PACKED":"UNPACKED");
-	i=write_string(g,g->buf);	
-	usleep(10000000);
-	total=0;
-	while(i){
-		i=read_raw(g);
-		if(0 == total){
-			sz=get_datsize(g->buf);
-			printf("Len %ld Got %d ",sz,i);
-		}else
-			printf("%ld ",sz-total);
-		fflush(NULL);
-		fwrite(g->buf,1,i,ofd);	
-		total+=i;
-	}
-	printf("Done. Wrote %ld bytes\n",total);
-		
 	rtn=0;
 closem:
 	if(NULL != ofd)
 		fclose(ofd);
+	if(NULL != cfd)
+		fclose(cfd);
+	if(NULL != tfd)
+		fclose(tfd);
 	close_gpib(g);
 	return rtn;
 }
