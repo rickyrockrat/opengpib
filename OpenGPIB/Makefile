@@ -35,6 +35,8 @@ gpib.lib: gpib.o prologixs.o serial.o common.o
 get_tek_waveform:	get_tek_waveform.o gpib.lib
 	gcc -lm -o $@ $^
 	
+get_hp_16530_waveform.o get_hp_16555_waveform.o parse_16500_config.o: hp16500.h
+
 get_hp_16530_waveform: get_hp_16530_waveform.o gpib.lib
 	gcc -lm -o $@ $^
 	
