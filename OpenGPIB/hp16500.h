@@ -94,4 +94,176 @@ struct hp_scope_preamble {
 #define HP_FMT_ASC 	0
 #define HP_FMT_BYTE 1
 #define HP_FMT_WORD 2
+
+
+struct section_hdr {
+	char name[11]; /**the last byte is reserved, but usally 0  */
+	uint8 module_id;
+	uint32 block_len; /**lsb is most significant byte, i.e 0x100 is stored as 10 0, not 0 10  */
+}__attribute__((__packed__));	
+
+struct rtc_data {
+	uint16 year; /**RTC=year-1990  */
+	uint8 month; /**manual says 2 bytes, but it appears to be a misprint  */
+	uint8 day;
+	uint8 dow;
+	uint8 hour;
+	uint8 min;
+	uint8 sec;
+}__attribute__((__packed__));	
+struct analyzer_data {
+	uint32 data_mode;
+	uint32 pods; /**bit 21-clock pod, bit 1-12=pod 1-12, all other bits unused.  */
+	uint32 masterchip;
+	uint32 maxmem;
+	uint32 unused1;
+	uint64 sampleperiod;
+	uint32 tag_type; /**0-off,1=time, 2=state tags.  */
+	uint64 trig_off;
+	uint8 unused2[30];
+}__attribute__((__packed__));	
+
+struct data_preamble {
+	uint32 instid;
+	uint32 rev_code;
+	uint32 chips;
+	uint32 analyzer_id;
+	struct analyzer_data a1;
+	struct analyzer_data a2;
+	uint8 unused1[40];
+	/**number of valid rows of data... offset 173 */
+	uint32 data_pod4_hi;
+	uint32 data_pod3_hi;
+	uint32 data_pod2_hi;
+	uint32 data_pod1_hi;
+	uint32 data_pod4_mid;
+	uint32 data_pod3_mid;
+	uint32 data_pod2_mid;
+	uint32 data_pod1_mid;
+	uint32 data_pod4_master;
+	uint32 data_pod3_master;
+	uint32 data_pod2_master;
+	uint32 data_pod1_master;
+	/**trigger position?? offset 261 */
+	uint8 unused2[40];
+	uint32 trig_pod4_hi;
+	uint32 trig_pod3_hi;
+	uint32 trig_pod2_hi;
+	uint32 trig_pod1_hi;
+	uint32 trig_pod4_mid;
+	uint32 trig_pod3_mid;
+	uint32 trig_pod2_mid;
+	uint32 trig_pod1_mid;
+	uint32 trig_pod4_master;
+	uint32 trig_pod3_master;
+	uint32 trig_pod2_master;
+	uint32 trig_pod1_master;
+	/** offset 349  */
+	uint8 unused3[234];
+	/**  acquision time*/
+	
+	struct rtc_data rtc;
+}__attribute__((__packed__));	
+
+struct block_spec {
+	uint8 blockstart[2]; /**should be #8  */
+	char blocklen_data[8];	 /**decimal len of block, stored in ascii  */
+	uint32 blocklen;
+}__attribute__((__packed__));	
+
+struct hp_data_block {
+	struct block_spec bs;
+	struct section_hdr shdr;
+	struct data_preamble preamble;
+}__attribute__((__packed__));	
+
+struct hp_block_hdr {
+	struct block_spec bs;
+	char *data;
+}__attribute__((__packed__));	
+
+struct section {
+	struct section_hdr hdr;
+	uint32 sz;
+	uint32 off;
+	char *data;
+}__attribute__((__packed__));	
+
+#define LABEL_RECORD_LEN 22
+#define LABEL_MAP_LEN 12
+
+struct label_map {
+	uint8 unknown1;
+	uint8 clk;
+	uint8 unknown2[4];
+	uint8 pod2_hi;
+	uint8 pod2_lo;
+	uint8 pod1_hi;
+	uint8 pod1_lo; 
+	uint8 unknown3;
+}__attribute__((__packed__));	
+
+struct labels {
+	char name[6];
+	uint8 unknown1[3];
+	uint8 polarity;
+	uint8 unknown2;
+	uint8 strange_offset;
+	uint16 strange_offsetlo;
+	uint8 unknown3[4];
+	uint8 bits;
+	uint8 enable;
+	uint8 sequence;
+	uint32 actual_offset;
+	struct label_map map;
+}__attribute__((__packed__));	
+
+struct one_card_data {
+	uint16 clkunused;
+	uint8 clkhi;
+	uint8 clklo;
+	uint8 pdata[8];
+}__attribute__((__packed__));	
+struct two_card_data {
+	uint32 clk;
+	uint16 epods[4];
+	uint16 mpods[4];
+}__attribute__((__packed__));	
+
+struct three_card_data {
+	uint32 clk;
+	uint16 eh_pods[4];
+	uint16 el_pods[4];
+	uint16 mpods[4];
+}__attribute__((__packed__));	
+
+#define ONE_CARD_ROWSIZE 12
+#define TWO_CARD_ROWSIZE 20
+#define THREE_CARD_ROWSIZE 28
+/** 
+Cards Clock Pod Bytes Data Bytes Total Bytes Per Row
+1     4 bytes         8 bytes    12 bytes
+2     4 bytes         16 bytes   20 bytes
+3     4 bytes         24 bytes   28 bytes
+
+
+The sequence of pod data within a row is the same as shown above for th
+number of valid rows per pod. The number of valid rows per pod can be
+determined by examining bytes 253 through 256 for pod pair 3/4 of the
+master card and bytes 257 through 260 for pod pair 1/2 of the master car
+The number of valid rows for other pod pairs is contained in bytes 213
+through 252.
+A one-card configuration has the following data arrangement (per row):
+<clk pod 1> <pod 4> <pod 3> <pod 2> <pod 1>
+A two-card configuration has the following data arrangement (per row):
+       <-----expansion card ------><-------master card-------->
+<clk 1><pod 4><pod 3><pod 2><pod 1><pod 4><pod 3><pod 2><pod 1>
+A three-card configuration has the following data arrangement per row:
+       <- high expander -><-lower expander -><---master card--->
+<clk 1><pod 4>. . .<pod 1><pod 4>. . .<pod 1><pod 4>. . .<pod 1>
+
+                   exp2 exp1 mstr
+Clock Pod 1 < xxxx MLKJ MLKJ MLKJ >
+
+*/
 #endif
