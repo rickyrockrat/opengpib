@@ -26,11 +26,16 @@ Change Log: \n
 
 #include "common.h"
 #include "gpib.h"
+
 #include <ctype.h>
+
 /**for open...  */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#define HP16500_COM_SYMBOLS 1
+#include "hp16500.h"
 /** 
 The channels correspond to Slot,channel number, so Slot D, channel 1 is D1.
 The first channel is the lowest slot, so if it starts with C1, the channels start at C1
@@ -106,27 +111,13 @@ Voltage=(Value-Yreference)*Yinc +Yorigin
 Time= (point# -Xref)*Xinc + Xorigin
 
 */
-struct hp_preamble {
-	float xinc;
-	float xorg;
-	float xref;
-	float yinc;
-	float yorg;
-	float yref;
-	int points;
-	int fmt;
-};
-
-#define HP_FMT_ASC 	0
-#define HP_FMT_BYTE 1
-#define HP_FMT_WORD 2
 
 /***************************************************************************/
 /** FMT,TYPE,Points,Count,Xinc,Xorigin,Xref,Yinc,Yorigin,Yref.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int parse_preamble(struct gpib *g, struct hp_preamble *h)
+int parse_preamble(struct gpib *g, struct hp_scope_preamble *h)
 {
 	h->fmt=get_value_col(0,g->buf);
 	h->points=get_value_col(2,g->buf);
@@ -167,7 +158,7 @@ int init_instrument(struct gpib *g)
 	for (i=0,osc=-1;i<5;++i){
 		slots[i]=(int)get_value_col(i,&g->buf[s]);
 		printf("Slot %c=%d\n",'A'+i,slots[i]);
-		if(11 == slots[i])
+		if(CARDTYPE_16530A == slots[i])
 			osc=i;
 	}
 	if(-1 == osc){
@@ -220,7 +211,7 @@ int check_channel(char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_preamble(struct gpib *g,char *ch, struct hp_preamble *h)
+int get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h)
 {
 	int i;
 	if(NULL == ch)
@@ -286,7 +277,7 @@ void usage(void)
 int main(int argc, char * argv[])
 {
 	struct gpib *g;
-	struct hp_preamble h;
+	struct hp_scope_preamble h;
 	FILE *ofd;
 	char *name, *ofname, *channel[MAX_CHANNELS], *lbuf;
 	int i, c,inst_addr, rtn, ch_idx, raw,xy;
@@ -347,7 +338,7 @@ int main(int argc, char * argv[])
 			}
 		}
 	}
-	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name))){
+	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,-1))){
 		printf("Can't open/init controller at %s. Fatal\n",name);
 		return 1;
 	}
