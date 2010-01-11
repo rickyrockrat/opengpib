@@ -295,7 +295,7 @@ int main(int argc, char * argv[])
 			}
 		}
 	}
-	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name))){
+	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,-1))){
 		printf("Can't open %s. Fatal\n",name);
 		return 1;
 	}
