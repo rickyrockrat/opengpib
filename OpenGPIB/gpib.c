@@ -31,6 +31,24 @@ Change Log: \n
 #include "serial.h"
 #include "prologixs.h"
 
+/***************************************************************************/
+/** .
+\n\b Arguments:
+len is max_len for msg.
+\n\b Returns: number of chars read.
+****************************************************************************/
+int read_raw(struct gpib *g)
+{
+	int i,j;
+	i=0;
+	while( (j=g->read(g->ctl,&g->buf[i],g->buf_len-i)) >0){
+		i+=j;
+		usleep(1000);
+	}
+	/*printf("Got %d bytes\n'%s'\n",i,g->buf); */
+	return i;
+}
+
 
 /***************************************************************************/
 /** .
@@ -47,7 +65,7 @@ int read_string(struct gpib *g)
 		usleep(1000);
 	}
 	g->buf[i]=0;
-	/*printf("Got %d bytes\n'%s'\n",i,g->buf); */
+	/*printf("Got %d bytes\n'%s'\n",i,g->buf);  */
 	return i;
 }
 /***************************************************************************/
@@ -129,16 +147,24 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct gpib *open_gpib(int ctype, int addr, char *dev_path)
+struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 {
 	struct gpib *g;
 	if(NULL == (g=malloc(sizeof(struct gpib)) ) ){
 		printf("Out of mem on serial register\n");
 		return NULL;
-	}		
+	}
 	memset(g,0,sizeof(struct gpib));
 	g->addr=addr;
-	g->buf_len=BUF_SIZE;
+	if(0>= buf_size)
+		buf_size=8096;
+	if(NULL == (g->buf=malloc(buf_size) ) ){
+		printf("Out of mem on buf size of %d\n",buf_size);
+		free(g);
+		return NULL;
+	}
+	g->buf_len=buf_size;
+	/*printf("Using %d buf size\n",g->buf_len); */
 	g->type_ctl=ctype;
 	/**set up the controller and interface. FIXME Replace with config file.  */
 	switch(ctype&CONTROLLER_TYPEMASK){
