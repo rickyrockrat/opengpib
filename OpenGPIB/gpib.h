@@ -36,7 +36,6 @@ other controllers.
 #include <sys/time.h>
 #include <unistd.h> /**for usleep  */
 
-#define BUF_SIZE 8096
 /**interface types  */
 enum {
 	GPIB_IF_SERIAL=0,
@@ -69,7 +68,7 @@ struct gpib {
 	int (*open)(struct gpib *g, char *path);			/** Returns: 1 on failure, 0 on success */
 	int (*close)(struct gpib *g);									/**closes interface  */
 	int (*control)(struct gpib *g, int cmd, int data); 			/**controller-interface control. Set addr, etc.  */
-	char buf[BUF_SIZE];														/**GPIB buffer  */
+	char *buf;														/**GPIB buffer  */
 	int buf_len;													/**buffer length  */
 	char *dev_path;																/**physical device path.  */
 };
@@ -82,10 +81,11 @@ struct ginstrument {
 	int (*init)(struct ginstrument *inst);									/**function to call to initialize instrument.  */
 };
 
+int read_raw(struct gpib *g);
 int read_string(struct gpib *g);
 int write_string(struct gpib *g, char *msg);
 int write_get_data (struct gpib *g, char *cmd);
 int write_wait_for_data(char *msg, int sec, struct gpib *g);
-struct gpib *open_gpib(int ctype, int addr, char *dev_path); /**opens and inits GPIB interface, interface,and controller  */
+struct gpib *open_gpib(int ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
 int close_gpib (struct gpib *g);
 #endif
