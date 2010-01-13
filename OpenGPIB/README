@@ -1,0 +1,62 @@
+This is the OpenGPIB library, written from scratch by rickyrockrat
+(rickyrockrat@yahoo.com).
+What is amazing is that most of it works and actually produces useful 
+data.
+
+There are other efforts out there but none that really supported Linux. 
+
+Notable sites such as http://www.ke5fx.com (Windows only) and 
+http://www.ko4bb.com/ (RF site) should be referenced.
+
+There was some attempt to write a wrapper for the graphics library
+for the GPIB Toolkit the ke5fx offers, however it would have taken
+a lot of testing using a Windows box, and I have very little patience
+with Windows these days.  Besides, I had to get some work done (i.e.
+data out of my test equipment).
+
+The web page is http://opengpib.sourceforge.net. 
+
+
+All the tools should accept -h for a usage page.
+
+Here are some useful invocations of the tools:
+
+Network Analyzer
+/networkanalyzer -a s9 -a a18 -d s/dev/ttyUSB0 -d a/dev/ttyUSB1 -f s1 -f e2000 -i 1000 -m c -l s10  -f f -c cablecal10.cal
+Signal generator on /dev/ttyUSB0, address 9, Analyzer on /dev/ttyUSB1, address 18
+Start frequency 1Mhz, end frequency 2000Mhz, increment of 1000kHz, mode is calibration, level is 10dbm
+
+The -f f sets a follow mode (see usage).
+
+Extract a 1655x waveform:
+
+Get the trace.
+./get_hp_16555_waveform -d /dev/ttyUSB2 -t foo.dat
+Get the configuration:
+./get_hp_16555_waveform -d /dev/ttyUSB2 -c foo.cfg
+
+Parse the trace file into a format la2vcd can use:
+./parse_16500_config -d foo.dat  -f foo.la
+
+Convert the trace to a vcd:
+la2vcd -td 2ns -r 16 -b 32 -sf 31 CLK -sf 29-24 RED -sf 11 STVD -sf 10 STVU -sf 9 CLKV -sf 7 OE -sf 5 LD -sf 3 POL -sf 1 DIO2 -sf 0 DIO1 foo.la -o foo.vcd 
+
+Extract a Tek 2440 waveform (extracts to base.ch1 base.ch2 base.cursors):
+./get_tek_waveform -a 9 -c ch1 -c ch2 -c cursors -d /dev/ttyUSB1 -o base
+
+
+Manipulate and display the tek data:
+
+tek2gplot
+This will add additional plots using a function. Available functions as of 0.1 are:
+
+diff
+max-y
+min-y
+pk-pk
+
+see makepng for an invocation that will generate a png. Leave terminal type off for
+and Xwindow.
+
+This has only been tested on a 64-bit Linux operating system. 
+
