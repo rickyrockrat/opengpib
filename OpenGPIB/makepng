@@ -3,14 +3,30 @@
 #\n\b Author:      Doug Springer
 #\n\b Company:     DNK Designs Inc.
 #\n\b Date:        08/05/2008 11:18 pm
-#\n\b Description: 
+#\n\b Description: Generate a PNG image from scope data.
 #*/ /************************************************************************
 #Change Log: \n
+# This file is part of OpenGPIB.
+#
+#    OpenGPIB is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    OpenGPIB is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+#    
+#		The License should be in the file called COPYING.
 #
 
 usage () {
 
-	echo "Usage for \$Revision: 1.6 $:"
+	echo "Usage for \$Revision: 1.7 $:"
 	echo "makepng -b basename <options>"
 	echo " -b bn bn is the base filename. Input files should be bn.ch1 bn.ch2, etc"
 	echo " -c process cursors file basename.cursors"
