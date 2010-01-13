@@ -164,6 +164,40 @@ void show_labelmaps(struct section *sec)
 	
 }
 
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+struct hp_block_hdr *read_block(char *cfname)
+{
+	struct hp_block_hdr *blk=NULL;
+	FILE *cfd=NULL;
+	
+	if(NULL == (cfd=fopen(cfname,"r"))) {
+		printf("Unable to open '%s' for writing\n",cfname);
+		goto closem;
+	}
+	if(NULL == (blk=malloc(sizeof(struct hp_block_hdr))) ){
+		printf("Unable to malloc for hdr\n");
+		goto closem;
+	}
+	/**read in header  */
+	fread(blk,1,10,cfd);
+	sscanf(blk->bs.blocklen_data,"%d",&blk->bs.blocklen);
+	printf("Blocksize is %d\n",blk->bs.blocklen);
+	/**allocate room for data  */
+	if(NULL == (blk->data=malloc(blk->bs.blocklen))){
+		printf("Unable to malloc %d bytes\n",blk->bs.blocklen);
+		goto closem;
+	}
+	/**read data in  */
+	fread(blk->data,1,blk->bs.blocklen,cfd);
+closem:
+	if(NULL != cfd)
+		fclose(cfd);
+	return blk;
+}
 
 /***************************************************************************/
 /** .
@@ -172,28 +206,17 @@ void show_labelmaps(struct section *sec)
 ****************************************************************************/
 void parse_config( char *cfname)
 {
-	FILE *cfd;
-	struct hp_block_hdr blk;
+	struct hp_block_hdr *blk;
 	struct section *sec;
-	if(NULL == (cfd=fopen(cfname,"r"))) {
-		printf("Unable to open '%s' for writing\n",cfname);
-		goto closem;
+	
+	if(NULL == (blk=read_block(cfname))) {
+		printf("Unable to read block from '%s'\n",cfname);
+		return;
 	}
-	/**read in header  */
-	fread(&blk,1,10,cfd);
-	sscanf(blk.bs.blocklen_data,"%d",&blk.bs.blocklen);
-	printf("Blocksize is %d\n",blk.bs.blocklen);
-	/**allocate room for data  */
-	if(NULL == (blk.data=malloc(blk.bs.blocklen))){
-		printf("Unable to malloc %d bytes\n",blk.bs.blocklen);
-		goto closem;
-	}
-	/**read data in  */
-	fread(blk.data,1,blk.bs.blocklen,cfd);
-	show_sections(&blk);
-	if(NULL == (sec=find_section("CONFIG    ",&blk))){
+	show_sections(blk);
+	if(NULL == (sec=find_section("CONFIG    ",blk))){
 		printf("Unable to find section 'CONFIG    '\n");
-		goto closem;
+		return;
 	}
 	printf("First Machine is '%s', second is '%s'\n",sec->data,(char *)(sec->data+0x40));
 	/** printf("First Label is '%s'\n",(char *)(sec->data+0x27A));
@@ -207,9 +230,6 @@ void parse_config( char *cfname)
 						                    l.map.pod1_hi,l.map.pod1_lo,l.map.pod2_hi,l.map.pod2_lo);*/
 	show_labelmaps(sec);
 	
-closem:
-	if(NULL != cfd)
-		fclose(cfd);
 }
 
 /***************************************************************************/
@@ -234,37 +254,22 @@ void swap_analyzer_bytes(struct analyzer_data *a)
 ****************************************************************************/
 void swapbytes(struct data_preamble *p)
 {
+	int i;
 	p->instid=swap32(p->instid);
 	p->rev_code=swap32(p->rev_code);
 	p->chips=swap32(p->chips);
 	p->analyzer_id=swap32(p->analyzer_id);
 	swap_analyzer_bytes(&p->a1);
   swap_analyzer_bytes(&p->a2);
+	for (i=0; i<4; ++i){
+		p->data_hi[i]=swap32(p->data_hi[i]);
+		p->data_mid[i]=swap32(p->data_mid[i]);
+		p->data_master[i]=swap32(p->data_master[i]);
+		p->trig_hi[i]=swap32(p->trig_hi[i]);
+		p->trig_mid[i]=swap32(p->trig_mid[i]);
+		p->trig_master[i]=swap32(p->trig_master[i]);
+	}
 	
-	p->data_pod4_hi=swap32(p->data_pod4_hi);
-	p->data_pod3_hi=swap32(p->data_pod3_hi);
-	p->data_pod2_hi=swap32(p->data_pod2_hi);
-	p->data_pod1_hi=swap32(p->data_pod1_hi);
-	p->data_pod4_mid=swap32(p->data_pod4_mid);
-	p->data_pod3_mid=swap32(p->data_pod3_mid);
-	p->data_pod2_mid=swap32(p->data_pod2_mid);
-	p->data_pod1_mid=swap32(p->data_pod1_mid);
-	p->data_pod4_master=swap32(p->data_pod4_master);
-	p->data_pod3_master=swap32(p->data_pod3_master);
-	p->data_pod2_master=swap32(p->data_pod2_master);
-	p->data_pod1_master=swap32(p->data_pod1_master);
-	p->trig_pod4_hi=swap32(p->trig_pod4_hi);
-	p->trig_pod3_hi=swap32(p->trig_pod3_hi);
-	p->trig_pod2_hi=swap32(p->trig_pod2_hi);
-	p->trig_pod1_hi=swap32(p->trig_pod1_hi);
-	p->trig_pod4_mid=swap32(p->trig_pod4_mid);
-	p->trig_pod3_mid=swap32(p->trig_pod3_mid);
-	p->trig_pod2_mid=swap32(p->trig_pod2_mid);
-	p->trig_pod1_mid=swap32(p->trig_pod1_mid);
-	p->trig_pod4_master=swap32(p->trig_pod4_master);
-	p->trig_pod3_master=swap32(p->trig_pod3_master);
-	p->trig_pod2_master=swap32(p->trig_pod2_master);
-	p->trig_pod1_master=swap32(p->trig_pod1_master);
 	p->rtc.year=swap16(p->rtc.year);
 	/*p->rtc.month=swap16(p->rtc.month); */
 	
@@ -288,23 +293,34 @@ void show_analyzer(struct analyzer_data *a)
 void show_pre(struct data_preamble *p)
 {
 	struct rtc_data *r;
+	int i;
 	printf("ID=%d REV=%04x Chips=%04x AID=%04x\n",p->instid,p->rev_code, p->chips, p->analyzer_id);
 	printf("Analyzer 1\n");
 	show_analyzer(&p->a1);
 	printf("Analyzer 2\n");
 	show_analyzer(&p->a2);
 	printf("Valid Data Rows\n");
-	printf("4h=%d 3h=%d 2h=%d 1h=%d 4m=%d 3m=%d 2m=%d 1m=%d M4=%d M3=%d M2=%d M1=%d\n",
-	p->data_pod4_hi,p->data_pod3_hi,p->data_pod2_hi,p->data_pod1_hi,
-	p->data_pod4_mid,p->data_pod3_mid,p->data_pod2_mid,p->data_pod1_mid,
-	p->data_pod4_master,p->data_pod3_master,p->data_pod2_master,p->data_pod1_master);
-	printf("Trigger Point\n");
-	printf("4h=%d 3h=%d 2h=%d 1h=%d 4m=%d 3m=%d 2m=%d 1m=%d M4=%d M3=%d M2=%d M1=%d\n",
-	p->trig_pod4_hi,p->trig_pod3_hi,p->trig_pod2_hi,p->trig_pod1_hi,
-	p->trig_pod4_mid,p->trig_pod3_mid,p->trig_pod2_mid,p->trig_pod1_mid,
-	p->trig_pod4_master,p->trig_pod3_master,p->trig_pod2_master,p->trig_pod1_master);
+	for (i=0; i<4; ++i){
+		printf("%dh=%d ",(3-i)+1,p->data_hi[i]);
+	}
+	for (i=0; i<4; ++i){
+		printf("%dm=%d ",(3-i)+1,p->data_mid[i]);
+	}
+	for (i=0; i<4; ++i){
+		printf("%dM=%d ",(3-i)+1,p->data_master[i]);
+	}
+	printf("\nTrigger Point\n");
+	for (i=0; i<4; ++i){
+		printf("%dh=%d ",(3-i)+1,p->trig_hi[i]);
+	}
+	for (i=0; i<4; ++i){
+		printf("%dm=%d ",(3-i)+1,p->trig_mid[i]);
+	}
+	for (i=0; i<4; ++i){
+		printf("%dM=%d ",(3-i)+1,p->trig_master[i]);
+	}
 	r=&p->rtc;
-	printf("Acq time %d/%d/%d dow %d %d:%d:%d\n",
+	printf("\nAcq time %d/%d/%d dow %d %d:%d:%d\n",
 	r->year+1990,r->month,r->day,r->dow,r->hour,r->min,r->sec);
 	/**our trace data should start right after r->sec.  */
 	/*print_data( */
@@ -327,6 +343,8 @@ char *get_trace_start(struct section *sec)
 	printf("start %p last %p %ld (0x%lx) @%p\n",sec->data,&lp->rtc.sec,(long int)(&lp->rtc.sec)-(long int)sec->data,(long int)(&lp->rtc.sec)-(long int)sec->data,s); 
 	return s;
 }
+#define MODE_EDGES 1
+#define MODE_LEVELS 0
 /***************************************************************************/
 /** Given a pod and a bit, find all states & times.
 \n\b Arguments:
@@ -335,16 +353,18 @@ state  bit fields to look for that match this state
 mask -  bits to look at, 1 means look for it
 \n\b Returns:
 ****************************************************************************/
-void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask,struct data_preamble *pre, struct section *sec)
+void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask, int mode,struct data_preamble *pre, struct section *sec)
 {
 	struct one_card_data *d;
-	char *s;
+	char *s,*b;
+	uint32 count;
 	long int  ps;
 	int inc,c,p;
-	int cmatch, pmatch;
+	int cmatch, pmatch, lc, lp;
 	ps=0;
 	c=0;
 	cmatch=pmatch=0;
+	lc=lp=1;
 	if(0 == clkmask)
 		cmatch=-1;
 	if(0==mask)
@@ -359,8 +379,9 @@ void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask
 	}
 	p=((pod-1)*2);
 	p=6-p;
-	s=get_trace_start(sec);
+	b=s=get_trace_start(sec);
 	inc = ONE_CARD_ROWSIZE;
+	count=0;
 	while(s<sec->data + sec->sz){
 		uint16 val,_clk,x;
 		
@@ -380,18 +401,136 @@ void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask
 			else 
 				pmatch=0;
 		}
-		if(1 == pmatch || 1 == cmatch) {
-			printf("c%04x pod %04x %ldns\n",_clk,val,ps/1000);
-			++c;
-			if(c>10 )
-				break;
+		if(mode&MODE_LEVELS){
+			if(1 == pmatch || 1 == cmatch) {
+			
+				printf("c%04x pod %04x %ldns\n",_clk,val,ps/1000);
+				++c;
+				if(c>10 )
+					break;	
+			}
+		}else if(mode&MODE_EDGES){
+			x=0;
+			if(pmatch != lp){
+				x=1;
+				lp=pmatch;
+			}
+			if(cmatch != lc){
+				x=1;
+				lc=cmatch;
+			}
+			if(x){
+				printf("%08d %08lx c%04x pod %04x %ldns\n",count,(s-b)+0x258,_clk,val,ps/1000);
+				++c;
+				if(c>10 )
+					break;	
+			}
 		}
 		
 		ps+=pre->a1.sampleperiod;
 		
 		s+=inc;
-		
+		++count;
+		if(count>=pre->data_master[3])
+			break;
 	}	
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int number_of_pods_assigned(uint32 pods)
+{
+	int i, p;
+	for (p=0,i=1;i;i<<=1)
+		if(i&pods)
+			++p;
+	printf("pods_assigned %d\n",p);
+	return p;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+uint32 valid_rows(int pod_no, uint32 pods, uint32 *rows)
+{
+	uint32 i;
+	if(pod_no <1 || pod_no>12){
+		printf("valid_rows: invalid pod %d\n",pod_no);
+		return 0;
+	}
+	i=1<<pod_no;
+	if(i&pods)
+		return rows[4-pod_no];
+	return 0;
+}
+/***************************************************************************/
+/** 
+Look at the pods assigned to the analyzer, then look at the valid rows of 
+that pod to know if the data is good.  Also, if the mode of the analyzer 
+is 13, it is half-channel so you *know* the second pod data is not good 
+reguardless of the what the data_xxx vars say. 
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+uint32 put_data_to_file(struct data_preamble *p, struct section *sec, char *fname)
+{
+	struct one_card_data *d;
+	char *dstart;
+	long int ps;
+	int inc,c,fields,i;
+	FILE *out;
+	uint32 count;
+	count=0;
+	
+	ps=0;
+	
+	if(NULL == (out=fopen(fname,"w+"))) {
+		printf("Unable to open '%s' for writing\n",fname);
+		goto closem;
+	}
+	printf("Writing file '%s'\n",fname);
+	/*if(13 == p->a1.data_mode) */
+	fields=number_of_pods_assigned(p->a1.pods);
+	
+	printf("Valid rows: ");
+	for (c=1; c<5; ++c){
+		printf("%d=%d ",c,valid_rows(c,p->a1.pods,p->data_master));
+	}
+	printf("\n");
+	dstart=get_trace_start(sec);
+/*	dstart = (void *)((char *)(&lp->rtc.sec) - (char *)sec->data);  */
+	c=0;
+	inc = ONE_CARD_ROWSIZE;
+	while (dstart < sec->data + sec->sz){
+		d=(struct one_card_data *)dstart;
+		fprintf(out,"%02x%02x",d->clkhi, d->clklo);
+		if(fields>1){/**if 1, just clock??  */
+			
+			for (i=4;i>0;--i){
+				int x;
+				if(valid_rows(i,p->a1.pods,p->data_master))	{
+					x=8-(i*2);
+					fprintf(out,"%02x%02x",d->pdata[x],d->pdata[x+1]);
+				}
+			}
+		}	
+		fprintf(out,"\n");
+		/**just print out clk, pod 1 & 2 data  */
+/*		fprintf(out,"%02x%02x%02x%02x%02x%02x\n",d->clkhi, d->clklo,d->pdata[4],d->pdata[5],d->pdata[6],d->pdata[7]); */
+		ps+=p->a1.sampleperiod;
+		dstart+=inc;
+		++count;
+	}
+closem:
+	if(NULL != out)
+		fclose(out);
+	return count;
+	
 }
 /***************************************************************************/
 /** .
@@ -404,11 +543,12 @@ void print_data(struct data_preamble *p, struct section *sec)
 	char *dstart;
 	long int ps;
 	int inc,c;
-	
+	uint32 count;
+	count=0;
 	c=0;
 	ps=0;
 	inc = ONE_CARD_ROWSIZE;
-	
+	printf("Valid rows= %d\n",p->data_master[3]);
 	dstart=get_trace_start(sec);
 /*	dstart = (void *)((char *)(&lp->rtc.sec) - (char *)sec->data);  */
 	
@@ -436,46 +576,35 @@ void print_data(struct data_preamble *p, struct section *sec)
 	}
 	
 }
+
+
 /***************************************************************************/
 /** .\n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-void parse_data( char *cfname)
+void parse_data( char *cfname, char *out)
 {
-	FILE *cfd;
-	struct hp_block_hdr blk;
+	struct hp_block_hdr *blk;
 	struct section *sec;
 	struct data_preamble pre;
-	if(NULL == (cfd=fopen(cfname,"r"))) {
-		printf("Unable to open '%s' for writing\n",cfname);
-		goto closem;
+	
+	if(NULL == (blk=read_block(cfname))) {
+		printf("Unable to read '%s' for writing\n",cfname);
+		return;
 	}
-	/**read in header  */
-	fread(&blk,1,10,cfd);
-	sscanf(blk.bs.blocklen_data,"%d",&blk.bs.blocklen);
-	printf("Blocksize is %d\n",blk.bs.blocklen);
-	/**allocate room for data  */
-	if(NULL == (blk.data=malloc(blk.bs.blocklen))){
-		printf("Unable to malloc %d bytes\n",blk.bs.blocklen);
-		goto closem;
-	}
-	/**read data in  */
-	fread(blk.data,1,blk.bs.blocklen,cfd);
-	show_sections(&blk);
-	if(NULL == (sec=find_section("DATA      ",&blk))){
+	show_sections(blk);
+	if(NULL == (sec=find_section("DATA      ",blk))){
 		printf("Unable to find section 'DATA      '\n");
-		goto closem;
+		return;
 	}
 	memcpy(&pre,sec->data,sizeof(struct data_preamble));
 	swapbytes(&pre);
 	show_pre(&pre);
 	
 	print_data(&pre,sec);
-	search_state(1,0,0,0x800,0x800,&pre,sec);
-	
-closem:
-	if(NULL != cfd)
-		fclose(cfd);
+	search_state(1,0,0,0x800,0x800,MODE_EDGES,&pre,sec);
+	if(NULL != out)
+		put_data_to_file(&pre,sec,out);
 }
 /***************************************************************************/
 /** .
@@ -487,6 +616,7 @@ void usage(void)
 	printf("Usage: parse_16500_config <options>\n"
 	" -c filename set name of config file\n"
 	" -d filename set name of data file\n"
+	" -f file set name of output file. Send valid data to file\n"
 	"");
 }
 /***************************************************************************/
@@ -496,16 +626,19 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char *argv[])
 {
-	char *cfname, *dfname;
+	char *cfname, *dfname, *outfname;
 	int c;
-	dfname=cfname=NULL;
-	while( -1 != (c = getopt(argc, argv, "c:d:h")) ) {
+	outfname=dfname=cfname=NULL;
+	while( -1 != (c = getopt(argc, argv, "c:d:f:h")) ) {
 		switch(c){
 			case 'c':
 				cfname=strdup(optarg);
 				break;
 			case 'd':
 				dfname=strdup(optarg);
+				break;
+			case 'f':
+				outfname=strdup(optarg);
 				break;
 			default:
 				usage();
@@ -520,7 +653,7 @@ int main(int argc, char *argv[])
 		parse_config(cfname);
 	}
 	if(NULL != dfname ){
-		parse_data(dfname);
+		parse_data(dfname,outfname);
 	}
 closem:
 	return 0;
