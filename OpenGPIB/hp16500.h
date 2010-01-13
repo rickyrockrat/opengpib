@@ -123,15 +123,7 @@ struct analyzer_data {
 	uint8 unused2[30];
 }__attribute__((__packed__));	
 
-struct data_preamble {
-	uint32 instid;
-	uint32 rev_code;
-	uint32 chips;
-	uint32 analyzer_id;
-	struct analyzer_data a1;
-	struct analyzer_data a2;
-	uint8 unused1[40];
-	/**number of valid rows of data... offset 173 */
+/**  
 	uint32 data_pod4_hi;
 	uint32 data_pod3_hi;
 	uint32 data_pod2_hi;
@@ -144,7 +136,6 @@ struct data_preamble {
 	uint32 data_pod3_master;
 	uint32 data_pod2_master;
 	uint32 data_pod1_master;
-	/**trigger position?? offset 261 */
 	uint8 unused2[40];
 	uint32 trig_pod4_hi;
 	uint32 trig_pod3_hi;
@@ -158,6 +149,24 @@ struct data_preamble {
 	uint32 trig_pod3_master;
 	uint32 trig_pod2_master;
 	uint32 trig_pod1_master;
+*/
+struct data_preamble {
+	uint32 instid;
+	uint32 rev_code;
+	uint32 chips;
+	uint32 analyzer_id;
+	struct analyzer_data a1;
+	struct analyzer_data a2;
+	uint8 unused1[40];
+	/**number of valid rows of data... offset 173 */
+	uint32 data_hi[4];/**0=pod4,3=pod1  */
+	uint32 data_mid[4];
+	uint32 data_master[4];
+	/**trigger position?? offset 261 */
+	uint8 unused2[40];
+	uint32 trig_hi[4];
+	uint32 trig_mid[4];
+	uint32 trig_master[4];
 	/** offset 349  */
 	uint8 unused3[234];
 	/**  acquision time*/
