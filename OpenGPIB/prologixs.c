@@ -54,6 +54,7 @@ int prologixs_init(struct gpib *g)
 	struct prologixs_ctl *c;
 	c=(struct prologixs_ctl *)g->ctl;
 	if(g->type_ctl&OPTION_DEBUG)printf("Init Prologix controller\n");
+	write_string(g,"++clr");
 	read_string(g);
 	/*make sure auto reply is on*/
 	if(c->autor)
@@ -125,6 +126,13 @@ int control_prologixs(struct gpib *g, int cmd, int data)
 			i=sprintf(cmdbuf,"++addr %d\n",data);
 			if(c->serial.write(&c->serial,cmdbuf,i) == i){
 				g->addr=data;
+				return 1;
+			}
+			break;
+		case CTL_SEND_CLR:
+			i=sprintf(cmdbuf,"++clr\n");
+			if(c->serial.write(&c->serial,cmdbuf,i) == i){
+				printf("Sent Device Clear\n");
 				return 1;
 			}
 			break;
