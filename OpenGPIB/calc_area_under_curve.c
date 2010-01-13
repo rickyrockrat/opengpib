@@ -44,6 +44,10 @@ void usage( void)
 	" -d dlm use delimiter dlm for column spacing (space)\n"
 	" -i fname unput file name. - is stdin. This is required.\n"
 	" -m dx/mx set the divider or multiplier for result (1/1).\n"
+	" The file data is assumed to be one or more columns of floating \n"
+	" point numbers.  Use -d to specify the single-character delimiter\n"
+	" between columns.\n"
+	
 	
 	"");
 }
