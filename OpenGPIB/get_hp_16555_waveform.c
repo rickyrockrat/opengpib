@@ -113,25 +113,6 @@ number of valid rows.
 
 */
 
-
-
-/***************************************************************************/
-/** FMT,TYPE,Points,Count,Xinc,Xorigin,Xref,Yinc,Yorigin,Yref.
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int parse_preamble(struct gpib *g, struct hp_scope_preamble *h)
-{
-	h->fmt=get_value_col(0,g->buf);
-	h->points=get_value_col(2,g->buf);
-	h->xinc=get_value_col(4,g->buf);
-	h->xorg=get_value_col(5,g->buf);
-	h->xref=get_value_col(6,g->buf);
-	h->yinc=get_value_col(7,g->buf);
-	h->yorg=get_value_col(8,g->buf);
-	h->yref=get_value_col(9,g->buf);
-	return 0;
-}
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -178,76 +159,13 @@ int init_instrument(struct gpib *g)
 		sprintf(g->buf,":SELECT %d",osc+1);
 		write_string(g,g->buf);	
 	}
-	
+	write_get_data(g,":SELECT?");
 /*	i=write_get_data(g,":?"); */
 	printf("Selected Card %s to talk to.\n",g->buf);
 
 	return i;
 /*34,-1,12,12,11,1,0,5,5,5 */
 	/** :WAV:REC FULL;:WAV:FORM ASC;:SELECT? */
-}
-
-/***************************************************************************/
-/** returns the value of the digits at the end. 0 is invalid channel number.
-\n\b Arguments:
-\n\b Returns: 0 on error, channel no on success.
-****************************************************************************/
-int check_channel(char *ch)
-{
-	int i,b;
-	if(NULL ==ch)
-		return 0;
-	for (b=-1,i=0;ch[i];++i){
-		if(isdigit(ch[i])){
-			b=i;
-			break;
-		}
-	}
-	if( -1 == b ){
-		printf("Channel '%s' is invalid\n",ch);
-		return 0;
-	}
-	return atoi(&ch[b]);
-}
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h)
-{
-	int i;
-	if(NULL == ch)
-		return -1;
-	if(0 == (i=check_channel(ch)))
-		return -1;
-	/*printf("GetPre %d\n",i);	  */
-	sprintf(g->buf,":WAV:SOUR CHAN%d;PRE?",i);
-	if( write_get_data(g,g->buf) <=0){
-		printf("No data from preamble (%d)\n",i);
-		return 0; 
-	}
-		
-	parse_preamble(g,h);
-	return 1;
-}
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int get_data(struct gpib *g, char *ch)
-{
-	int i;
-	if(NULL == ch)
-		return -1;
-	if(0 == (i=check_channel(ch)))
-		return -1;
-/*	printf("GetData %d\n",i); */
-	sprintf(g->buf,":WAV:SOUR CHAN%d;DATA?",i);
-	i=write_get_data(g,g->buf);	
-	return i;
-	
 }
 
 /***************************************************************************/
@@ -351,7 +269,7 @@ int main(int argc, char * argv[])
 		return 1;
 	} 
 		
-	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,-1))){
+	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,1048576))){
 		printf("Can't open/init controller at %s. Fatal\n",name);
 		return 1;
 	}
@@ -384,6 +302,7 @@ int main(int argc, char * argv[])
 		printf("Retreiving Setup\n");
 		sprintf(g->buf,":SYSTEM:SETUP?");
 		i=write_string(g,g->buf);	
+		usleep(100000);
 		total=0;
 		while(i){
 			i=read_raw(g);
