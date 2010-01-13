@@ -6,6 +6,23 @@
 \n\b Description: Prologix interface routines
 */ /************************************************************************
 Change Log: \n
+ This file is part of OpenGPIB.
+
+    OpenGPIB is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License version 3 
+    as published by the Free Software Foundation. Note that permission 
+    is not granted to redistribute this program under the terms of any
+    other version of the General Public License.
+
+    OpenGPIB is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+    
+		The License should be in the file called COPYING.
 */
 
 #include "gpib.h"

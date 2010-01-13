@@ -6,61 +6,23 @@
 \n\b Description: 
 */ /************************************************************************
 Change Log: \n
-$Log: not supported by cvs2svn $
-Revision 1.18  2008/10/06 19:20:25  dfs
-Added variable right margin, read of NR.PT for points
+ This file is part of OpenGPIB.
 
-Revision 1.17  2008/08/19 19:40:37  dfs
-Fixed too many labels on xtics
+    OpenGPIB is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License version 3 
+    as published by the Free Software Foundation. Note that permission 
+    is not granted to redistribute this program under the terms of any
+    other version of the General Public License.
 
-Revision 1.16  2008/08/19 19:13:32  dfs
-Fixed check_xrange = 100
+    OpenGPIB is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-Revision 1.15  2008/08/19 18:35:48  dfs
-Added pk-pk, min-y, max-y functions, #def r,l,b margins
-
-Revision 1.14  2008/08/19 16:55:04  dfs
-Added more headroom for labels
-
-Revision 1.13  2008/08/19 16:51:31  dfs
-Added description option (-a)
-
-Revision 1.12  2008/08/19 06:51:37  dfs
-Fixed minor formatting issue, default to first 2 files for func
-
-Revision 1.11  2008/08/19 06:43:32  dfs
-Major cleanup, added multiple function, structurized data
-
-Revision 1.10  2008/08/19 00:41:22  dfs
-Moved data to main data struct, functionality same
-
-Revision 1.9  2008/08/18 22:09:26  dfs
-Added time cursor handling, fixed vert scaling, fixed horiz printing
-
-Revision 1.8  2008/08/12 23:04:00  dfs
-Added diff function
-
-Revision 1.7  2008/08/03 23:31:59  dfs
-Added cursor plotting
-
-Revision 1.6  2008/08/03 22:22:07  dfs
-Added multiple plots, but gnuplot segfaults
-
-Revision 1.5  2008/08/03 06:20:25  dfs
-Moved get_string, get_value to common
-
-Revision 1.4  2008/08/02 08:54:43  dfs
-Attempt to add yrange adjustment
-
-Revision 1.3  2007/10/05 20:35:44  dfs
-Added -l and -t options
-
-Revision 1.2  2007/10/05 14:45:56  dfs
-Added trigger, plot title, and fixed y-axis label
-
-Revision 1.1.1.1  2007/10/05 13:59:11  dfs
-Initial Creation
-
+    You should have received a copy of the GNU General Public License
+    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+    
+		The License should be in the file called COPYING.
 */
 #define _GNU_SOURCE
 /*#define _ISOC99_SOURCE  */
@@ -668,7 +630,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.19 $\n"
+	printf("tek2gplot: $Revision: 1.20 $\n"
 	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"

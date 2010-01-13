@@ -3,24 +3,26 @@
 \n\b Author:      Doug Springer
 \n\b Company:     DNK Designs Inc.
 \n\b Date:        08/01/2008  4:21 pm
-\n\b Description: 
+\n\b Description: Implementation of an interface over a serial port.
 */ /************************************************************************
 Change Log: \n
-$Log: not supported by cvs2svn $
-Revision 1.5  2009-04-07 19:01:39  dfs
-Moved string massage to prologixs
+ This file is part of OpenGPIB.
 
-Revision 1.4  2009-04-07 18:14:40  dfs
-Added control, timeout, fixed read
+    OpenGPIB is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License version 3 
+    as published by the Free Software Foundation. Note that permission 
+    is not granted to redistribute this program under the terms of any
+    other version of the General Public License.
 
-Revision 1.3  2009-04-07 07:05:16  dfs
-Changed to more encapsulated interface code
+    OpenGPIB is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-Revision 1.2  2009-04-06 20:57:26  dfs
-Major re-write for new gpib API
-
-Revision 1.1  2008/08/02 08:53:58  dfs
-Initial working rev
+    You should have received a copy of the GNU General Public License
+    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+    
+		The License should be in the file called COPYING.
 
 */
 

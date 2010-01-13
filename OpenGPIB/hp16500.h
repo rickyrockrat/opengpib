@@ -1,5 +1,33 @@
+/** \file ******************************************************************
+\n\b File:        hp16500.h
+\n\b Author:      Doug Springer
+\n\b Company:     DNK Designs Inc.
+\n\b Date:        01/13/2010 11:42 am
+\n\b Description: 
+*/ /************************************************************************
+Change Log: \n
+ This file is part of OpenGPIB.
+
+    OpenGPIB is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License version 3 
+    as published by the Free Software Foundation. Note that permission 
+    is not granted to redistribute this program under the terms of any
+    other version of the General Public License.
+
+    OpenGPIB is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+    
+		The License should be in the file called COPYING.
+*/
+
 #ifndef _HP16500_H_
 #define _HP16500_H_ 1
+
 /** Id Number Card*/
 #define CARDTYPE_16515A  1         /** HP 16515A 1GHz Timing Master Card*/
 #define CARDTYPE_16516A  2         /** HP 16516A 1GHz Timing Expansion Card*/
