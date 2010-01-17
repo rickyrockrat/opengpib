@@ -270,9 +270,11 @@ struct three_card_data {
 }__attribute__((__packed__));	
 
 struct signal_data {
+	int bits; /**width of signal in bits  */
 	int lsb; /**lowest number bit where signal starts  */
 	int msb; /**highes number bit where signal ends  */
 	char *name;
+	struct signal_data *next;
 };
 
 #define ONE_CARD_ROWSIZE 12
