@@ -45,7 +45,7 @@ uint32 swap32(uint32 in)
 	out|=(in&0x0000FF00)<<8;
 	out|=in>>24;
 	out|=(in&0x00FF0000)>>8;
-	/*printf("in %d out %d\n",in,out); */
+	/*fprintf(stderr,"in %d out %d\n",in,out); */
 	return out;
 }
 /***************************************************************************/
@@ -65,7 +65,7 @@ uint64 swap64(uint64 in)
 	out|=(in&0x0000FF0000000000)>>24;
 	out|=(in&0x00000000FF000000)<<8;
 	out|=(in&0x000000FF00000000)>>8;
-	/*printf("in %016lx out %016lx\n",in,out);  */
+	/*fprintf(stderr,"in %016lx out %016lx\n",in,out);  */
 	return out;
 }
 /***************************************************************************/
@@ -78,7 +78,7 @@ uint16 swap16(uint16 in)
 	uint16 out;
 	out=in<<8;
 	out|=in>>8;
-	/*printf("in %d out %d\n",in,out); */
+	/*fprintf(stderr,"in %d out %d\n",in,out); */
 	return out;
 }
 /***************************************************************************/
@@ -92,18 +92,18 @@ struct section *find_section(char *name, struct hp_block_hdr *blk )
 	uint32 total;
   struct section *sec;
 	if( NULL == (sec=malloc(sizeof(struct section))))	{
-		printf("Unable to alloc for section\n");
+		fprintf(stderr,"Unable to alloc for section\n");
 		return NULL;
 	}
 	for (total=0,sec->sz=1; total<blk->bs.blocklen && sec->sz>0;){
 		memcpy(&sec->hdr,(char *)(blk->data+total),sizeof(struct section_hdr));
 		sec->hdr.name[10]=0;
 		sec->sz=swap32(sec->hdr.block_len);
-		printf("Looking at Name %s module_id %d len %d\n",sec->hdr.name, sec->hdr.module_id,sec->sz);	
+		fprintf(stderr,"Looking at Name %s module_id %d len %d\n",sec->hdr.name, sec->hdr.module_id,sec->sz);	
 		
 		if(!strcmp(name,sec->hdr.name)){
 			if( NULL == (sec->data=malloc(sec->sz)) )	{
-				printf("Unable to alloc for section\n");
+				fprintf(stderr,"Unable to alloc for section\n");
 				free(sec);
 				return NULL;
 			}		
@@ -130,7 +130,7 @@ void show_sections(struct hp_block_hdr *blk )
 		memcpy(&hdr,(char *)(blk->data+total),sizeof(struct section_hdr));
 		hdr.name[10]=0;
 		sz=swap32(hdr.block_len);
-		printf("Name '%s' module_id %d len %d\n",hdr.name, hdr.module_id,sz);	
+		fprintf(stderr,"Name '%s' module_id %d len %d\n",hdr.name, hdr.module_id,sz);	
 		total+=sz+16; /**16 is size of section info  */
 	}
 }
@@ -156,20 +156,20 @@ void show_label(struct labels *l, FILE *out)
 		}
 		fprintf(out,"\n");
 	}else{
-		printf("%s map is clk ",l->name);
+		fprintf(stderr,"%s map is clk ",l->name);
 		for (m=0;m<10;++m){
 			if(m>1 && !(m%2))
-				printf("P%d ",5-((m+2)/2));
-			printf("%02x ",l->map.clk_pods[m]);
+				fprintf(stderr,"P%d ",5-((m+2)/2));
+			fprintf(stderr,"%02x ",l->map.clk_pods[m]);
 		}
 			
-		printf(" #bits %d ena %d seq %d ",l->bits,l->enable, l->sequence);	
+		fprintf(stderr," #bits %d ena %d seq %d ",l->bits,l->enable, l->sequence);	
 		/** for (m=0;m<3;++m)
-			printf("%02x ",l->unknown1[m]);
-		printf("*3* ");
+			fprintf(stderr,"%02x ",l->unknown1[m]);
+		fprintf(stderr,"*3* ");
 		for (m=0;m<4;++m)
-			printf("%02x ",l->unknown3[m]);*/
-		printf("\n");
+			fprintf(stderr,"%02x ",l->unknown3[m]);*/
+		fprintf(stderr,"\n");
 	}
 		
 }
@@ -188,9 +188,9 @@ void show_labelmaps(struct section *sec, FILE *out)
 	for (i=0,k=0x27A; i<0xFF; ++i){
 		memcpy(&l,sec->data+k,LABEL_RECORD_LEN);
 		l.actual_offset=swap16(l.strange_offsetlo);
-		//printf("Actual map offset=0x%x ",l.actual_offset); 
+		//fprintf(stderr,"Actual map offset=0x%x ",l.actual_offset); 
 		l.actual_offset-=0x6E90;
-		/*printf("Adjusted = 0x%x ",l.actual_offset); */
+		/*fprintf(stderr,"Adjusted = 0x%x ",l.actual_offset); */
 		memcpy(&l.map,sec->data+0x27A+l.actual_offset,LABEL_MAP_LEN);
 		show_label(&l, out);
 			
@@ -213,20 +213,20 @@ struct hp_block_hdr *read_block(char *cfname)
 	FILE *cfd=NULL;
 	
 	if(NULL == (cfd=fopen(cfname,"r"))) {
-		printf("Unable to open '%s' for writing\n",cfname);
+		fprintf(stderr,"Unable to open '%s' for writing\n",cfname);
 		goto closem;
 	}
 	if(NULL == (blk=malloc(sizeof(struct hp_block_hdr))) ){
-		printf("Unable to malloc for hdr\n");
+		fprintf(stderr,"Unable to malloc for hdr\n");
 		goto closem;
 	}
 	/**read in header  */
 	fread(blk,1,10,cfd);
 	sscanf(blk->bs.blocklen_data,"%d",&blk->bs.blocklen);
-	printf("Blocksize is %d\n",blk->bs.blocklen);
+	fprintf(stderr,"Blocksize is %d\n",blk->bs.blocklen);
 	/**allocate room for data  */
 	if(NULL == (blk->data=malloc(blk->bs.blocklen))){
-		printf("Unable to malloc %d bytes\n",blk->bs.blocklen);
+		fprintf(stderr,"Unable to malloc %d bytes\n",blk->bs.blocklen);
 		goto closem;
 	}
 	/**read data in  */
@@ -252,17 +252,17 @@ struct section *parse_config( char *cfname, char *name, int mode)
 	struct section *sec;
 	
 	if(NULL == (blk=read_block(cfname))) {
-		printf("Unable to read block from '%s'\n",cfname);
+		fprintf(stderr,"Unable to read block from '%s'\n",cfname);
 		return NULL;
 	}
 	
 	if(NULL == (sec=find_section(name,blk))){
-		printf("Unable to find section '%s'\n",name);
+		fprintf(stderr,"Unable to find section '%s'\n",name);
 		return NULL;
 	}
 	if(SHOW_PRINT == mode){
 		show_sections(blk);
-		printf("First Machine is '%s', second is '%s'\n",sec->data,(char *)(sec->data+0x40));
+		fprintf(stderr,"First Machine is '%s', second is '%s'\n",sec->data,(char *)(sec->data+0x40));
 		show_labelmaps(sec, NULL);
 	}
 	return sec;
@@ -318,7 +318,7 @@ void swapbytes(struct data_preamble *p)
 ****************************************************************************/
 void show_analyzer(struct analyzer_data *a)
 {
-	printf("datam=%d pods=%08x master=%04x maxmem=%04x samp=%ldps tagtype=%04x trig_off=%ldps\n",
+	fprintf(stderr,"datam=%d pods=%08x master=%04x maxmem=%04x samp=%ldps tagtype=%04x trig_off=%ldps\n",
 	a->data_mode, a->pods, a->masterchip, a->maxmem, a->sampleperiod,a->tag_type,a->trig_off);	
 }
 /***************************************************************************/
@@ -330,33 +330,33 @@ void show_pre(struct data_preamble *p)
 {
 	struct rtc_data *r;
 	int i;
-	printf("ID=%d REV=%04x Chips=%04x AID=%04x\n",p->instid,p->rev_code, p->chips, p->analyzer_id);
-	printf("Analyzer 1\n");
+	fprintf(stderr,"ID=%d REV=%04x Chips=%04x AID=%04x\n",p->instid,p->rev_code, p->chips, p->analyzer_id);
+	fprintf(stderr,"Analyzer 1\n");
 	show_analyzer(&p->a1);
-	printf("Analyzer 2\n");
+	fprintf(stderr,"Analyzer 2\n");
 	show_analyzer(&p->a2);
-	printf("Valid Data Rows\n");
+	fprintf(stderr,"Valid Data Rows\n");
 	for (i=0; i<4; ++i){
-		printf("%dh=%d ",(3-i)+1,p->data_hi[i]);
+		fprintf(stderr,"%dh=%d ",(3-i)+1,p->data_hi[i]);
 	}
 	for (i=0; i<4; ++i){
-		printf("%dm=%d ",(3-i)+1,p->data_mid[i]);
+		fprintf(stderr,"%dm=%d ",(3-i)+1,p->data_mid[i]);
 	}
 	for (i=0; i<4; ++i){
-		printf("%dM=%d ",(3-i)+1,p->data_master[i]);
+		fprintf(stderr,"%dM=%d ",(3-i)+1,p->data_master[i]);
 	}
-	printf("\nTrigger Point\n");
+	fprintf(stderr,"\nTrigger Point\n");
 	for (i=0; i<4; ++i){
-		printf("%dh=%d ",(3-i)+1,p->trig_hi[i]);
-	}
-	for (i=0; i<4; ++i){
-		printf("%dm=%d ",(3-i)+1,p->trig_mid[i]);
+		fprintf(stderr,"%dh=%d ",(3-i)+1,p->trig_hi[i]);
 	}
 	for (i=0; i<4; ++i){
-		printf("%dM=%d ",(3-i)+1,p->trig_master[i]);
+		fprintf(stderr,"%dm=%d ",(3-i)+1,p->trig_mid[i]);
+	}
+	for (i=0; i<4; ++i){
+		fprintf(stderr,"%dM=%d ",(3-i)+1,p->trig_master[i]);
 	}
 	r=&p->rtc;
-	printf("\nAcq time %d/%d/%d dow %d %d:%d:%d\n",
+	fprintf(stderr,"\nAcq time %d/%d/%d dow %d %d:%d:%d\n",
 	r->year+1990,r->month,r->day,r->dow,r->hour,r->min,r->sec);
 	/**our trace data should start right after r->sec.  */
 	/*print_data( */
@@ -376,7 +376,7 @@ char *get_trace_start(struct section *sec)
 	lp=(struct data_preamble *)sec->data;
 	
 	s=((char *)&lp->rtc.sec - sec->data)+sec->data+1; 
-	printf("start %p last %p %ld (0x%lx) @%p\n",sec->data,&lp->rtc.sec,(long int)(&lp->rtc.sec)-(long int)sec->data,(long int)(&lp->rtc.sec)-(long int)sec->data,s); 
+	fprintf(stderr,"start %p last %p %ld (0x%lx) @%p\n",sec->data,&lp->rtc.sec,(long int)(&lp->rtc.sec)-(long int)sec->data,(long int)(&lp->rtc.sec)-(long int)sec->data,s); 
 	return s;
 }
 #define MODE_EDGES 1
@@ -406,11 +406,11 @@ void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask
 	if(0==mask)
 		pmatch=-1;
 	if(-1 == cmatch && -1== pmatch){
-		printf("Must have either clock or pod mask set\n");
+		fprintf(stderr,"Must have either clock or pod mask set\n");
 		return;
 	}
 	if(pod>=4 || pod<1){
-		printf("Valid pod numbers are 1-4, not %d\n",pod);
+		fprintf(stderr,"Valid pod numbers are 1-4, not %d\n",pod);
 		return;
 	}
 	p=((pod-1)*2);
@@ -440,7 +440,7 @@ void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask
 		if(mode&MODE_LEVELS){
 			if(1 == pmatch || 1 == cmatch) {
 			
-				printf("c%04x pod %04x %ldns\n",_clk,val,ps/1000);
+				fprintf(stderr,"c%04x pod %04x %ldns\n",_clk,val,ps/1000);
 				++c;
 				if(c>10 )
 					break;	
@@ -456,7 +456,7 @@ void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask
 				lc=cmatch;
 			}
 			if(x){
-				printf("%08d %08lx c%04x pod %04x %ldns\n",count,(s-b)+0x258,_clk,val,ps/1000);
+				fprintf(stderr,"%08d %08lx c%04x pod %04x %ldns\n",count,(s-b)+0x258,_clk,val,ps/1000);
 				++c;
 				if(c>10 )
 					break;	
@@ -483,7 +483,7 @@ int number_of_pods_assigned(uint32 pods)
 	for (p=0,i=1;i;i<<=1)
 		if(i&pods)
 			++p;
-	printf("pods_assigned %d\n",p);
+	fprintf(stderr,"pods_assigned %d\n",p);
 	return p;
 }
 
@@ -496,7 +496,7 @@ uint32 valid_rows(int pod_no, uint32 pods, uint32 *rows)
 {
 	uint32 i;
 	if(pod_no <1 || pod_no>12){
-		printf("valid_rows: invalid pod %d\n",pod_no);
+		fprintf(stderr,"valid_rows: invalid pod %d\n",pod_no);
 		return 0;
 	}
 	i=1<<pod_no;
@@ -526,18 +526,18 @@ uint32 put_data_to_file(struct data_preamble *p, struct section *sec, char *fnam
 	ps=0;
 	
 	if(NULL == (out=fopen(fname,"w+"))) {
-		printf("Unable to open '%s' for writing\n",fname);
+		fprintf(stderr,"Unable to open '%s' for writing\n",fname);
 		goto closem;
 	}
-	printf("Writing file '%s'\n",fname);
+	fprintf(stderr,"Writing file '%s'\n",fname);
 	/*if(13 == p->a1.data_mode) */
 	fields=number_of_pods_assigned(p->a1.pods);
 	
-	printf("Valid rows: ");
+	fprintf(stderr,"Valid rows: ");
 	for (c=1; c<5; ++c){
-		printf("%d=%d ",c,valid_rows(c,p->a1.pods,p->data_master));
+		fprintf(stderr,"%d=%d ",c,valid_rows(c,p->a1.pods,p->data_master));
 	}
-	printf("\n");
+	fprintf(stderr,"\n");
 	dstart=get_trace_start(sec);
 /*	dstart = (void *)((char *)(&lp->rtc.sec) - (char *)sec->data);  */
 	c=0;
@@ -584,14 +584,14 @@ void print_data(struct data_preamble *p, struct section *sec)
 	c=0;
 	ps=0;
 	inc = ONE_CARD_ROWSIZE;
-	printf("Valid rows= %d\n",p->data_master[3]);
+	fprintf(stderr,"Valid rows= %d\n",p->data_master[3]);
 	dstart=get_trace_start(sec);
 /*	dstart = (void *)((char *)(&lp->rtc.sec) - (char *)sec->data);  */
 	
 	while (dstart < sec->data + sec->sz){
 		int i;
 		d=(struct one_card_data *)dstart;
-		printf("CH%02x CL%02x ",d->clkhi, d->clklo);
+		fprintf(stderr,"CH%02x CL%02x ",d->clkhi, d->clklo);
 		for (i=0; i<8; ++i){
 			char x,y;
 			if(!(i%2))
@@ -599,11 +599,11 @@ void print_data(struct data_preamble *p, struct section *sec)
 			else 
 				x='L';
 			y='0'+(9-i)/2;
-			printf("%c%c%02x ",x,y,d->pdata[i]);
+			fprintf(stderr,"%c%c%02x ",x,y,d->pdata[i]);
 			
 		}
 		
-		printf(" %ldns\n",ps/1000);
+		fprintf(stderr," %ldns\n",ps/1000);
 		ps+=p->a1.sampleperiod;
 		dstart+=inc;
 		++c;
@@ -625,18 +625,18 @@ struct data_preamble *parse_data( char *cfname, char *out, int mode)
 	struct data_preamble *pre;
 	
 	if(NULL == (pre=malloc(sizeof(struct data_preamble)))){
-		printf("Unable to allocate for data_preamble struct\n");
+		fprintf(stderr,"Unable to allocate for data_preamble struct\n");
 		return NULL;
 	}
 	
 	if(NULL == (blk=read_block(cfname))) {
-		printf("Unable to read '%s' for writing\n",cfname);
+		fprintf(stderr,"Unable to read '%s' for writing\n",cfname);
 		goto err;
 	}
 	if(mode != JUST_LOAD)
 		show_sections(blk);
 	if(NULL == (sec=find_section("DATA      ",blk))){
-		printf("Unable to find section 'DATA      '\n");
+		fprintf(stderr,"Unable to find section 'DATA      '\n");
 		goto err;
 	}
 	
@@ -671,7 +671,7 @@ struct signal_data *add_signal(struct signal_data *d,int bits, int lsb, int msb,
 	}else s=NULL;	
 		
 	if(NULL ==(x=malloc(sizeof(struct signal_data )))){
-		printf("Out of Mem for signal_data on '%s'\n",name);
+		fprintf(stderr,"Out of Mem for signal_data on '%s'\n",name);
 		return NULL;
 	}
 	memset(x,0,sizeof(struct signal_data ));
@@ -702,34 +702,34 @@ struct signal_data *show_vcd_label(uint8 *a, struct labels *l)
 		struct signal_data *s=d;
 		while(s){
 			if(s->lsb==s->msb)
-				printf("-sf %d %s ",s->lsb,s->name);
+				fprintf(stderr,"-sf %d %s ",s->lsb,s->name);
 			else
-				printf("-sf %d-%d %s ",s->msb, s->lsb,s->name);
+				fprintf(stderr,"-sf %d-%d %s ",s->msb, s->lsb,s->name);
 			s=s->next;
 		}
 	  return d;	
 	}
-	/*printf("       "); */
+	/*fprintf(stderr,"       "); */
 	for (bits=i=0;i<13;++i){
-		/*printf(" %d ",a[12-i]); */
+		/*fprintf(stderr," %d ",a[12-i]); */
 		if(a[i])
 			bits+=16;/**each pod is 16 lines, and we register the clock as 16 too  */
 	}
 	bytes=bits/8;
-	/*printf("bits=%d, bytes=%d\n",bits,bytes);	 */
+	/*fprintf(stderr,"bits=%d, bytes=%d\n",bits,bytes);	 */
 	/**now load the data array  */
 	p=bytes-1;
 	for (i=0;i<10;++i){
 		if(a[i/2]){
 			if(p<0){
-				printf("Fatal Err.p -1");
+				fprintf(stderr,"Fatal Err.p -1");
 				return NULL;
 			}
 			pod[p--]=l->map.clk_pods[i];	
-			/*printf("%02x ",l->map.clk_pods[i]); */
+			/*fprintf(stderr,"%02x ",l->map.clk_pods[i]); */
 		}
 	}
-	/*printf("\n"); */
+	/*fprintf(stderr,"\n"); */
 	/**now pod has clk top two indexes and lowest pod in 0,1, lsb in 0  */	
 	/**we start out off-by one on bit position (p)  */
 	bs=be=0;
@@ -739,7 +739,7 @@ struct signal_data *show_vcd_label(uint8 *a, struct labels *l)
 			++p;
 			if(x&pod[i]){
 				if(bs && be ){
-					printf("Can't handle discontinous bits at bit %d for label %s\n",p-1,l->name);
+					fprintf(stderr,"Can't handle discontinous bits at bit %d for label %s\n",p-1,l->name);
 					return NULL;
 				}
 				if(!bs)
@@ -787,9 +787,9 @@ struct signal_data *show_la2vcd(struct data_preamble *pre, struct section *sec, 
 	for (i=0,k=0x27A; i<0xFF; ++i){
 		memcpy(&l,sec->data+k,LABEL_RECORD_LEN);
 		l.actual_offset=swap16(l.strange_offsetlo);
-		//printf("Actual map offset=0x%x ",l.actual_offset); 
+		//fprintf(stderr,"Actual map offset=0x%x ",l.actual_offset); 
 		l.actual_offset-=0x6E90;
-		/*printf("Adjusted = 0x%x ",l.actual_offset); */
+		/*fprintf(stderr,"Adjusted = 0x%x ",l.actual_offset); */
 		memcpy(&l.map,sec->data+0x27A+l.actual_offset,LABEL_MAP_LEN);
 			
 		k+=LABEL_RECORD_LEN;
@@ -800,7 +800,7 @@ struct signal_data *show_la2vcd(struct data_preamble *pre, struct section *sec, 
 	}
 	if(SHOW_PRINT == mode){
 		show_vcd_label(active,NULL);
-		printf("\n");	
+		fprintf(stderr,"\n");	
 	}
 	
 	return show_vcd_label(NULL,NULL);
@@ -812,7 +812,7 @@ struct signal_data *show_la2vcd(struct data_preamble *pre, struct section *sec, 
 ****************************************************************************/
 void usage(void)
 {
-	printf("Usage: parse_16500_config <options>\n"
+	fprintf(stderr,"Usage: parse_16500_config <options>\n"
 	" -c filename set name of config file\n"
 	" -d filename set name of data file\n"
 	" -f file set name of output file. Send valid data to file\n"
@@ -865,7 +865,7 @@ int main(int argc, char *argv[])
 			FILE *cfd=NULL;
 	
 			if(NULL == (cfd=fopen(lfname,"w+"))) {
-				printf("Unable to open '%s' for writing\n",lfname);
+				fprintf(stderr,"Unable to open '%s' for writing\n",lfname);
 				goto closem;
 			}
 			
@@ -880,9 +880,8 @@ int main(int argc, char *argv[])
 		struct data_preamble *p;
 		if(NULL != (p=parse_data(dfname,outfname,v))){
 			if(JUST_LOAD==v && NULL !=s){
-				printf("Showing stuff\n");
 				show_la2vcd(p,s,SHOW_PRINT);
-				printf("-td %ld ns",pre->a1.sampleperiod/1000);
+				fprintf(stderr,"-td %ld ns\n",p->a1.sampleperiod/1000);
 			}
 				
 		}
