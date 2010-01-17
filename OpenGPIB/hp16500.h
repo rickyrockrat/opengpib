@@ -27,7 +27,7 @@ Change Log: \n
 
 #ifndef _HP16500_H_
 #define _HP16500_H_ 1
-
+#include "common.h"
 /** Id Number Card*/
 #define CARDTYPE_16515A  1         /** HP 16515A 1GHz Timing Master Card*/
 #define CARDTYPE_16516A  2         /** HP 16516A 1GHz Timing Expansion Card*/
@@ -200,6 +200,8 @@ struct data_preamble {
 	/**  acquision time*/
 	
 	struct rtc_data rtc;
+	char *data;	 /**origial section data  */
+	uint32 data_sz;	/**and section data size  */
 }__attribute__((__packed__));	
 
 struct block_spec {
@@ -280,6 +282,9 @@ struct signal_data {
 #define ONE_CARD_ROWSIZE 12
 #define TWO_CARD_ROWSIZE 20
 #define THREE_CARD_ROWSIZE 28
+
+#define SHOW_PRINT 1
+#define JUST_LOAD 2
 /** 
 Cards Clock Pod Bytes Data Bytes Total Bytes Per Row
 1     4 bytes         8 bytes    12 bytes
@@ -306,4 +311,30 @@ A three-card configuration has the following data arrangement per row:
 Clock Pod 1 < xxxx MLKJ MLKJ MLKJ >
 
 */
+
+uint32 swap32(uint32 in);
+uint64 swap64(uint64 in);
+uint16 swap16(uint16 in);
+struct section *find_section(char *name, struct hp_block_hdr *blk );
+void show_sections(struct hp_block_hdr *blk );
+void config_show_label(struct labels *l, FILE *out);
+void config_show_labelmaps(struct section *sec, FILE *out);
+struct hp_block_hdr *read_block(char *cfname);
+struct section *parse_config( char *cfname, char *name, int mode);
+void swap_analyzer_bytes(struct analyzer_data *a);
+void swapbytes(struct data_preamble *p);
+void show_analyzer(struct analyzer_data *a);
+void show_pre(struct data_preamble *p);
+char *get_trace_start(struct data_preamble *p);
+void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask, int mode,struct data_preamble *pre);
+int number_of_pods_assigned(uint32 pods);
+uint32 valid_rows(int pod_no, uint32 pods, uint32 *rows);
+int get_next_datarow(struct data_preamble *p, char *buf);
+uint32 put_data_to_file(struct data_preamble *p, char *fname);
+void print_data(struct data_preamble *p);
+struct data_preamble *parse_data( char *cfname, char *out, int mode);
+struct signal_data *add_signal(struct signal_data *d,int bits, int lsb, int msb, char *name);
+struct signal_data *show_vcd_label(uint8 *a, struct labels *l);
+struct signal_data *show_la2vcd(struct data_preamble *pre, struct section *sec, int mode);
+
 #endif
