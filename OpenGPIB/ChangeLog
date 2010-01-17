@@ -1,2 +1,4 @@
 2010-01-17 RickyRockRat V_0_0_2: prepare to move the hp16500 parser to a lib so it 
 can be integrated with the rest of the system. Also prepare to add the la2vcd lib.
+2010-01-17 RickyRockRat V_0_0_3: Moved parser to the new hp16500 library.
+Integrated la2vcd lib into parse_16500_config.
