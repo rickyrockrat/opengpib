@@ -230,14 +230,9 @@ struct section {
 #define LABEL_MAP_LEN 12
 
 struct label_map {
-	uint8 unknown1;
-	uint8 clk;
-	uint8 unknown2[4];
-	uint8 pod2_hi;
-	uint8 pod2_lo;
-	uint8 pod1_hi;
-	uint8 pod1_lo; 
-	uint8 unknown3;
+	/**offset 0= hi byte.  */
+	uint8 clk_pods[10]; /**0 and 1 index are clk  */
+	uint8 unknown;
 }__attribute__((__packed__));	
 
 struct labels {
@@ -273,6 +268,12 @@ struct three_card_data {
 	uint16 el_pods[4];
 	uint16 mpods[4];
 }__attribute__((__packed__));	
+
+struct signal_data {
+	int lsb; /**lowest number bit where signal starts  */
+	int msb; /**highes number bit where signal ends  */
+	char *name;
+};
 
 #define ONE_CARD_ROWSIZE 12
 #define TWO_CARD_ROWSIZE 20
