@@ -138,9 +138,47 @@ void show_sections(struct hp_block_hdr *blk )
 /***************************************************************************/
 /** .
 \n\b Arguments:
+If a the file pointer is not null, output the data in this format:
+Label  Ch Cl P4h l P3h l P2h l P1h l
+POL    00 00 00 00 00 00 00 00 00 08
+
+Where h= hi, l= lo, C=CLK and P=POD. In the above example, POL is bit 3, on
+Pod 1
 \n\b Returns:
 ****************************************************************************/
-void show_labelmaps(struct section *sec)
+void show_label(struct labels *l, FILE *out)
+{
+	int m;
+	if(NULL != out){
+		fprintf(out,"%s ",l->name);
+		for (m=0;m<10;++m){
+			fprintf(out,"%02x ",l->map.clk_pods[m]);
+		}
+		fprintf(out,"\n");
+	}else{
+		printf("%s map is clk ",l->name);
+		for (m=0;m<10;++m){
+			if(m>1 && !(m%2))
+				printf("P%d ",5-((m+2)/2));
+			printf("%02x ",l->map.clk_pods[m]);
+		}
+			
+		printf(" #bits %d ena %d seq %d ",l->bits,l->enable, l->sequence);	
+		/** for (m=0;m<3;++m)
+			printf("%02x ",l->unknown1[m]);
+		printf("*3* ");
+		for (m=0;m<4;++m)
+			printf("%02x ",l->unknown3[m]);*/
+		printf("\n");
+	}
+		
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void show_labelmaps(struct section *sec, FILE *out)
 {
 	struct labels l;
 	int i,k;
@@ -154,9 +192,8 @@ void show_labelmaps(struct section *sec)
 		l.actual_offset-=0x6E90;
 		/*printf("Adjusted = 0x%x ",l.actual_offset); */
 		memcpy(&l.map,sec->data+0x27A+l.actual_offset,LABEL_MAP_LEN);
-		printf("%s map is clk 0x%02x, P1 0x%02x %02x P2 0x%02x %02x #bits %d ena %d seq %d\n",l.name,l.map.clk,
-							                    l.map.pod1_hi,l.map.pod1_lo,l.map.pod2_hi,l.map.pod2_lo,
-							                    l.bits,l.enable, l.sequence);	
+		show_label(&l, out);
+			
 		k+=LABEL_RECORD_LEN;
 		snprintf(x,7,"Lab%d  ",i+1);
 		if(!strcmp(l.name,x))
@@ -200,37 +237,35 @@ closem:
 	return blk;
 }
 
+#define SHOW_PRINT 1
+#define JUST_LOAD 2
 /***************************************************************************/
 /** .
 \n\b Arguments:
+cfname is config file input name, name is name of section to return, mode 
+indicates if we want info or quiet.
 \n\b Returns:
 ****************************************************************************/
-void parse_config( char *cfname)
+struct section *parse_config( char *cfname, char *name, int mode)
 {
 	struct hp_block_hdr *blk;
 	struct section *sec;
 	
 	if(NULL == (blk=read_block(cfname))) {
 		printf("Unable to read block from '%s'\n",cfname);
-		return;
+		return NULL;
 	}
-	show_sections(blk);
-	if(NULL == (sec=find_section("CONFIG    ",blk))){
-		printf("Unable to find section 'CONFIG    '\n");
-		return;
-	}
-	printf("First Machine is '%s', second is '%s'\n",sec->data,(char *)(sec->data+0x40));
-	/** printf("First Label is '%s'\n",(char *)(sec->data+0x27A));
-	memcpy(&l,sec->data+0x27A,LABEL_RECORD_LEN);
-	l.actual_offset=swap16(l.strange_offsetlo);
-	printf("Actual map offset=0x%x ",l.actual_offset);
-	l.actual_offset-=0x6C16;
-	printf("Adjusted = 0x%x ",l.actual_offset);
-	memcpy(&l.map,sec->data+l.actual_offset,LABEL_MAP_LEN);
-	printf("%s map is clk 0x%02x, P1 0x%02x %02x P2 0x%02x %02x\n",l.name,l.map.clk,
-						                    l.map.pod1_hi,l.map.pod1_lo,l.map.pod2_hi,l.map.pod2_lo);*/
-	show_labelmaps(sec);
 	
+	if(NULL == (sec=find_section(name,blk))){
+		printf("Unable to find section '%s'\n",name);
+		return NULL;
+	}
+	if(SHOW_PRINT == mode){
+		show_sections(blk);
+		printf("First Machine is '%s', second is '%s'\n",sec->data,(char *)(sec->data+0x40));
+		show_labelmaps(sec, NULL);
+	}
+	return sec;
 }
 
 /***************************************************************************/
@@ -583,29 +618,145 @@ void print_data(struct data_preamble *p, struct section *sec)
 /** .\n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-void parse_data( char *cfname, char *out)
+struct data_preamble *parse_data( char *cfname, char *out, int mode)
 {
 	struct hp_block_hdr *blk;
 	struct section *sec;
-	struct data_preamble pre;
+	struct data_preamble *pre;
+	
+	if(NULL == (pre=malloc(sizeof(struct data_preamble)))){
+		printf("Unable to allocate for data_preamble struct\n");
+		return NULL;
+	}
 	
 	if(NULL == (blk=read_block(cfname))) {
 		printf("Unable to read '%s' for writing\n",cfname);
-		return;
+		goto err;
 	}
-	show_sections(blk);
+	if(mode != JUST_LOAD)
+		show_sections(blk);
 	if(NULL == (sec=find_section("DATA      ",blk))){
 		printf("Unable to find section 'DATA      '\n");
-		return;
+		goto err;
 	}
-	memcpy(&pre,sec->data,sizeof(struct data_preamble));
-	swapbytes(&pre);
-	show_pre(&pre);
 	
-	print_data(&pre,sec);
-	search_state(1,0,0,0x800,0x800,MODE_EDGES,&pre,sec);
+	memcpy(pre,sec->data,sizeof(struct data_preamble));
+	swapbytes(pre);
+	if(mode == JUST_LOAD)
+		return pre;
+	show_pre(pre);
+	
+	print_data(pre,sec);
+	search_state(1,0,0,0x800,0x800,MODE_EDGES,pre,sec);
 	if(NULL != out)
-		put_data_to_file(&pre,sec,out);
+		put_data_to_file(pre,sec,out);
+	return pre;
+err:
+	free(pre);
+	return NULL;
+}
+
+/***************************************************************************/
+/** pods[0] is pod4, hi byte..
+active[0] is pod1
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int show_vcd_label(uint8 *a, struct labels *l )
+{
+	int i,bits, bs, be,p,bytes;
+	uint8 pod[26];
+	uint16 x;
+	/*printf("       "); */
+	for (bits=i=0;i<13;++i){
+		/*printf(" %d ",a[12-i]); */
+		if(a[i])
+			bits+=16;/**each pod is 16 lines, and we register the clock as 16 too  */
+	}
+	bytes=bits/8;
+	/*printf("bits=%d, bytes=%d\n",bits,bytes);	 */
+	/**now load the data array  */
+	p=bytes-1;
+	for (i=0;i<10;++i){
+		if(a[i/2]){
+			if(p<0){
+				printf("Fatal Err.p -1");
+				return 1;
+			}
+			pod[p--]=l->map.clk_pods[i];	
+			/*printf("%02x ",l->map.clk_pods[i]); */
+		}
+	}
+	/*printf("\n"); */
+	/**now pod has clk top two indexes and lowest pod in 0,1, lsb in 0  */	
+	/**we start out off-by one on bit position (p)  */
+	bs=be=0;
+	for (p=i=0;i<bytes;++i){
+		
+		for (x=1;x<0x100;x<<=1){
+			++p;
+			if(x&pod[i]){
+				if(bs && be ){
+					printf("Can't handle discontinous bits at bit %d for label %s\n",p-1,l->name);
+					return 1;
+				}
+				if(!bs)
+					bs=p;	/**this is off by one.  */
+			}else if(bs && !be){
+				be=p-1;
+			}
+				
+		}
+	}	
+	if (bs==be)
+	 printf("-sf %d %s ",bs-1,l->name);
+	else
+		printf("-sf %d %d %s ",be-1, bs-1,l->name);
+	return 0;
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
+pre is the preable from the data. sec is the config section from the config.
+\n\b Returns:
+****************************************************************************/
+void show_la2vcd(struct data_preamble *pre, struct section *sec)
+{
+	int fields,i,k;
+	char x[10];
+	struct labels l;
+	uint8 active[13]; /**max 12 pods +clock can be assigned to one machine.  */
+										/**but only 4 pod logic is implemented here...  */
+	printf("-td %ld ",pre->a1.sampleperiod);
+	fields=number_of_pods_assigned(pre->a1.pods);
+	memset(active,0,13);
+	active[4]=1;
+	/**set this array so that pod 1 is high bit, so we match data struct in label  */
+	if(fields>1){/**if 1, just clock??  */
+		for (i=4;i>0;--i){
+			if(valid_rows(i,pre->a1.pods,pre->data_master))	{
+				active[i-1]=1;
+			}
+		}	
+	}	
+			
+	/**0x27A is 0x294-1A. 1A is start of machine name 1.  */
+	for (i=0,k=0x27A; i<0xFF; ++i){
+		memcpy(&l,sec->data+k,LABEL_RECORD_LEN);
+		l.actual_offset=swap16(l.strange_offsetlo);
+		//printf("Actual map offset=0x%x ",l.actual_offset); 
+		l.actual_offset-=0x6E90;
+		/*printf("Adjusted = 0x%x ",l.actual_offset); */
+		memcpy(&l.map,sec->data+0x27A+l.actual_offset,LABEL_MAP_LEN);
+		show_vcd_label(active,&l);
+			
+		k+=LABEL_RECORD_LEN;
+		snprintf(x,7,"Lab%d  ",i+1);
+		if(!strcmp(l.name,x))
+			break;
+	}
+	printf("\n");
+			
 }
 /***************************************************************************/
 /** .
@@ -618,6 +769,8 @@ void usage(void)
 	" -c filename set name of config file\n"
 	" -d filename set name of data file\n"
 	" -f file set name of output file. Send valid data to file\n"
+	" -l file set name of output file. Send label map to file\n"
+	" -v set la2vcd mode\n"
 	"");
 }
 /***************************************************************************/
@@ -627,10 +780,13 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char *argv[])
 {
-	char *cfname, *dfname, *outfname;
-	int c;
-	outfname=dfname=cfname=NULL;
-	while( -1 != (c = getopt(argc, argv, "c:d:f:h")) ) {
+	char *cfname, *dfname, *lfname,*outfname;
+	struct section *s;
+	int c,v;
+	s=NULL;
+	v=SHOW_PRINT;
+	outfname=dfname=lfname=cfname=NULL;
+	while( -1 != (c = getopt(argc, argv, "c:d:f:hl:v")) ) {
 		switch(c){
 			case 'c':
 				cfname=strdup(optarg);
@@ -641,6 +797,12 @@ int main(int argc, char *argv[])
 			case 'f':
 				outfname=strdup(optarg);
 				break;
+			case 'l':
+				lfname=strdup(optarg);
+				break;
+			case 'v':
+				v=JUST_LOAD; 
+				break;
 			default:
 				usage();
 				return 1;
@@ -650,11 +812,35 @@ int main(int argc, char *argv[])
 		usage();
 		goto closem;
 	}	
-	if(NULL != cfname ){
-		parse_config(cfname);
+	if(NULL != lfname && NULL != cfname ){
+		
+		if(NULL !=(s=parse_config(cfname,"CONFIG    ",JUST_LOAD) ) ){
+			FILE *cfd=NULL;
+	
+			if(NULL == (cfd=fopen(lfname,"w+"))) {
+				printf("Unable to open '%s' for writing\n",lfname);
+				goto closem;
+			}
+			
+			show_labelmaps(s, cfd);
+			if(NULL != cfd)
+				fclose(cfd);
+		}
+	}	else	if(NULL != cfname ){
+		s=parse_config(cfname,"CONFIG    ",v);
 	}
+	printf("************************\n");
 	if(NULL != dfname ){
-		parse_data(dfname,outfname);
+		struct data_preamble *p;
+		if(NULL != (p=parse_data(dfname,outfname,v))){
+			printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEE\n");
+			if(JUST_LOAD==v && NULL !=s){
+				printf("Showing stuff\n");
+				show_la2vcd(p,s);
+			}
+				
+		}
+		
 	}
 closem:
 	return 0;
