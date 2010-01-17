@@ -28,6 +28,9 @@
 #-std=c99
 CFLAGS+=-Wall
 
+ifndef LA2VCD_LIB
+LA2VCD_LIB=
+endif
 all: tek2gplot get_tek_waveform get_hp_16530_waveform get_hp_16555_waveform calc_area_under_curve networkanalyzer parse_16500_config
 
 common.o: CFLAGS+=-std=c99 -D_COMMON_
@@ -58,6 +61,12 @@ get_hp_16530_waveform: get_hp_16530_waveform.o gpib.lib
 	gcc -lm -o $@ $^
 	
 get_hp_16555_waveform: get_hp_16555_waveform.o gpib.lib
+	gcc -lm -o $@ $^
+
+parse_16500_config.o: parse_16500_config.c Makefile
+	gcc -Wall -c -DLA2VCD_LIB=$(LA2VCD_LIB) -o $@ $<
+
+parse_16500_config:parse_16500_config.o $(LA2VCD_LIB)
 	gcc -lm -o $@ $^
 
 networkanalyzer: networkanalyzer.o gpib.lib
