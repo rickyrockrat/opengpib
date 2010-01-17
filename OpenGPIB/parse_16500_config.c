@@ -657,16 +657,58 @@ err:
 }
 
 /***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+struct signal_data *add_signal(struct signal_data *d,int bits, int lsb, int msb, char *name)
+{
+	struct signal_data *s, *x;
+	if(NULL != d){
+		s=d;
+		while(s->next)
+			s=s->next;
+	}else s=NULL;	
+		
+	if(NULL ==(x=malloc(sizeof(struct signal_data )))){
+		printf("Out of Mem for signal_data on '%s'\n",name);
+		return NULL;
+	}
+	memset(x,0,sizeof(struct signal_data ));
+	if(NULL!=s){
+		s->next=x;
+	}
+	x->name=strdup(name);
+	x->lsb=lsb;
+	x->msb=msb;
+	x->bits=bits;
+	return x;
+}
+/***************************************************************************/
 /** pods[0] is pod4, hi byte..
 active[0] is pod1
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int show_vcd_label(uint8 *a, struct labels *l )
+struct signal_data *show_vcd_label(uint8 *a, struct labels *l)
 {
 	int i,bits, bs, be,p,bytes;
 	uint8 pod[26];
 	uint16 x;
+	static struct signal_data *d=NULL;
+	if(NULL ==a && NULL ==l)
+		return d;
+	if(NULL ==l && NULL !=d){
+		struct signal_data *s=d;
+		while(s){
+			if(s->lsb==s->msb)
+				printf("-sf %d %s ",s->lsb,s->name);
+			else
+				printf("-sf %d-%d %s ",s->msb, s->lsb,s->name);
+			s=s->next;
+		}
+	  return d;	
+	}
 	/*printf("       "); */
 	for (bits=i=0;i<13;++i){
 		/*printf(" %d ",a[12-i]); */
@@ -681,7 +723,7 @@ int show_vcd_label(uint8 *a, struct labels *l )
 		if(a[i/2]){
 			if(p<0){
 				printf("Fatal Err.p -1");
-				return 1;
+				return NULL;
 			}
 			pod[p--]=l->map.clk_pods[i];	
 			/*printf("%02x ",l->map.clk_pods[i]); */
@@ -698,7 +740,7 @@ int show_vcd_label(uint8 *a, struct labels *l )
 			if(x&pod[i]){
 				if(bs && be ){
 					printf("Can't handle discontinous bits at bit %d for label %s\n",p-1,l->name);
-					return 1;
+					return NULL;
 				}
 				if(!bs)
 					bs=p;	/**this is off by one.  */
@@ -708,11 +750,12 @@ int show_vcd_label(uint8 *a, struct labels *l )
 				
 		}
 	}	
-	if (bs==be)
-	 printf("-sf %d %s ",bs-1,l->name);
+	if(NULL ==d)
+		d=add_signal(NULL, bits, bs-1,be-1,l->name);
 	else
-		printf("-sf %d %d %s ",be-1, bs-1,l->name);
-	return 0;
+		add_signal(d, bits, bs-1,be-1,l->name);
+
+	return d;
 }
 /***************************************************************************/
 /** .
@@ -720,14 +763,14 @@ int show_vcd_label(uint8 *a, struct labels *l )
 pre is the preable from the data. sec is the config section from the config.
 \n\b Returns:
 ****************************************************************************/
-void show_la2vcd(struct data_preamble *pre, struct section *sec)
+struct signal_data *show_la2vcd(struct data_preamble *pre, struct section *sec, int mode)
 {
 	int fields,i,k;
 	char x[10];
 	struct labels l;
 	uint8 active[13]; /**max 12 pods +clock can be assigned to one machine.  */
 										/**but only 4 pod logic is implemented here...  */
-	printf("-td %ld ",pre->a1.sampleperiod);
+	
 	fields=number_of_pods_assigned(pre->a1.pods);
 	memset(active,0,13);
 	active[4]=1;
@@ -748,15 +791,19 @@ void show_la2vcd(struct data_preamble *pre, struct section *sec)
 		l.actual_offset-=0x6E90;
 		/*printf("Adjusted = 0x%x ",l.actual_offset); */
 		memcpy(&l.map,sec->data+0x27A+l.actual_offset,LABEL_MAP_LEN);
-		show_vcd_label(active,&l);
 			
 		k+=LABEL_RECORD_LEN;
 		snprintf(x,7,"Lab%d  ",i+1);
 		if(!strcmp(l.name,x))
 			break;
+		show_vcd_label(active,&l);
 	}
-	printf("\n");
-			
+	if(SHOW_PRINT == mode){
+		show_vcd_label(active,NULL);
+		printf("\n");	
+	}
+	
+	return show_vcd_label(NULL,NULL);
 }
 /***************************************************************************/
 /** .
@@ -829,14 +876,13 @@ int main(int argc, char *argv[])
 	}	else	if(NULL != cfname ){
 		s=parse_config(cfname,"CONFIG    ",v);
 	}
-	printf("************************\n");
 	if(NULL != dfname ){
 		struct data_preamble *p;
 		if(NULL != (p=parse_data(dfname,outfname,v))){
-			printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEE\n");
 			if(JUST_LOAD==v && NULL !=s){
 				printf("Showing stuff\n");
-				show_la2vcd(p,s);
+				show_la2vcd(p,s,SHOW_PRINT);
+				printf("-td %ld ns",pre->a1.sampleperiod/1000);
 			}
 				
 		}
