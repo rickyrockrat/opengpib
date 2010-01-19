@@ -45,6 +45,7 @@ enum {
 /**controller types  */
 enum {
 	GPIB_CTL_PROLOGIXS=0,
+	GPIB_CTL_HP16500C,
 	GPIB_CTL_NONE,
 };
 /**controller commands  */
@@ -60,6 +61,10 @@ enum {
 
 #define CONTROLLER_TYPEMASK 0xFF
 #define OPTION_DEBUG 0x100
+#ifndef TOSTRING
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#endif
 /**structure to talk to the host controller  */
 struct gpib {
 	int addr; 																		/**instrument address. Check against inst addr  */
@@ -90,4 +95,7 @@ int write_get_data (struct gpib *g, char *cmd);
 int write_wait_for_data(char *msg, int sec, struct gpib *g);
 struct gpib *open_gpib(int ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
 int close_gpib (struct gpib *g);
+int gpib_option_to_type(char *op);
+void show_gpib_supported_controllers(void);
 #endif
+
