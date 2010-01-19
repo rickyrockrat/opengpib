@@ -31,6 +31,17 @@ Change Log: \n
 #include "gpib.h"
 #include "serial.h"
 #include "prologixs.h"
+#include "hp16500ip.h"
+struct supported_dev {
+	int type;
+	char *option;
+	char *name;
+};
+static struct supported_dev s_dev[]={\
+	{GPIB_CTL_PROLOGIXS,"prologixs","Prologix Serial GPIB Controller"},														
+	{GPIB_CTL_HP16500C,"hpip","HP 16500C LAN Controller"},
+	{-1,NULL,NULL},
+};
 
 /***************************************************************************/
 /** .
@@ -46,7 +57,7 @@ int read_raw(struct gpib *g)
 		i+=j;
 		usleep(1000);
 	}
-	/*printf("Got %d bytes\n'%s'\n",i,g->buf); */
+	/*fprintf(stderr,"Got %d bytes\n'%s'\n",i,g->buf); */
 	return i;
 }
 
@@ -66,7 +77,7 @@ int read_string(struct gpib *g)
 		usleep(1000);
 	}
 	g->buf[i]=0;
-	/*printf("Got %d bytes\n'%s'\n",i,g->buf);  */
+	/*fprintf(stderr,"Got %d bytes\n'%s'\n",i,g->buf);  */
 	return i;
 }
 /***************************************************************************/
@@ -78,10 +89,10 @@ int write_string(struct gpib *g, char *msg)
 {
 	int i;
 	if(NULL == msg){
-		printf("msg null\n");
+		fprintf(stderr,"msg null\n");
 		return -1;
 	}
-	/*printf("WS:%s",msg); */
+	/*fprintf(stderr,"WS:%s",msg); */
 	i=strlen(msg);
 	return g->write(g->ctl,msg,i);
 }
@@ -94,14 +105,14 @@ int write_string(struct gpib *g, char *msg)
 int write_get_data (struct gpib *g, char *cmd)
 {
 	int i;
-	/*printf("Write... "); */
+	/*fprintf(stderr,"Write... "); */
 	write_string(g,cmd);
-	/*printf("Read..."); */
+	/*fprintf(stderr,"Read..."); */
 	if(-1 == (i=read_string(g)) ){
-		printf("%s:Unable to read from port for %s\n",__func__,cmd);
+		fprintf(stderr,"%s:Unable to read from port for %s\n",__func__,cmd);
 		return 0;
 	}
-	/*printf("WGD rtn\n"); */
+	/*fprintf(stderr,"WGD rtn\n"); */
 	return i;
 }
 
@@ -132,12 +143,12 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 	if(gi->addr != gi->g->addr){
 		if(NULL !=gi->g->control){
 			if(0 != gi->g->control(gi->g,CTL_SET_ADDR,gi->addr)){
-				printf("Unable to set instrument address %d\n",gi->addr);
+				fprintf(stderr,"Unable to set instrument address %d\n",gi->addr);
 				return -1;
 			}
 			
 		}else{
-			printf("Unable to set instrument address (%d!=%d). device control not set\n",gi->addr,gi->g->addr);
+			fprintf(stderr,"Unable to set instrument address (%d!=%d). device control not set\n",gi->addr,gi->g->addr);
 		}
 	}
 	return write_string(gi->g,cmd);
@@ -151,9 +162,13 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 {
 	struct gpib *g;
-	printf("OpenGPIB Version ""VERSION""\n");
+	fprintf(stderr,"OpenGPIB Version %s\n",TOSTRING(VERSION));  
+	if(NULL == dev_path){
+		fprintf(stderr,"Device name is NULL. Must specify device.\n");
+		return NULL;
+	}
 	if(NULL == (g=malloc(sizeof(struct gpib)) ) ){
-		printf("Out of mem on serial register\n");
+		fprintf(stderr,"Out of mem on gpib alloc\n");
 		return NULL;
 	}
 	memset(g,0,sizeof(struct gpib));
@@ -161,12 +176,12 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 	if(0>= buf_size)
 		buf_size=8096;
 	if(NULL == (g->buf=malloc(buf_size) ) ){
-		printf("Out of mem on buf size of %d\n",buf_size);
+		fprintf(stderr,"Out of mem on buf size of %d\n",buf_size);
 		free(g);
 		return NULL;
 	}
 	g->buf_len=buf_size;
-	/*printf("Using %d buf size\n",g->buf_len); */
+	/*fprintf(stderr,"Using %d buf size\n",g->buf_len); */
 	g->type_ctl=ctype;
 	/**set up the controller and interface. FIXME Replace with config file.  */
 	switch(ctype&CONTROLLER_TYPEMASK){
@@ -176,8 +191,14 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 			if(g->open(g,dev_path))
 				goto err;
 			break;
+		case GPIB_CTL_HP16500C:
+			if(register_hp16500c(g))
+				goto err1;
+			if(g->open(g,dev_path))
+				goto err;
+			break;
 		default:
-			printf("Unknown controller %d\n",ctype);
+			fprintf(stderr,"Unknown controller %d\n",ctype);
 			goto err1;
 			break;
 	}
@@ -205,5 +226,34 @@ int close_gpib (struct gpib *g)
 	if(NULL != g->dev_path)
 		free(g->dev_path);
 	return 0;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int gpib_option_to_type(char *op)
+{
+	int i;
+	for (i=0; NULL != s_dev[i].name;++i){
+		if(!strcmp(s_dev[i].option,op))
+			return s_dev[i].type;
+	}	
+	return -1;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void show_gpib_supported_controllers(void)
+{
+	int i;
+	fprintf(stderr,"Type Option Name\n");
+	for (i=0; NULL != s_dev[i].name;++i){
+		fprintf(stderr,"%d    '%s' %s\n",gpib_option_to_type(s_dev[i].option),s_dev[i].option, s_dev[i].name);
+	}
 }
 
