@@ -1,0 +1,9 @@
+To create a login shell to transfer release files:
+ssh -t  rickyrockrat,opengpib@shell.sourceforge.net create
+Directory is:
+cd /home/frs/project/o/op/opengpib
+
+This accesses the web page files:
+sftp rickyrockrat,opengpib@web.sourceforge.net
+Directory is:
+htdocs
