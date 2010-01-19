@@ -27,7 +27,7 @@
 
 #-std=c99
 
-VERSION = 0.05
+VERSION = 0.06
 
 PACKAGE = opengpib
 
@@ -51,9 +51,19 @@ LA2VCD_H=$(dir $(LA2VCD_LIB))
 CFLAGS +=-I$(LA2VCD_H) -DLA2VCD_LIB=$(LA2VCD_LIB)
 endif
 
-all: $(TARGETS)
+all: help
 
-common.o hp16500.o: CFLAGS+=-std=c99 -D_COMMON_
+help:
+	@echo "Usage: make defs target"
+	@echo "Targets are: dist clean build"
+	@echo "To get the vcd output (input for gtkwave), build with"	
+	@echo " make LA2VCD_LIB=/path/to/la2vcd.lib build"
+	@echo " la2vcd should be available from the same location"
+	@echo " you obtained this software."
+
+build: test $(TARGETS)
+
+common.o hp16500.o hp16500ip.o : CFLAGS+=-std=c99 -D_COMMON_
 
 common.o: common.c common.h Makefile
 
@@ -69,10 +79,12 @@ serial.o: serial.h serial.c	Makefile
 
 gpib.o: gpib.c gpib.h	Makefile
 
-gpib.lib: gpib.o prologixs.o serial.o common.o
+gpib.lib: gpib.o prologixs.o serial.o common.o hp16500ip.o
 	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
 	
 hp16500.o: hp16500.c  hp16500.h	Makefile
+
+hp16500ip.o: hp16500ip.c  hp16500ip.h	Makefile
 
 hp16500.lib: hp16500.o
 	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
@@ -87,13 +99,16 @@ get_hp_16530_waveform: get_hp_16530_waveform.o gpib.lib
 	
 get_hp_16555_waveform: get_hp_16555_waveform.o gpib.lib  hp16500.lib $(LA2VCD_LIB)
 	gcc -lm -o $@ $^
+	
+test: test.o gpib.lib
+	gcc -lm -o $@ $^
 
 %.o: Makefile
 
 #parse_16500_config.o: parse_16500_config.c 
 #	gcc -Wall -c  -o $@ $<
 
-parse_16500_config:parse_16500_config.o hp16500.lib $(LA2VCD_LIB)
+parse_16500_config:parse_16500_config.o hp16500.lib gpib.lib $(LA2VCD_LIB)
 	gcc -lm -o $@ $^
 
 networkanalyzer: networkanalyzer.o gpib.lib
