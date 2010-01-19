@@ -36,7 +36,7 @@ Change Log: \n
 \n\b Returns:
 ****************************************************************************/
 void usage(void)
-{ fprintf(stderr,"parse_16500_config Version ""VERSION""\n"
+{ fprintf(stderr,"parse_16500_config Version %s\n"
 	"Usage: parse_16500_config <options>\n"
 	" -c filename set name of config file\n"
 	" -d filename set name of data file\n"
@@ -45,7 +45,7 @@ void usage(void)
 #ifdef LA2VCD_LIB
 	" -v file set name of output file. Send vcd data to file\n"
 #endif
-	"");
+	"",TOSTRING(VERSION));
 }
 /***************************************************************************/
 /** .
