@@ -151,7 +151,7 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 {
 	struct gpib *g;
-	printf("OpenGPIB Version 0.1\n");
+	printf("OpenGPIB Version ""VERSION""\n");
 	if(NULL == (g=malloc(sizeof(struct gpib)) ) ){
 		printf("Out of mem on serial register\n");
 		return NULL;

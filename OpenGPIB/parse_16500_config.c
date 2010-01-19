@@ -36,8 +36,8 @@ Change Log: \n
 \n\b Returns:
 ****************************************************************************/
 void usage(void)
-{
-	fprintf(stderr,"Usage: parse_16500_config <options>\n"
+{ fprintf(stderr,"parse_16500_config Version ""VERSION""\n"
+	"Usage: parse_16500_config <options>\n"
 	" -c filename set name of config file\n"
 	" -d filename set name of data file\n"
 	" -f file set name of output file. Send valid data to file\n"
