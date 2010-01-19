@@ -58,5 +58,25 @@ pk-pk
 see makepng for an invocation that will generate a png. Leave terminal type off for
 and Xwindow.
 
-This has only been tested on a 64-bit Linux operating system. 
+This has only been tested on a 64-bit Linux operating system, and only 2 controllers are
+supported thus far.  It's prettty easy to write new controller interfaces.
+
+Look at hp16500ip.c/h or prologixs.c/h (device implemntation) and gpib.c/h.
+
+You add the open, read, write, close, and control function implementation, then the define
+for the new controller, and it should "just work". 
+
+Here are the steps to adding another controller:
+
+1) The functions in the dev implementation need to be duplicated (hp16500ip.c/h or prologixs.c/h).
+2) The interface type needs to be added to the enum in gpib.h (GPIB_CTL_*).
+3) Add the entry in the table at the top of gpib.c (supported_dev).
+4) Add the entry to the case in open_gpib.
+
+See get_hp_16555_waveform.c to see how the option works from the table in supported_dev.
+There are 2 functions that work on this table, one displays supported controllers, the 
+other validates the option and returns the device type.
+
+Feel free to email me at rickyrockrat
+
 
