@@ -28,7 +28,9 @@ Change Log: \n
 #include "common.h"
 #include "gpib.h"
 #include "hp16500.h"
-
+#ifdef LA2VCD_LIB
+#include "la2vcd.h"
+#endif
 #include <ctype.h>
 /**for open...  */
 #include <sys/types.h>
@@ -133,6 +135,7 @@ int init_instrument(struct gpib *g)
 	/*printf("Got %d bytes\n",i); */
 	if(NULL == strstr(g->buf,"HEWLETT PACKARD,16500C")){
 		printf("Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",g->buf);
+		g->control(g,CTL_SEND_CLR,0);
 		return -1;
 	}
 	if(0 == write_get_data(g,":CARDCAGE?"))
@@ -198,11 +201,12 @@ void usage(void)
 	" -a addr set instrument address to addr (7)\n"
 	" -c fname put config data to fname\n"
 	" -d dev set path to device name\n"
-	" -g set gnuplot mode, with x,y (time volts), one point per line\n"
 	" -o fname put config lfDATAlf data to file called fname\n"
 	" -p set packed mode to packed (unpacked)\n"
 	" -t fname put trace(data) to fname\n"
-	
+#ifdef LA2VCD_LIB
+	" -v fname put vcd data to fname (requires -c, -t)\n"
+#endif	
 	
 	"");
 }
@@ -215,19 +219,18 @@ void usage(void)
 int main(int argc, char * argv[])
 {
 	struct gpib *g;
-	FILE *ofd,*cfd,*tfd;
+	FILE *ofd,*cfd,*tfd,*vfd;
 	char *name, *ofname;
-	char *tname,*cname;
-	int i, c,inst_addr, rtn, raw,xy;
+	char *tname,*cname,*vname;
+	int i, c,inst_addr, rtn, raw;
 	long int total,sz;
 	name="/dev/ttyUSB0";
 	inst_addr=7;
 	rtn=1;
-	ofname=tname=cname=NULL;
-	tfd=cfd=ofd=NULL;
+	ofname=tname=cname=vname=NULL;
+	vfd=tfd=cfd=ofd=NULL;
 	raw=0;
-	xy=0;
-	while( -1 != (c = getopt(argc, argv, "a:c:d:gho:pt:")) ) {
+	while( -1 != (c = getopt(argc, argv, "a:c:d:ho:pt:v:")) ) {
 		switch(c){
 			case 'a':
 				inst_addr=atoi(optarg);
@@ -241,18 +244,22 @@ int main(int argc, char * argv[])
 			case 'h':
 				usage();
 				return 1;
-			case 'g':
-				xy=1;
-				break;
 			case 'o':
 				ofname=strdup(optarg);
 				break;
-
 			case 'p':
 				raw=1;
 				break;
 			case 't':
 				tname=strdup(optarg);
+				break;
+			case 'v':
+#ifdef LA2VCD_LIB 
+				vname=strdup(optarg);
+#else
+				fprintf(stderr,"-v not supported. Re-build with LA2VCD_LIB=/path/to/lib\n");
+				return 1;
+#endif
 				break;
 			default:
 				usage();
@@ -269,7 +276,11 @@ int main(int argc, char * argv[])
 		usage();
 		return 1;
 	} 
-		
+	if(NULL != vname && (NULL == cname || NULL == tname)){
+		printf("Must specify -c and -t with -v\n");
+		usage();
+		return 1;
+	}
 	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,1048576))){
 		printf("Can't open/init controller at %s. Fatal\n",name);
 		return 1;
@@ -322,29 +333,61 @@ int main(int argc, char * argv[])
 		}
 		printf("\nWrote %ld config + %d datahdr.\n",total,i);
 	}
-	
-	
+	usleep(1000000);
 	
 	if(tfd>0 ||ofd>0){ /**grab data  */
+		int nodata=0;
 		printf("Retreiving Data\n");
 	/*	goto closem; */
 		sprintf(g->buf,":DBLOCK %s;:SYSTEM:DATA?",raw?"PACKED":"UNPACKED");
 		i=write_string(g,g->buf);	
-		usleep(10000000);
+		usleep(1000000);
 		total=0;
 		while(i){
+			uint32 off=0;
 			i=read_raw(g);
 			if(0 == total){
-				sz=get_datsize(g->buf);
-				printf("Len %ld Got %d ",sz,i);
+				if(g->buf[0]!='#'){
+					for (off=0;off<i && g->buf[off] != '#';++off);
+					if(i == off){
+						printf("discarding first buffer of %d\n",i);
+						i=0;
+						++nodata;
+					}else if(off){
+						printf("Discarding first %d byte(s)\n",off);
+						i-=off;
+					}
+				}
+				if(i)	{
+					sz=get_datsize(g->buf);
+					printf("Len %ld Got %d ",sz,i);	
+				}
+				
 			}else
 				printf("%ld ",sz-total);
 			fflush(NULL);
 			fwrite(g->buf,1,i,ofd?ofd:tfd);	
 			total+=i;
+			if(0 == i){
+				++nodata;
+				if(nodata>10){
+					printf("No Data for 10 tries\n");
+					break;
+				}else
+					nodata=0;
+					
+			}
+				
 		}
 		printf("Done. Wrote %ld bytes\n",total);
+		if(total!=sz+10){	/**add header size of 10  */
+			printf("Total does not match size. Sending CLR\n");
+			g->control(g,CTL_SEND_CLR,0);
+		}
+			
 	}	
+	
+	
 	rtn=0;
 closem:
 	if(NULL != ofd)
@@ -354,5 +397,66 @@ closem:
 	if(NULL != tfd)
 		fclose(tfd);
 	close_gpib(g);
+#ifdef LA2VCD_LIB	
+	if(total != sz)
+		goto endvcd;
+	if(NULL !=vname){ /**generate a vcd file from the config and data  */
+		struct section *s;
+		struct data_preamble *p;
+		struct la2vcd *l;
+		struct signal_data *d,*x;
+		char buf[500];
+		if(NULL ==(s=parse_config(cname,"CONFIG    ",JUST_LOAD) ) ){
+			printf("Unable to re-open '%s'\n",cname);
+			goto endvcd;
+		}	
+		if(NULL == (p=parse_data(tname,NULL,JUST_LOAD))){
+			printf("Unable to re-open data file '%s'\n",tname);
+			goto endvcd;
+		}	
+		if(NULL ==(d=show_la2vcd(p,s,JUST_LOAD))){
+			printf("Error loading labels\n");
+			goto endvcd;
+		}	
+		if(NULL==(l=open_la2vcd(vname,NULL,p->a1.sampleperiod*1e-12,0,NULL==s?NULL:s->data))){ 
+			printf("Unable to open la2vcd lib\n");
+			goto endvcd;
+		}	
+    if(vcd_add_file(l,NULL,16,d->bits)){
+			fprintf(stderr,"Failed to add input file\n");
+			goto endvcd;
+		}
+		printf("Bits=%d\n",d->bits);
+		/**Add our signal descriptions in  */
+/*		vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0); */
+		for (x=d;x;x=x->next){
+			vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,x->name, x->lsb, x->msb);
+			/*printf("Added '%s' %d %d\n",x->name,x->msb,x->lsb); */
+		}
+			if(-1 == write_vcd_header (l)){
+			fprintf(stderr,"VCD Header write failed\n");
+			goto endvcd;
+		}
+		fprintf(stderr,"Wrote VCD Hdr\n");
+		/**rewind our data  */
+    get_next_datarow(NULL,NULL);
+		l->first_input_file->buf=buf;
+		printf("r,bit=%d %d\n",l->first_input_file->radix,l->first_input_file->bit_count);
+		while (1) {
+			if(get_next_datarow(p,buf)){
+				vcd_read_sample(l); 
+				write_vcd_data (l);
+				advance_time (l);
+			} else
+				break;
+		}
+
+		write_vcd_trailer (l);
+		close_la2vcd(l);
+	}	
+	
+endvcd:
+#endif	/**la2vcd lib def  */
+				
 	return rtn;
 }
