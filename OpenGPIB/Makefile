@@ -26,7 +26,23 @@
 #		The License should be in the file called COPYING.
 
 #-std=c99
-CFLAGS+=-Wall
+
+VERSION = 0.04
+
+PACKAGE = opengpib
+
+TARGETS=tek2gplot get_tek_waveform get_hp_16530_waveform get_hp_16555_waveform calc_area_under_curve networkanalyzer parse_16500_config
+
+CSRCS = common.c get_hp_16530_waveform.c get_tek_waveform.c gpib.c networkanalyzer.c \
+prologixs.c serial.c tek2gplot.c calc_area_under_curve.c parse_16500_config.c get_hp_16555_waveform.c
+HDRS = common.h gpib.h prologixs.h serial.h hp16500.h
+
+MISC = COPYING README Makefile makepng runcal ChangeLog
+
+DISTFILES = $(MISC) $(HDRS) $(CSRCS)
+DISTNAME = $(PACKAGE)-$(VERSION)
+
+CFLAGS+=-Wall -DVERSION=$(VERSION)
 
 ifndef LA2VCD_LIB
 LA2VCD_LIB=
@@ -34,7 +50,7 @@ else
 LA2VCD_H=$(dir $(LA2VCD_LIB))
 CFLAGS +=-I$(LA2VCD_H) -DLA2VCD_LIB=$(LA2VCD_LIB)
 endif
-TARGETS=tek2gplot get_tek_waveform get_hp_16530_waveform get_hp_16555_waveform calc_area_under_curve networkanalyzer parse_16500_config
+
 all: $(TARGETS)
 
 common.o hp16500.o: CFLAGS+=-std=c99 -D_COMMON_
@@ -86,4 +102,11 @@ networkanalyzer: networkanalyzer.o gpib.lib
 .PHONY: clean
 clean:
 	-rm *.o *.lib $(TARGETS)
+
+dist: $(DISTFILES)
+	-rm -rf $(DISTNAME)
+	mkdir $(DISTNAME)
+	for f in $(DISTFILES); do ln $$f $(DISTNAME)/$$f; done
+	tar --gzip -chf $(DISTNAME).tar.gz $(DISTNAME)
+	-rm -rf $(DISTNAME)
 
