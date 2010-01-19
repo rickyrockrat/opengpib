@@ -33,7 +33,6 @@ Change Log: \n
 #endif
 #include <ctype.h>
 /**for open...  */
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 /** 
@@ -125,16 +124,16 @@ int init_instrument(struct gpib *g)
 {
 	int i,s;
 	int slots[5], osc;
-	printf("Initializing Instrument\n");
+	fprintf(stderr,"Initializing Instrument\n");
 	g->control(g,CTL_SET_TIMEOUT,500);
 	while(read_string(g));
 	g->control(g,CTL_SET_TIMEOUT,50000);
 	/*write_string(g,"*CLS"); */
 	if(0 == write_get_data(g,"*IDN?"))
 		return -1;
-	/*printf("Got %d bytes\n",i); */
+	/*fprintf(stderr,"Got %d bytes\n",i); */
 	if(NULL == strstr(g->buf,"HEWLETT PACKARD,16500C")){
-		printf("Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",g->buf);
+		fprintf(stderr,"Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",g->buf);
 		g->control(g,CTL_SEND_CLR,0);
 		return -1;
 	}
@@ -145,27 +144,27 @@ int init_instrument(struct gpib *g)
 			break;
 	for (i=0,osc=-1;i<5;++i){
 		slots[i]=(int)get_value_col(i,&g->buf[s]);
-		printf("Slot %c=%d\n",'A'+i,slots[i]);
+		fprintf(stderr,"Slot %c=%d\n",'A'+i,slots[i]);
 		if(CARDTYPE_16554M == slots[i])
 			osc=i;
 	}
 	if(-1 == osc){
-		printf("Unable to find Sampling card\n");
+		fprintf(stderr,"Unable to find Sampling card\n");
 		return -1;
 	}
-	printf("Found Sampling in slot %c\n",'A'+osc);
+	fprintf(stderr,"Found Sampling in slot %c\n",'A'+osc);
 	
 	write_get_data(g,":SELECT?");
 
 	if(osc+1 == (g->buf[0]-0x30)){
-		printf("Timebase %s already selected\n",g->buf);
+		fprintf(stderr,"Timebase %s already selected\n",g->buf);
 	}	else{
 		sprintf(g->buf,":SELECT %d",osc+1);
 		write_string(g,g->buf);	
 	}
 	write_get_data(g,":SELECT?");
 /*	i=write_get_data(g,":?"); */
-	printf("Selected Card %s to talk to.\n",g->buf);
+	fprintf(stderr,"Selected Card %s to talk to.\n",g->buf);
 
 	return i;
 /*34,-1,12,12,11,1,0,5,5,5 */
@@ -183,7 +182,7 @@ long int get_datsize(char *hdr)
 	char *s;
 	
 	if(NULL==(s=strstr(hdr,"#8")) ){
-		printf("unable to find data len\n");
+		fprintf(stderr,"unable to find data len\n");
 		return 0;
 	}
 	s+=2;
@@ -197,20 +196,23 @@ long int get_datsize(char *hdr)
 ****************************************************************************/
 void usage(void)
 {
-	printf("get_hp_16555_waveform <options>\n"
+	fprintf(stderr,"Version %s: get_hp_16555_waveform <options>\n"
 	" -a addr set instrument address to addr (7)\n"
 	" -c fname put config data to fname\n"
 	" -d dev set path to device name\n"
+	" -m meth set method to meth (hpip)\n"
 	" -o fname put config lfDATAlf data to file called fname\n"
-	" -p set packed mode to packed (unpacked)\n"
+	" -p set packed mode to packed for config only (unpacked)\n"
 	" -t fname put trace(data) to fname\n"
 #ifdef LA2VCD_LIB
-	" -v fname put vcd data to fname (requires -c, -t)\n"
+	" -v basename put vcd data to basename.vcd. Creates .dat and .cfg\n"
 #endif	
 	
-	"");
+	"Make sure the 16550C Controller is connected to LAN for ip \nor to HPIB for prologix\n"
+	"\nHere are the supported controllers\n\n"
+	"",TOSTRING(VERSION));
+	show_gpib_supported_controllers();
 }
-
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -222,20 +224,25 @@ int main(int argc, char * argv[])
 	FILE *ofd,*cfd,*tfd,*vfd;
 	char *name, *ofname;
 	char *tname,*cname,*vname;
-	int i, c,inst_addr, rtn, raw;
+	int i, c,inst_addr, rtn, raw,dtype;
 	long int total,sz;
-	name="/dev/ttyUSB0";
 	inst_addr=7;
 	rtn=1;
-	ofname=tname=cname=vname=NULL;
+	name=ofname=tname=cname=vname=NULL;
 	vfd=tfd=cfd=ofd=NULL;
 	raw=0;
-	while( -1 != (c = getopt(argc, argv, "a:c:d:ho:pt:v:")) ) {
+	dtype=GPIB_CTL_HP16500C;
+	while( -1 != (c = getopt(argc, argv, "a:c:d:hmo:pt:v:")) ) {
 		switch(c){
 			case 'a':
 				inst_addr=atoi(optarg);
 				break;
 			case 'c':
+				if(NULL != vname){
+					fprintf(stderr,"-v and -c are mutually exclusive.\n");
+					usage();
+					return 1;
+				}
 				cname=strdup(optarg);
 				break;
 			case 'd':
@@ -244,6 +251,12 @@ int main(int argc, char * argv[])
 			case 'h':
 				usage();
 				return 1;
+			case 'm':
+				if(-1 == (dtype=gpib_option_to_type(optarg)))	{
+					fprintf(stderr,"'%s' method not supported\n",optarg);
+					return -1;
+				}
+				break;
 			case 'o':
 				ofname=strdup(optarg);
 				break;
@@ -251,11 +264,30 @@ int main(int argc, char * argv[])
 				raw=1;
 				break;
 			case 't':
+				if(NULL != vname){
+					fprintf(stderr,"-v and -t are mutually exclusive.\n");
+					usage();
+					return 1;
+				}
 				tname=strdup(optarg);
 				break;
 			case 'v':
 #ifdef LA2VCD_LIB 
-				vname=strdup(optarg);
+				if(NULL != tname || NULL != cname){
+					fprintf(stderr,"-v and -c/-tare mutually exclusive.\n");
+					usage();
+					return 1;
+				}				
+				if(NULL ==(vname=malloc( (strlen(optarg)+5)*3 ))){
+					fprintf(stderr,"Unable to malloc filename space for '%s'\n",optarg);
+					return 1;
+				}
+				i=1+sprintf(vname,"%s.vcd",optarg);
+				
+				cname=&vname[i];
+				i+=1+sprintf(cname,"%s.cfg",optarg);
+				tname=&vname[i];
+				sprintf(tname,"%s.dat",optarg);
 #else
 				fprintf(stderr,"-v not supported. Re-build with LA2VCD_LIB=/path/to/lib\n");
 				return 1;
@@ -267,51 +299,51 @@ int main(int argc, char * argv[])
 		}
 	}
 	if(NULL != ofname && (NULL != tname || NULL != cname)){
-		printf("-o and -t/-c are mutually exclusive\n");
+		fprintf(stderr,"-o and -t/-c are mutually exclusive\n");
 		usage();
 		return 1;
 	}
 	if(NULL == ofname && NULL == tname && NULL == cname){
-		printf("must specify -t/-c or -o\n");
+		fprintf(stderr,"must specify -t/-c or -o\n");
 		usage();
 		return 1;
 	} 
 	if(NULL != vname && (NULL == cname || NULL == tname)){
-		printf("Must specify -c and -t with -v\n");
+		fprintf(stderr,"Must specify -c and -t with -v\n");
 		usage();
 		return 1;
 	}
-	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,1048576))){
-		printf("Can't open/init controller at %s. Fatal\n",name);
+	if(NULL == (g=open_gpib(dtype,inst_addr,name,1048576))){
+		fprintf(stderr,"Can't open/init controller at %s. Fatal\n",name);
 		return 1;
 	}
 	
 	if(-1 == init_instrument(g)){
-		printf("Unable to initialize instrument.\n");
-		printf("Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
+		fprintf(stderr,"Unable to initialize instrument.\n");
+		fprintf(stderr,"Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
 		goto closem;
 	}
 	if(NULL != ofname){
 			if(NULL == (ofd=fopen(ofname,"w+"))) {
-				printf("Unable to open '%s' for writing\n",ofname);
+				fprintf(stderr,"Unable to open '%s' for writing\n",ofname);
 				goto closem;
 			}
 	}	else{
 		if(NULL !=cname){
 			if(NULL == (cfd=fopen(cname,"w+"))) {
-				printf("Unable to open '%s' for writing\n",cname);
+				fprintf(stderr,"Unable to open '%s' for writing\n",cname);
 				goto closem;
 			}
 		}
 		if(NULL !=tname){
 			if(NULL == (tfd=fopen(tname,"w+"))) {
-				printf("Unable to open '%s' for writing\n",tname);
+				fprintf(stderr,"Unable to open '%s' for writing\n",tname);
 				goto closem;
 			}
 		}
 	}
 	if(cfd>0 ||ofd>0){ /**grab config  */
-		printf("Retreiving Setup\n");
+		fprintf(stderr,"Retreiving Setup\n");
 		sprintf(g->buf,":SYSTEM:SETUP?");
 		i=write_string(g,g->buf);	
 		usleep(100000);
@@ -320,9 +352,9 @@ int main(int argc, char * argv[])
 			i=read_raw(g);
 			if(0 == total){
 				sz=get_datsize(g->buf);
-				printf("Len %ld Got %d ",sz,i);
+				fprintf(stderr,"Len %ld Got %d ",sz,i);
 			}else
-				printf("%ld ",sz-total);
+				fprintf(stderr,"%ld ",sz-total);
 			fflush(NULL);
 			fwrite(g->buf,1,i,ofd?ofd:cfd);	
 			total+=i;
@@ -331,13 +363,13 @@ int main(int argc, char * argv[])
 			i=sprintf(g->buf,"\nDATA\n");
 			fwrite(g->buf,1,i,ofd);		
 		}
-		printf("\nWrote %ld config + %d datahdr.\n",total,i);
+		fprintf(stderr,"\nWrote %ld config + %d datahdr.\n",total,i);
 	}
 	usleep(1000000);
 	
 	if(tfd>0 ||ofd>0){ /**grab data  */
 		int nodata=0;
-		printf("Retreiving Data\n");
+		fprintf(stderr,"Retreiving Data\n");
 	/*	goto closem; */
 		sprintf(g->buf,":DBLOCK %s;:SYSTEM:DATA?",raw?"PACKED":"UNPACKED");
 		i=write_string(g,g->buf);	
@@ -350,28 +382,28 @@ int main(int argc, char * argv[])
 				if(g->buf[0]!='#'){
 					for (off=0;off<i && g->buf[off] != '#';++off);
 					if(i == off){
-						printf("discarding first buffer of %d\n",i);
+						fprintf(stderr,"discarding first buffer of %d\n",i);
 						i=0;
 						++nodata;
 					}else if(off){
-						printf("Discarding first %d byte(s)\n",off);
+						fprintf(stderr,"Discarding first %d byte(s)\n",off);
 						i-=off;
 					}
 				}
 				if(i)	{
 					sz=get_datsize(g->buf);
-					printf("Len %ld Got %d ",sz,i);	
+					fprintf(stderr,"Len %ld Got %d ",sz,i);	
 				}
 				
 			}else
-				printf("%ld ",sz-total);
+				fprintf(stderr,"%ld ",sz-total);
 			fflush(NULL);
 			fwrite(g->buf,1,i,ofd?ofd:tfd);	
 			total+=i;
 			if(0 == i){
 				++nodata;
 				if(nodata>10){
-					printf("No Data for 10 tries\n");
+					fprintf(stderr,"No Data for 10 tries\n");
 					break;
 				}else
 					nodata=0;
@@ -379,9 +411,9 @@ int main(int argc, char * argv[])
 			}
 				
 		}
-		printf("Done. Wrote %ld bytes\n",total);
+		fprintf(stderr,"Done. Wrote %ld bytes\n",total);
 		if(total!=sz+10){	/**add header size of 10  */
-			printf("Total does not match size. Sending CLR\n");
+			fprintf(stderr,"Total does not match size. Sending CLR\n");
 			g->control(g,CTL_SEND_CLR,0);
 		}
 			
@@ -407,31 +439,31 @@ closem:
 		struct signal_data *d,*x;
 		char buf[500];
 		if(NULL ==(s=parse_config(cname,"CONFIG    ",JUST_LOAD) ) ){
-			printf("Unable to re-open '%s'\n",cname);
+			fprintf(stderr,"Unable to re-open '%s'\n",cname);
 			goto endvcd;
 		}	
 		if(NULL == (p=parse_data(tname,NULL,JUST_LOAD))){
-			printf("Unable to re-open data file '%s'\n",tname);
+			fprintf(stderr,"Unable to re-open data file '%s'\n",tname);
 			goto endvcd;
 		}	
 		if(NULL ==(d=show_la2vcd(p,s,JUST_LOAD))){
-			printf("Error loading labels\n");
+			fprintf(stderr,"Error loading labels\n");
 			goto endvcd;
 		}	
 		if(NULL==(l=open_la2vcd(vname,NULL,p->a1.sampleperiod*1e-12,0,NULL==s?NULL:s->data))){ 
-			printf("Unable to open la2vcd lib\n");
+			fprintf(stderr,"Unable to open la2vcd lib\n");
 			goto endvcd;
 		}	
     if(vcd_add_file(l,NULL,16,d->bits)){
 			fprintf(stderr,"Failed to add input file\n");
 			goto endvcd;
 		}
-		printf("Bits=%d\n",d->bits);
+		fprintf(stderr,"Bits=%d\n",d->bits);
 		/**Add our signal descriptions in  */
 /*		vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0); */
 		for (x=d;x;x=x->next){
 			vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,x->name, x->lsb, x->msb);
-			/*printf("Added '%s' %d %d\n",x->name,x->msb,x->lsb); */
+			/*fprintf(stderr,"Added '%s' %d %d\n",x->name,x->msb,x->lsb); */
 		}
 			if(-1 == write_vcd_header (l)){
 			fprintf(stderr,"VCD Header write failed\n");
@@ -441,7 +473,7 @@ closem:
 		/**rewind our data  */
     get_next_datarow(NULL,NULL);
 		l->first_input_file->buf=buf;
-		printf("r,bit=%d %d\n",l->first_input_file->radix,l->first_input_file->bit_count);
+		fprintf(stderr,"r,bit=%d %d\n",l->first_input_file->radix,l->first_input_file->bit_count);
 		while (1) {
 			if(get_next_datarow(p,buf)){
 				vcd_read_sample(l); 
