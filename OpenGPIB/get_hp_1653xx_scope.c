@@ -31,7 +31,6 @@ Change Log: \n
 #include <ctype.h>
 
 /**for open...  */
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
@@ -139,16 +138,16 @@ int init_instrument(struct gpib *g)
 {
 	int i,s;
 	int slots[5], osc;
-	printf("Initializing Instrument\n");
+	fprintf(stderr,"Initializing Instrument\n");
 	g->control(g,CTL_SET_TIMEOUT,500);
 	while(read_string(g));
 	g->control(g,CTL_SET_TIMEOUT,50000);
 	/*write_string(g,"*CLS"); */
 	if(0 == write_get_data(g,"*IDN?"))
 		return -1;
-	/*printf("Got %d bytes\n",i); */
+	/*fprintf(stderr,"Got %d bytes\n",i); */
 	if(NULL == strstr(g->buf,"HEWLETT PACKARD,16500C")){
-		printf("Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",g->buf);
+		fprintf(stderr,"Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",g->buf);
 		return -1;
 	}
 	if(0 == write_get_data(g,":CARDCAGE?"))
@@ -158,27 +157,27 @@ int init_instrument(struct gpib *g)
 			break;
 	for (i=0,osc=-1;i<5;++i){
 		slots[i]=(int)get_value_col(i,&g->buf[s]);
-		printf("Slot %c=%d\n",'A'+i,slots[i]);
+		fprintf(stderr,"Slot %c=%d\n",'A'+i,slots[i]);
 		if(CARDTYPE_16530A == slots[i])
 			osc=i;
 	}
 	if(-1 == osc){
-		printf("Unable to find timebase card\n");
+		fprintf(stderr,"Unable to find timebase card\n");
 		return -1;
 	}
-	printf("Found Timbase in slot %c\n",'A'+osc);
+	fprintf(stderr,"Found Timbase in slot %c\n",'A'+osc);
 	
 	write_get_data(g,":SELECT?");
 
 	if(osc+1 == (g->buf[0]-0x30)){
-		printf("Timebase %s already selected\n",g->buf);
+		fprintf(stderr,"Timebase %s already selected\n",g->buf);
 	}	else{
 		sprintf(g->buf,":SELECT %d",osc+1);
 		write_string(g,g->buf);	
 	}
 	
 	i=write_get_data(g,":WAV:REC FULL;:WAV:FORM BYTE;:SELECT?");
-	printf("Selected Card %s to talk to.\n",g->buf);
+	fprintf(stderr,"Selected Card %s to talk to.\n",g->buf);
 
 	return i;
 /*34,-1,12,12,11,1,0,5,5,5 */
@@ -202,7 +201,7 @@ int check_channel(char *ch)
 		}
 	}
 	if( -1 == b ){
-		printf("Channel '%s' is invalid\n",ch);
+		fprintf(stderr,"Channel '%s' is invalid\n",ch);
 		return 0;
 	}
 	return atoi(&ch[b]);
@@ -219,10 +218,10 @@ int get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h)
 		return -1;
 	if(0 == (i=check_channel(ch)))
 		return -1;
-	/*printf("GetPre %d\n",i);	  */
+	/*fprintf(stderr,"GetPre %d\n",i);	  */
 	sprintf(g->buf,":WAV:SOUR CHAN%d;PRE?",i);
 	if( write_get_data(g,g->buf) <=0){
-		printf("No data from preamble (%d)\n",i);
+		fprintf(stderr,"No data from preamble (%d)\n",i);
 		return 0; 
 	}
 		
@@ -241,7 +240,7 @@ int get_data(struct gpib *g, char *ch)
 		return -1;
 	if(0 == (i=check_channel(ch)))
 		return -1;
-/*	printf("GetData %d\n",i); */
+/*	fprintf(stderr,"GetData %d\n",i); */
 	sprintf(g->buf,":WAV:SOUR CHAN%d;DATA?",i);
 	i=write_get_data(g,g->buf);	
 	return i;
@@ -254,7 +253,7 @@ int get_data(struct gpib *g, char *ch)
 ****************************************************************************/
 void usage(void)
 {
-	printf("get_hp_16530_waveform <options>\n"
+	fprintf(stderr,"get_hp_16530_waveform <options>\n"
 	" -a addr set instrument address to addr (7)\n"
 	" -c n Use channel n for data (ch1). ch1-ch?\n"
 	"    The -c option can be used multiple times. In this case, the fname\n"
@@ -300,7 +299,7 @@ int main(int argc, char * argv[])
 				break;
 			case 'c':
 				if(ch_idx>=MAX_CHANNELS){
-					printf("Too many -c options. Max of %d allowed.\n",MAX_CHANNELS);
+					fprintf(stderr,"Too many -c options. Max of %d allowed.\n",MAX_CHANNELS);
 				}
 				channel[ch_idx++]=strdup(optarg);
 				break;
@@ -334,19 +333,19 @@ int main(int argc, char * argv[])
 	else {
 		for (c=0;c<ch_idx;++c){
 			if(0==check_channel(channel[c])){
-				printf("Channel %s is invalid\n",channel[c]);
+				fprintf(stderr,"Channel %s is invalid\n",channel[c]);
 				return 1;
 			}
 		}
 	}
 	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,-1))){
-		printf("Can't open/init controller at %s. Fatal\n",name);
+		fprintf(stderr,"Can't open/init controller at %s. Fatal\n",name);
 		return 1;
 	}
 	
 	if(-1 == init_instrument(g)){
-		printf("Unable to initialize instrument.\n");
-		printf("Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
+		fprintf(stderr,"Unable to initialize instrument.\n");
+		fprintf(stderr,"Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
 		goto closem;
 	}
 	if(NULL != ofname){
@@ -362,32 +361,32 @@ int main(int argc, char * argv[])
 		i+=5;
 		/**allocate buffer for all fnames.  */
 		if(NULL == (lbuf=malloc(strlen(ofname)+i)) ){
-			printf("Out of mem for lbuf alloc\n");
+			fprintf(stderr,"Out of mem for lbuf alloc\n");
 			goto closem;
 		}
-		printf("f\n");
+		fprintf(stderr,"f\n");
 	}else
 		lbuf=NULL;
-	printf("Channel loop\n");
+	fprintf(stderr,"Channel loop\n");
 	/**channel loop. Open file, dump data, close file, repeat  */
 	for (c=0;c<ch_idx && NULL != channel[c];++c){
 		int point;
 		if(NULL != ofname && NULL != lbuf ){ /**we have valid filename & channel, open  */
 			sprintf(lbuf,"%s.%s",ofname,channel[c]);
 			if(NULL == (ofd=fopen(lbuf,"w+"))) {
-				printf("Unable to open '%s' for writing\n",lbuf);
+				fprintf(stderr,"Unable to open '%s' for writing\n",lbuf);
 				goto closem;
 			}
-			printf("Reading Channel %s\n",channel[c]);
+			fprintf(stderr,"Reading Channel %s\n",channel[c]);
 			if( 0 >= (i=get_preamble(g,channel[c],&h))){
-				printf("Preable failed on %s\n",channel[c]);
+				fprintf(stderr,"Preable failed on %s\n",channel[c]);
 				goto closem;
 			}
 	/** Voltage=(Value-Yreference)*Yinc +Yorigin
 			Time= (point# -Xref)*Xinc + Xorigin */
 			fwrite(g->buf,1,i,ofd);	
 			if(-1 == (i=get_data(g,channel[c])) ){
-				printf("Unable to get waveform??\n");
+				fprintf(stderr,"Unable to get waveform??\n");
 				goto closem;
 			}	
 			point=0;
@@ -399,7 +398,7 @@ int main(int argc, char * argv[])
 					float time;
 					time=h.xinc*(float)point;
 					if(0==point)
-						printf("%d %f %f \n",point,h.xinc,time); 
+						fprintf(stderr,"%d %f %f \n",point,h.xinc,time); 
 					volts=(g->buf[x]-h.yref)*h.yinc + h.yorg;
 					if(xy){
 						if(raw)
