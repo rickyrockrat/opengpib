@@ -35,6 +35,7 @@ Change Log: \n
 #include <unistd.h> /**getopt  */
 #include <time.h> /**timespec  */
 #include <stdint.h> // int types are defined here
+#include <sys/types.h>
 typedef  int8_t   int8;
 typedef uint8_t  uint8;
 typedef  int16_t  int16;
@@ -43,6 +44,8 @@ typedef  int32_t  int32;
 typedef uint32_t uint32;
 typedef  int64_t  int64;
 typedef uint64_t uint64;
+
+
 
 #ifndef _COMMON_
 #define MAX_CHANNELS 7
