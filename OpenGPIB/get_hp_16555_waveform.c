@@ -7,7 +7,10 @@
 */ /************************************************************************
 Change Log: \n
  This file is part of OpenGPIB.
+ For details, see http://opengpib.sourceforge.net/projects
 
+ Copyright (C) 2008-2009 Doug Springer <gpib@rickyrockrat.net>
+   
     OpenGPIB is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License version 3 
     as published by the Free Software Foundation. Note that permission 

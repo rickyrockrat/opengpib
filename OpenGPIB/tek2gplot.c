@@ -7,7 +7,10 @@
 */ /************************************************************************
 Change Log: \n
  This file is part of OpenGPIB.
+ For details, see http://opengpib.sourceforge.net/projects
 
+ Copyright (C) 2008-2009 Doug Springer <gpib@rickyrockrat.net>
+   
     OpenGPIB is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License version 3 
     as published by the Free Software Foundation. Note that permission 
@@ -630,7 +633,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.20 $\n"
+	printf("tek2gplot: $Revision: 1.21 $\n"
 	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
