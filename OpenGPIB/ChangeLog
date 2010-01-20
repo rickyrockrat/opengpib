@@ -4,3 +4,7 @@ can be integrated with the rest of the system. Also prepare to add the la2vcd li
 Integrated la2vcd lib into parse_16500_config.
 2010-01-19 RickyRockRat V_0_0_5: Added la2vcd to get_hp_16555_waveform. 
 Implemented a dist target and VERSION for imbedding into the build.
+2010-01-19 RickyRockRat V_0_0_6: Left out significant files from CVS...Bad
+rev.
+2010-01-19 RickyRockRat V_0_0_7: Added internet driver for HP, printf->
+fprintf clean up.
