@@ -157,19 +157,21 @@ int init_instrument(struct gpib *g)
 		fprintf(stderr,"Unable to find Sampling card\n");
 		return -1;
 	}
-	fprintf(stderr,"Found Sampling in slot %c\n",'A'+osc);
+	fprintf(stderr,"Found ");
+	print_card_model(slots[osc], hp_cardlist);
+	fprintf(stderr," in slot %c\n",'A'+osc);
 	
 	write_get_data(g,":SELECT?");
 
 	if(osc+1 == (g->buf[0]-0x30)){
-		fprintf(stderr,"Timebase %s already selected\n",g->buf);
+		fprintf(stderr,"Card %c already selected\n",g->buf[0]+'A'-'0'-1);
 	}	else{
 		sprintf(g->buf,":SELECT %d",osc+1);
 		write_string(g,g->buf);	
 	}
 	write_get_data(g,":SELECT?");
 /*	i=write_get_data(g,":?"); */
-	fprintf(stderr,"Selected Card %s to talk to.\n",g->buf);
+	fprintf(stderr,"Selected Card %c to talk to.\n",g->buf[0]+'A'-'0'-1);
 	sprintf(g->buf,"*OPC\n");
 	write_string(g,g->buf);	
 	sprintf(g->buf,":menu %d,0\n",osc+1);
@@ -517,7 +519,7 @@ closem:
 			fprintf(stderr,"Failed to add input file\n");
 			goto endvcd;
 		}
-		fprintf(stderr,"samp=%fns Bits=%d\n",p->a1.sampleperiod*1e-9,d->bits);
+		fprintf(stderr,"samp=%dns Bits=%d\n",(int)(p->a1.sampleperiod/1000),d->bits);
 		/**Add our signal descriptions in  */
 /*		vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0); */
 		for (x=d;x;x=x->next){
