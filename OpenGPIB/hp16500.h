@@ -126,6 +126,11 @@ struct hp_scope_preamble {
 #define HP_FMT_BYTE 1
 #define HP_FMT_WORD 2
 
+#define CLK_START 0
+#define POD_START 2
+#define POD_ARRAYSIZE 10 /**don't change this - it's set by the hp config data  */
+
+#define HEADER_SIZE 10 /** length of preamble before block starts.  */
 
 struct section_hdr {
 	char name[11]; /**the last byte is reserved, but usally 0  */
@@ -236,7 +241,7 @@ struct section {
 
 struct label_map {
 	/**offset 0= hi byte.  */
-	uint8 clk_pods[10]; /**0 and 1 index are clk  */
+	uint8 clk_pods[POD_ARRAYSIZE]; /**0 and 1 index are clk, 2 idx is hi byte of pod4  */
 	uint8 unknown;
 }__attribute__((__packed__));	
 
@@ -257,9 +262,7 @@ struct labels {
 
 struct one_card_data {
 	uint16 clkunused;
-	uint8 clkhi;
-	uint8 clklo;
-	uint8 pdata[8];
+	uint8 pdata[POD_ARRAYSIZE]; /**clkhi is 0, clklo is 1, pod 4 is 2  */
 }__attribute__((__packed__));	
 struct two_card_data {
 	uint32 clk;
@@ -276,6 +279,7 @@ struct three_card_data {
 
 struct signal_data {
 	int bits; /**width of signal in bits  */
+	int ena; /**is signal enabled in menu  */
 	int lsb; /**lowest number bit where signal starts  */
 	int msb; /**highes number bit where signal ends  */
 	char *name;
@@ -285,6 +289,8 @@ struct signal_data {
 #define ONE_CARD_ROWSIZE 12
 #define TWO_CARD_ROWSIZE 20
 #define THREE_CARD_ROWSIZE 28
+
+
 
 #define SHOW_PRINT 1
 #define JUST_LOAD 2
@@ -314,7 +320,8 @@ A three-card configuration has the following data arrangement per row:
 Clock Pod 1 < xxxx MLKJ MLKJ MLKJ >
 
 */
-
+int print_card_model(int id, struct hp_cards *h);
+long int get_datsize(char *hdr);
 uint32 swap32(uint32 in);
 uint64 swap64(uint64 in);
 uint16 swap16(uint16 in);
@@ -336,8 +343,8 @@ int get_next_datarow(struct data_preamble *p, char *buf);
 uint32 put_data_to_file(struct data_preamble *p, char *fname);
 void print_data(struct data_preamble *p);
 struct data_preamble *parse_data( char *cfname, char *out, int mode);
-struct signal_data *add_signal(struct signal_data *d,int bits, int lsb, int msb, char *name);
-struct signal_data *show_vcd_label(uint8 *a, struct labels *l);
+struct signal_data *add_signal(struct signal_data *d, int ena, int bits, int lsb, int msb, char *name);
+struct signal_data *show_vcd_label(char *a, struct labels *l);
 struct signal_data *show_la2vcd(struct data_preamble *pre, struct section *sec, int mode);
 
 #endif
