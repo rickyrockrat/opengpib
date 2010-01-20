@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
 							}
 							printf("Bits=%d\n",d->bits);
 							/**Add our signal descriptions in  */
-							vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0);
+/*							vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0); */
 							for (x=d;x;x=x->next){
 								vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,x->name, x->lsb, x->msb);
 								/*printf("Added '%s' %d %d\n",x->name,x->msb,x->lsb); */
