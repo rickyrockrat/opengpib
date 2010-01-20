@@ -52,7 +52,8 @@ int print_card_model(int id, struct hp_cards *h)
 {
 	int i;
 	for (i=0;NULL != h[i].desc;++i){
-		if(i==h[i].type){
+	  //fprintf(stderr,"%d - %s\n",h[i].type, h[i].desc);
+		if(id==h[i].type){
 			fprintf(stderr,"%s",h[i].desc);
 			return i;
 		}
@@ -793,7 +794,7 @@ struct signal_data *add_signal(struct signal_data *d,int ena, int bits, int lsb,
 	x->msb=msb;
 	x->bits=bits;
 	x->ena=ena;
-	fprintf(stderr,"%s %d %d %d %d\n",x->name, x->msb, x->lsb, x->bits, x->ena);
+	/*fprintf(stderr,"%s %d %d %d %d\n",x->name, x->msb, x->lsb, x->bits, x->ena); */
 	return x;
 }
 
