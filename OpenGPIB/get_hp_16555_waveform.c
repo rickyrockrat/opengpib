@@ -27,7 +27,7 @@ Change Log: \n
     
 		The License should be in the file called COPYING.
 */
-
+#define HP16500_COM_SYMBOLS
 #include "common.h"
 #include "gpib.h"
 #include "hp16500.h"
@@ -147,7 +147,9 @@ int init_instrument(struct gpib *g)
 			break;
 	for (i=0,osc=-1;i<5;++i){
 		slots[i]=(int)get_value_col(i,&g->buf[s]);
-		fprintf(stderr,"Slot %c=%d\n",'A'+i,slots[i]);
+		fprintf(stderr,"Slot %c=%d",'A'+i,slots[i]);
+		print_card_model(slots[i], hp_cardlist);
+		fprintf(stderr,"\n");
 		if(CARDTYPE_16554M == slots[i])
 			osc=i;
 	}
@@ -168,8 +170,11 @@ int init_instrument(struct gpib *g)
 	write_get_data(g,":SELECT?");
 /*	i=write_get_data(g,":?"); */
 	fprintf(stderr,"Selected Card %s to talk to.\n",g->buf);
-
-	return i;
+	sprintf(g->buf,"*OPC\n");
+	write_string(g,g->buf);	
+	sprintf(g->buf,":menu %d,0\n",osc+1);
+	write_string(g,g->buf);	
+	return osc;
 /*34,-1,12,12,11,1,0,5,5,5 */
 	/** :WAV:REC FULL;:WAV:FORM ASC;:SELECT? */
 }
@@ -179,18 +184,43 @@ int init_instrument(struct gpib *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-long int get_datsize(char *hdr)
+int wait_for_data(struct gpib *g)
 {
-	long int len;
-	char *s;
-	
-	if(NULL==(s=strstr(hdr,"#8")) ){
-		fprintf(stderr,"unable to find data len\n");
-		return 0;
+	int i;
+	/**make sure it is enabled  */
+	usleep(10000);
+	sprintf(g->buf,"*OPC\n");
+	write_string(g,g->buf);	
+	while(1){
+		sprintf(g->buf,"*OPC?\n");
+		i=write_get_data(g,g->buf);	
+		if( i ){
+			if(g->buf[0] == '1')
+				break;
+		}
+		usleep(10000);
 	}
-	s+=2;
-	sscanf(s,"%ld",&len);
-	return len;
+	return i;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int message_avail(struct gpib *g)
+{
+	int i;
+	/**make sure it is enabled  */
+	usleep(10000);
+	sprintf(g->buf,"*STB?\n");
+	i=write_get_data(g,g->buf);	
+	if( i ){
+		if(g->buf[0] & 0x10)
+			return 1;
+	}
+	usleep(10000);
+	return 0;
 }
 /***************************************************************************/
 /** .
@@ -206,6 +236,7 @@ void usage(void)
 	" -m meth set method to meth (hpip)\n"
 	" -o fname put config lfDATAlf data to file called fname\n"
 	" -p set packed mode to packed for config only (unpacked)\n"
+	" -r send run before getting data\n"
 	" -t fname put trace(data) to fname\n"
 #ifdef LA2VCD_LIB
 	" -v basename put vcd data to basename.vcd. Creates .dat and .cfg\n"
@@ -215,6 +246,72 @@ void usage(void)
 	"\nHere are the supported controllers\n\n"
 	"",TOSTRING(VERSION));
 	show_gpib_supported_controllers();
+}
+
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+long int write_data_to_file(struct gpib *g, FILE *fd)
+{
+	
+	long int  sz,total;
+	int nodata;
+	uint32 i, off=0;
+	/*wait_for_data(g); */
+	usleep(1000000); 
+	sz=total=0;
+	
+	while(1){
+		
+		i=read_raw(g);
+		if(i && 0 == total){
+			/**clean out beginning of buffer, if needed.  */
+			if(g->buf[0]!='#'){
+				for (off=0;off<i && g->buf[off] != '#';++off);
+				if(i == off){
+					fprintf(stderr,"discarding first buffer of %d\n",i);
+					i=0;
+					++nodata;
+				}else if(off){
+					fprintf(stderr,"Discarding first %d byte(s)\n",off);
+					i-=off;
+				}
+			}
+			
+			if(i)	{	/**fixme: What if we don't have enough data?  */
+				sz=get_datsize(g->buf);
+				fprintf(stderr,"Len %ld Got %d ",sz,i);	
+			}
+			
+		}else{
+			fprintf(stderr,"%ld ",sz-total);
+			off=0;
+		}
+			
+		fflush(NULL);
+		fwrite(&g->buf[off],1,i,fd);	
+		total+=i;
+		if(sz && total>= sz+HEADER_SIZE)
+			break;
+		if(0 == i){
+			++nodata;
+			if(nodata>10){
+				fprintf(stderr,"No Data for 10 tries\n");
+				break;
+			}
+				
+		}else
+			nodata=0;
+	}
+	fprintf(stderr,"Wrote %ld bytes\n",total);
+	if(total!=sz+HEADER_SIZE){	/**add header size of 10  */
+		fprintf(stderr,"Total does not match size. Sending CLR\n");
+		g->control(g,CTL_SEND_CLR,0);
+	}
+	return total;
 }
 /***************************************************************************/
 /** .
@@ -227,15 +324,16 @@ int main(int argc, char * argv[])
 	FILE *ofd,*cfd,*tfd,*vfd;
 	char *name, *ofname;
 	char *tname,*cname,*vname;
-	int i, c,inst_addr, rtn, raw,dtype;
-	long int total,sz;
+	int i, c,inst_addr, rtn, raw,dtype,trigger,slot;
+	long int total;
 	inst_addr=7;
 	rtn=1;
+	trigger=0;
 	name=ofname=tname=cname=vname=NULL;
 	vfd=tfd=cfd=ofd=NULL;
 	raw=0;
 	dtype=GPIB_CTL_HP16500C;
-	while( -1 != (c = getopt(argc, argv, "a:c:d:hmo:pt:v:")) ) {
+	while( -1 != (c = getopt(argc, argv, "a:c:d:hmo:prt:v:")) ) {
 		switch(c){
 			case 'a':
 				inst_addr=atoi(optarg);
@@ -265,6 +363,9 @@ int main(int argc, char * argv[])
 				break;
 			case 'p':
 				raw=1;
+				break;
+			case 'r':
+				trigger=1;
 				break;
 			case 't':
 				if(NULL != vname){
@@ -321,7 +422,7 @@ int main(int argc, char * argv[])
 		return 1;
 	}
 	
-	if(-1 == init_instrument(g)){
+	if(-1 == (slot=init_instrument(g)) ){
 		fprintf(stderr,"Unable to initialize instrument.\n");
 		fprintf(stderr,"Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
 		goto closem;
@@ -345,83 +446,38 @@ int main(int argc, char * argv[])
 			}
 		}
 	}
+	if(trigger){
+		fprintf(stderr,"Starting Aquisition. Waiting for Data\n");
+		sprintf(g->buf,":RMODE SINGLE");
+		i=write_string(g,g->buf);	
+		sprintf(g->buf,":START");
+		i=write_string(g,g->buf);	
+		wait_for_data(g);
+		/**move menu to config so it won't paint the screen...  */
+		sprintf(g->buf,":menu %d,0\n",slot+1);
+		write_string(g,g->buf);	
+	}
 	if(cfd>0 ||ofd>0){ /**grab config  */
 		fprintf(stderr,"Retreiving Setup\n");
 		sprintf(g->buf,":SYSTEM:SETUP?");
 		i=write_string(g,g->buf);	
-		usleep(100000);
-		total=0;
-		while(i){
-			i=read_raw(g);
-			if(0 == total){
-				sz=get_datsize(g->buf);
-				fprintf(stderr,"Len %ld Got %d ",sz,i);
-			}else
-				fprintf(stderr,"%ld ",sz-total);
-			fflush(NULL);
-			fwrite(g->buf,1,i,ofd?ofd:cfd);	
-			total+=i;
-		}	
+		total=write_data_to_file(g,ofd?ofd:cfd);	
+
 		if(ofd>0){
 			i=sprintf(g->buf,"\nDATA\n");
 			fwrite(g->buf,1,i,ofd);		
 		}
-		fprintf(stderr,"\nWrote %ld config + %d datahdr.\n",total,i);
 	}
-	usleep(1000000);
+	usleep(100000);
 	
 	if(tfd>0 ||ofd>0){ /**grab data  */
-		int nodata=0;
+		
 		fprintf(stderr,"Retreiving Data\n");
 	/*	goto closem; */
 		sprintf(g->buf,":DBLOCK %s;:SYSTEM:DATA?",raw?"PACKED":"UNPACKED");
 		i=write_string(g,g->buf);	
-		usleep(1000000);
-		total=0;
-		while(i){
-			uint32 off=0;
-			i=read_raw(g);
-			if(0 == total){
-				if(g->buf[0]!='#'){
-					for (off=0;off<i && g->buf[off] != '#';++off);
-					if(i == off){
-						fprintf(stderr,"discarding first buffer of %d\n",i);
-						i=0;
-						++nodata;
-					}else if(off){
-						fprintf(stderr,"Discarding first %d byte(s)\n",off);
-						i-=off;
-					}
-				}
-				if(i)	{
-					sz=get_datsize(g->buf);
-					fprintf(stderr,"Len %ld Got %d ",sz,i);	
-				}
-				
-			}else
-				fprintf(stderr,"%ld ",sz-total);
-			fflush(NULL);
-			fwrite(g->buf,1,i,ofd?ofd:tfd);	
-			total+=i;
-			if(0 == i){
-				++nodata;
-				if(nodata>10){
-					fprintf(stderr,"No Data for 10 tries\n");
-					break;
-				}else
-					nodata=0;
-					
-			}
-				
-		}
-		fprintf(stderr,"Done. Wrote %ld bytes\n",total);
-		if(total!=sz+10){	/**add header size of 10  */
-			fprintf(stderr,"Total does not match size. Sending CLR\n");
-			g->control(g,CTL_SEND_CLR,0);
-		}
-			
+		total=write_data_to_file(g,ofd?ofd:tfd);	
 	}	
-	
 	
 	rtn=0;
 closem:
@@ -433,8 +489,8 @@ closem:
 		fclose(tfd);
 	close_gpib(g);
 #ifdef LA2VCD_LIB	
-	if(total != sz)
-		goto endvcd;
+/*	if(total != sz+10) */
+/*		goto endvcd; */
 	if(NULL !=vname){ /**generate a vcd file from the config and data  */
 		struct section *s;
 		struct data_preamble *p;
@@ -461,7 +517,7 @@ closem:
 			fprintf(stderr,"Failed to add input file\n");
 			goto endvcd;
 		}
-		fprintf(stderr,"Bits=%d\n",d->bits);
+		fprintf(stderr,"samp=%fns Bits=%d\n",p->a1.sampleperiod*1e-9,d->bits);
 		/**Add our signal descriptions in  */
 /*		vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0); */
 		for (x=d;x;x=x->next){
@@ -495,3 +551,80 @@ endvcd:
 				
 	return rtn;
 }
+#if 0
+/**  		while (!message_avail(g))
+			usleep(10000);*/
+/*		wait_for_data(g); */
+		usleep(100000); 
+		sz=total=0;
+		
+		while(1){
+			i=read_raw(g);
+			if(i && 0 == total){
+				sz=get_datsize(g->buf);
+				fprintf(stderr,"Len %ld Got %d ",sz,i);
+			}else
+				fprintf(stderr,"%ld ",sz-total);
+			fflush(NULL);
+			fwrite(g->buf,1,i,ofd?ofd:cfd);	
+			total+=i;
+			if(sz && total>= sz+HEADER_SIZE)
+				break;
+			if(0 == i){
+				++nodata;
+				if(nodata>10){
+					fprintf(stderr,"No Data for 10 tries\n");
+					break;
+				}
+			}else
+				nodata=0;
+				
+		}	
+		
+/**DATA  */
+		/*wait_for_data(g); */
+		usleep(1000000); 
+		sz=total=0;
+		
+		while(1){
+			uint32 off=0;
+			i=read_raw(g);
+			if(i && 0 == total){
+				if(g->buf[0]!='#'){
+					for (off=0;off<i && g->buf[off] != '#';++off);
+					if(i == off){
+						fprintf(stderr,"discarding first buffer of %d\n",i);
+						i=0;
+						++nodata;
+					}else if(off){
+						fprintf(stderr,"Discarding first %d byte(s)\n",off);
+						i-=off;
+					}
+				}
+				if(i)	{
+					sz=get_datsize(g->buf);
+					fprintf(stderr,"Len %ld Got %d ",sz,i);	
+				}
+				
+			}else{
+				fprintf(stderr,"%ld ",sz-total);
+				off=0;
+			}
+				
+			fflush(NULL);
+			fwrite(&g->buf[off],1,i,ofd?ofd:tfd);	
+			total+=i;
+			if(sz && total> sz)
+				break;
+			if(0 == i){
+				++nodata;
+				if(nodata>10){
+					fprintf(stderr,"No Data for 10 tries\n");
+					break;
+				}
+					
+			}else
+				nodata=0;
+				
+		}
+#endif
