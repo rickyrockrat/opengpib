@@ -282,6 +282,7 @@ struct signal_data {
 	int ena; /**is signal enabled in menu  */
 	int lsb; /**lowest number bit where signal starts  */
 	int msb; /**highes number bit where signal ends  */
+	int pol; /**polarity of signal 1=normal (+), 0= inverted (-) */
 	char *name;
 	struct signal_data *next;
 };
@@ -320,6 +321,8 @@ A three-card configuration has the following data arrangement per row:
 Clock Pod 1 < xxxx MLKJ MLKJ MLKJ >
 
 */
+
+int validate_sampleperiod(uint32 p);
 int print_card_model(int id, struct hp_cards *h);
 long int get_datsize(char *hdr);
 uint32 swap32(uint32 in);
@@ -343,7 +346,7 @@ int get_next_datarow(struct data_preamble *p, char *buf);
 uint32 put_data_to_file(struct data_preamble *p, char *fname);
 void print_data(struct data_preamble *p);
 struct data_preamble *parse_data( char *cfname, char *out, int mode);
-struct signal_data *add_signal(struct signal_data *d, int ena, int bits, int lsb, int msb, char *name);
+struct signal_data *add_signal(struct signal_data *d, int pol, int ena, int bits, int lsb, int msb, char *name);
 struct signal_data *show_vcd_label(char *a, struct labels *l);
 struct signal_data *show_la2vcd(struct data_preamble *pre, struct section *sec, int mode);
 
