@@ -44,6 +44,22 @@ struct valid_bits {
 };
 
 /***************************************************************************/
+/** Make sure the sample period is valid.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int validate_sampleperiod(uint32 p)
+{
+	if( p<8){
+		if( 2 != p && 4 != p)
+			return -1;
+		return 0;
+	}
+	if(p%8)
+		return -1;
+	return 0;
+}
+/***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns: index into instrument array
@@ -209,7 +225,7 @@ void config_show_label(struct labels *l, FILE *out)
 			fprintf(stderr,"%02x ",l->map.clk_pods[m]);
 		}
 			
-		fprintf(stderr," #bits %d ena %d seq %d ",l->bits,l->enable, l->sequence);	
+		fprintf(stderr," pol %d #bits %d ena %d seq %d ",l->polarity,l->bits,l->enable, l->sequence);	
 		/** for (m=0;m<3;++m)
 			fprintf(stderr,"%02x ",l->unknown1[m]);
 		fprintf(stderr,"*3* ");
@@ -569,7 +585,7 @@ uint32 valid_rows(int pod_no, uint32 pods, uint32 *rows)
 
 
 /***************************************************************************/
-/** .
+/** FIXME. We do not compensate for inverted polarity here.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
@@ -772,7 +788,7 @@ err:
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct signal_data *add_signal(struct signal_data *d,int ena, int bits, int lsb, int msb, char *name)
+struct signal_data *add_signal(struct signal_data *d,int pol,int ena, int bits, int lsb, int msb, char *name)
 {
 	struct signal_data *s, *x;
 	if(NULL != d){
@@ -794,6 +810,7 @@ struct signal_data *add_signal(struct signal_data *d,int ena, int bits, int lsb,
 	x->msb=msb;
 	x->bits=bits;
 	x->ena=ena;
+	x->pol=pol;
 	/*fprintf(stderr,"%s %d %d %d %d\n",x->name, x->msb, x->lsb, x->bits, x->ena); */
 	return x;
 }
@@ -882,9 +899,9 @@ struct signal_data *show_vcd_label(char *a, struct labels *l)
 		}
 	}	
 	if(NULL ==d)
-		d=add_signal(NULL, l->enable, bits, bs,be,l->name);
+		d=add_signal(NULL, l->polarity,l->enable, bits, bs,be,l->name);
 	else
-		add_signal(d, l->enable, bits, bs,be,l->name);
+		add_signal(d, l->polarity,l->enable, bits, bs,be,l->name);
 
 	return d;
 }
