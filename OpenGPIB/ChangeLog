@@ -8,3 +8,7 @@ Implemented a dist target and VERSION for imbedding into the build.
 rev.
 2010-01-19 RickyRockRat V_0_0_7: Added internet driver for HP, printf->
 fprintf clean up.
+2010-01-19 RickyRockRat V_0_0_8: Added -r (set sample rate,trigger) and
+changed sec/div in waveform menu to get trace back soonest. Added setting of
+polarity bit, since it *does* invert the data. Still need to revert the data
+back to raw using this info.
