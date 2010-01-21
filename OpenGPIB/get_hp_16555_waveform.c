@@ -238,7 +238,7 @@ void usage(void)
 	" -m meth set method to meth (hpip)\n"
 	" -o fname put config lfDATAlf data to file called fname\n"
 	" -p set packed mode to packed for config only (unpacked)\n"
-	" -r send run before getting data\n"
+	" -r sample if !0, set sample period to sample ns and send run before getting data\n"
 	" -t fname put trace(data) to fname\n"
 #ifdef LA2VCD_LIB
 	" -v basename put vcd data to basename.vcd. Creates .dat and .cfg\n"
@@ -326,7 +326,7 @@ int main(int argc, char * argv[])
 	FILE *ofd,*cfd,*tfd,*vfd;
 	char *name, *ofname;
 	char *tname,*cname,*vname;
-	int i, c,inst_addr, rtn, raw,dtype,trigger,slot;
+	int i, c,inst_addr, rtn, raw,dtype,trigger,slot, speriod;
 	long int total;
 	inst_addr=7;
 	rtn=1;
@@ -335,7 +335,7 @@ int main(int argc, char * argv[])
 	vfd=tfd=cfd=ofd=NULL;
 	raw=0;
 	dtype=GPIB_CTL_HP16500C;
-	while( -1 != (c = getopt(argc, argv, "a:c:d:hmo:prt:v:")) ) {
+	while( -1 != (c = getopt(argc, argv, "a:c:d:hmo:pr:t:v:")) ) {
 		switch(c){
 			case 'a':
 				inst_addr=atoi(optarg);
@@ -367,6 +367,14 @@ int main(int argc, char * argv[])
 				raw=1;
 				break;
 			case 'r':
+				speriod=atoi(optarg);
+				if(0!=speriod){
+					if(-1 ==validate_sampleperiod(speriod)){
+						fprintf(stderr,"Invalid period %dns (must be 2,4,8 or 8ns increments)\n",speriod);
+						return -1;
+					}	
+				}
+				
 				trigger=1;
 				break;
 			case 't':
@@ -449,6 +457,25 @@ int main(int argc, char * argv[])
 		}
 	}
 	if(trigger){
+		char range[100], period[100];
+		range[0]=period[0]=0;
+		/**set waveform to minimal waveform display, so it doesn't take forever to draw  */
+		sprintf(g->buf,":mach1:TWAV:RANGE?\n");
+		i=write_wait_for_data(g->buf,5,g);	
+		if(i && i<100)
+			sprintf(range,"%s",g->buf);
+		if(0 != speriod){
+				/**set the sample period*/
+			sprintf(g->buf,":mach1:TTR:SPER?\n");
+			i=write_wait_for_data(g->buf,5,g);	
+			if(i && i<100)
+				sprintf(period,"%s",g->buf);
+			sprintf(g->buf,":mach1:TTR:SPER %dE-9\n",speriod);
+			i=write_string(g,g->buf);	
+		}
+		
+		sprintf(g->buf,":mach1:TWAV:RANGE 10E-9\n");
+		i=write_string(g,g->buf);	
 		fprintf(stderr,"Starting Aquisition. Waiting for Data\n");
 		sprintf(g->buf,":RMODE SINGLE");
 		i=write_string(g,g->buf);	
@@ -458,6 +485,16 @@ int main(int argc, char * argv[])
 		/**move menu to config so it won't paint the screen...  */
 		sprintf(g->buf,":menu %d,0\n",slot+1);
 		write_string(g,g->buf);	
+		if(range[0]){
+			sprintf(g->buf,":mach1:TWAV:RANGE %s\n",range);
+			write_string(g,g->buf);
+			usleep(10000);
+		}
+		if(period[0]){
+			sprintf(g->buf,":mach1:TTR:SPER %s\n",period);
+			write_string(g,g->buf);
+			usleep(10000);
+		}		
 	}
 	if(cfd>0 ||ofd>0){ /**grab config  */
 		fprintf(stderr,"Retreiving Setup\n");
