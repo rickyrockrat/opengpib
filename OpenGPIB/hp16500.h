@@ -236,13 +236,52 @@ struct section {
 	char *data;
 }__attribute__((__packed__));	
 
+/**these are guesses, since I haven't figured out how to separate A1 from A2 or A3 from A4  */
+/**for the pod_info* bytes  */
+#define POD_INFO_A1 0x02
+#define POD_INFO_A2 0x04
+#define POD_INFO_A3 0x08
+#define POD_INFO_A4 0x10
+/**10 bytes  */
+struct pod_assignment {
+	uint8 unknown1[3];
+	uint8 pod_info0; /**pod_info0 and 1 always seem to be equal to each other No pods=0 */
+	uint8 unknown2[3];
+	uint8 pod_info1;
+	uint8 unknown3;
+	uint8 pod_info2; /**this is 0x06 with no pods assigned to either analyzer, 0x66 if pod1/2, 0x78 if pod 3/4, 0x1E if pod1,2,3,4.  */
+}__attribute__((__packed__));	
+/**defines for the mode byte below  */
+#define MACHINE_MODE_OFF 		0
+#define MACHINE_MODE_TIMING 1
+#define MACHINE_MODE_STATE	2
+#define MACHINE_MODE_CMP_SPA 3
+#define MACHINE_MODE2_FULL 0
+#define MACHINE_MODE2_HALF 1
+/*64 bytes per machine config*/
+
+struct machine_config {
+	char name[11];
+	uint8 unknown3[4];
+	uint8 mode;	/**0=off,1=timing,2=state,3=statecompare or SPA  */
+	uint8 unknown4[7];
+	uint8 mode2;	 /*0=fullchannel, 1=half channel*/
+	uint8 unknown5[8];
+	struct pod_assignment assign;
+	uint8	un[22];
+}__attribute__((__packed__));	
+
+struct config_data {
+	struct machine_config m[2];
+}__attribute__((__packed__));	
+
 #define LABEL_RECORD_LEN 22
 #define LABEL_MAP_LEN 12
 
 struct label_map {
 	/**offset 0= hi byte.  */
 	uint8 clk_pods[POD_ARRAYSIZE]; /**0 and 1 index are clk, 2 idx is hi byte of pod4  */
-	uint8 unknown;
+	uint8 unknown[2];
 }__attribute__((__packed__));	
 
 struct labels {
