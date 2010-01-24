@@ -221,7 +221,7 @@ void config_show_label(struct labels *l, FILE *out)
 		fprintf(stderr,"%s map is clk ",l->name);
 		for (m=0;m<10;++m){
 			if(m>1 && !(m%2))
-				fprintf(stderr,"P%d ",5-((m+2)/2));
+				fprintf(stderr,"P%d ",6-((m+2)/2));
 			fprintf(stderr,"%02x ",l->map.clk_pods[m]);
 		}
 			
@@ -236,7 +236,7 @@ void config_show_label(struct labels *l, FILE *out)
 		
 }
 /***************************************************************************/
-/** .
+/** FIXME: This does not handle having both analyzers on.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
@@ -245,12 +245,41 @@ void config_show_labelmaps(struct section *sec, FILE *out)
 	struct labels l;
 	int i,k;
 	char x[10], active[SIZEOF_ACTIVE_ARRAY];
-	/**0x27A is 0x294-1A. 1A is start of machine name 1.  */
+	struct config_data d;
+	memcpy(&d,sec->data,sizeof(struct config_data));
+	
+	for (i=0;i<2;++i){
+		d.m[i].name[10]=0;
+		fprintf(stderr,"Machine %d is '%s'\n",i,d.m[i].name); 
+	}
+		
 	/**just for display purposes, set our bits to clock and 4 pods  */
 	memset(active,0,SIZEOF_ACTIVE_ARRAY);
+	active[4]=1; /**clk  */
+	for (i=0;i<2;++i){
+		int pod;
+		pod=0;
+		if(MACHINE_MODE_OFF == d.m[i].mode)
+			fprintf(stderr,"Machine %d is off\n",i+1);
+		else{
+			int x;
+			if(d.m[i].assign.pod_info0&(POD_INFO_A1|POD_INFO_A2))
+				pod=1;
+			if(d.m[i].assign.pod_info0&(POD_INFO_A3|POD_INFO_A4))
+				pod|=2;
+		  for (x=0;x<2;++x){
+				if(pod&(1<<x)){
+					active[x<<1]=1;
+					if(MACHINE_MODE2_FULL == d.m[i].mode2) /**full channel, both pods are used  */
+						active[(x<<1)+1]=1;
+				}
+			}	
+		}
+	}
 	for (i=0;i<5;++i)
-		active[i]=1;
-		
+		fprintf(stderr,"%d ",active[i]);	
+	fprintf(stderr,"\n");
+	/**0x27A is 0x294-1A. 1A is start of machine name 1.  */	
 	for (i=0,k=0x27A; i<0xFF; ++i){
 		memcpy(&l,sec->data+k,LABEL_RECORD_LEN);
 		l.actual_offset=swap16(l.strange_offsetlo);
@@ -327,7 +356,7 @@ struct section *parse_config( char *cfname, char *name, int mode)
 	}
 	if(SHOW_PRINT == mode){
 		show_sections(blk);
-		fprintf(stderr,"First Machine is '%s', second is '%s'\n",sec->data,(char *)(sec->data+0x40));
+		/*fprintf(stderr,"First Machine is '%s', second is '%s'\n",sec->data,(char *)(sec->data+0x40)); */
 		config_show_labelmaps(sec, NULL);
 	}
 	return sec;
