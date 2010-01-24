@@ -256,6 +256,7 @@ struct pod_assignment {
 #define MACHINE_MODE_TIMING 1
 #define MACHINE_MODE_STATE	2
 #define MACHINE_MODE_CMP_SPA 3
+/*defines for mode2 below */
 #define MACHINE_MODE2_FULL 0
 #define MACHINE_MODE2_HALF 1
 /*64 bytes per machine config*/
