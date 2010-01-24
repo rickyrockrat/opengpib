@@ -12,3 +12,5 @@ fprintf clean up.
 changed sec/div in waveform menu to get trace back soonest. Added setting of
 polarity bit, since it *does* invert the data. Still need to revert the data
 back to raw using this info.
+2010-01-24 RickyRockRat V_0_0_9: Added more reverse engineering for the config
+info, which really only effects the hp16500 config parser.
