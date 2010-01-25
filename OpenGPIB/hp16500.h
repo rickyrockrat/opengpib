@@ -370,7 +370,7 @@ uint64 swap64(uint64 in);
 uint16 swap16(uint16 in);
 struct section *find_section(char *name, struct hp_block_hdr *blk );
 void show_sections(struct hp_block_hdr *blk );
-void config_show_label(struct labels *l, FILE *out);
+void config_show_label(char *a,struct labels *l, FILE *out);
 void config_show_labelmaps(struct section *sec, FILE *out);
 struct hp_block_hdr *read_block(char *cfname);
 struct section *parse_config( char *cfname, char *name, int mode);
