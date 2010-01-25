@@ -206,23 +206,27 @@ POL    00 00 00 00 00 00 00 00 00 08
 
 Where h= hi, l= lo, C=CLK and P=POD. In the above example, POL is bit 3, on
 Pod 1
+a[0] is clk, a[1] is pod 4
 \n\b Returns:
 ****************************************************************************/
-void config_show_label(struct labels *l, FILE *out)
+void config_show_label(char *a, struct labels *l, FILE *out)
 {
 	int m;
 	if(NULL != out){
 		fprintf(out,"%s ",l->name);
 		for (m=0;m<10;++m){
-			fprintf(out,"%02x ",l->map.clk_pods[m]);
+			if(a[m/2])
+				fprintf(out,"%02x ",l->map.clk_pods[m]);
 		}
 		fprintf(out,"\n");
 	}else{
 		fprintf(stderr,"%s map is clk ",l->name);
 		for (m=0;m<10;++m){
-			if(m>1 && !(m%2))
-				fprintf(stderr,"P%d ",6-((m+2)/2));
-			fprintf(stderr,"%02x ",l->map.clk_pods[m]);
+			if(a[m/2]){
+				if(m>1 && !(m%2))
+					fprintf(stderr,"P%d ",6-((m+2)/2));
+				fprintf(stderr,"%02x ",l->map.clk_pods[m]);	
+			}
 		}
 			
 		fprintf(stderr," pol %d #bits %d ena %d seq %d ",l->polarity,l->bits,l->enable, l->sequence);	
@@ -287,7 +291,7 @@ void config_show_labelmaps(struct section *sec, FILE *out)
 		l.actual_offset-=0x6E90;
 		/*fprintf(stderr,"Adjusted = 0x%x ",l.actual_offset); */
 		memcpy(&l.map,sec->data+0x27A+l.actual_offset,LABEL_MAP_LEN);
-		config_show_label(&l, out);
+		config_show_label(active,&l, out);
 		show_vcd_label(active,&l);	
 		k+=LABEL_RECORD_LEN;
 		snprintf(x,7,"Lab%d  ",i+1);
@@ -861,9 +865,9 @@ struct signal_data *show_vcd_label(char *a, struct labels *l)
 	uint8 pod[26];
 	uint16 x;
 	static struct signal_data *d=NULL;
-	if(NULL ==a && NULL ==l)
+	if(NULL ==a && NULL ==l) /**just return pointer to data struct  */
 		return d;
-	if(NULL ==l && NULL !=d){
+	if(NULL ==l && NULL !=d){	/**print out our signal list  */
 		struct signal_data *s=d;
 		while(s){
 			if(s->lsb==s->msb)
