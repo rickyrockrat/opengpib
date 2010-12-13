@@ -1,0 +1,30 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head><meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>HP16500C Linux Fat Driver Readme</title></head><body>
+<h1 style="text-align: center;">HP16500C Linux Fat Driver Readme</h1>
+This driver is really very easy, and shouldn't mess up existing systems. <br>
+<br>
+It looks for 'HP16500' in the FAT table, then modifies parameters in
+that table to match a 512 sector size, which most sane FATs should
+already have.<br>
+<br>
+So even if this new code is triggered, it should be a NOP.<br>
+<br>
+Untar the tarball then go to that directory and type 'make'. You will
+need the Linux headers installed for your running kernel. If you use a
+debian package system, then use this commandto install them:<br>
+<br>
+sudo apt-get install linux-headers-$(uname -r)<br>
+<br>
+Once that is done, go to the directory where the driver is installed and type make.<br>
+<br>
+Then, make sure all FAT file systems are unmounted (you will get an error until they are unmounted) then type:<br>
+<br>
+sudo rmmod vfat fat<br>
+sudo insmod fat.ko<br>
+sudo insmod vfat.ko<br>
+<br>
+Your new modules should be running.<br>
+<br>
+Now you can mount that HP drive. I'm looking into doing the byteswap in the kernel as well, but that's really wacked.<br>
+<br>
+</body></html>

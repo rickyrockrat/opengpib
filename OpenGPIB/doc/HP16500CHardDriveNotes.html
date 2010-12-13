@@ -1,0 +1,96 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head><meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>HP 16500C Hard Drive Notes</title></head><body>
+<h1 style="text-align: center;">HP 16500C Hard Drive Notes</h1>
+The HP 16500C has a very&nbsp; interesting HDD.&nbsp; It is MS-Dos Fat16, with some twists.<br>
+<br>
+1) They are byte-swapped meaning every byte has to be swapped before reading/writing on a intel machine (and any Linux machine)<br>
+2) The bytes per sector is set to 32768.<br>
+3) There is no partiton table. Instead, the drive appears as a single partition.&nbsp; <br>
+<br>
+There is hope, however. Here is how you can extract and save the data.
+This all happens on a Linux box. Sorry, windows users, get a real OS.
+:) <br>
+<br>
+<h2>Introduction to Linux</h2>
+<br>
+On Windows you have C: D:&nbsp; until you run out of drive letters, and
+I don't know what the raw device access looks like. Not even sure a
+non-developer could access it.<br>
+<br>
+On Linux, which is a form a Unix, life is much easier for these sorts
+of things. Free compilers, free source code, and best of all an OS that
+makes sense and isn't out to take over the world. <br>
+<br>
+Drives are mounted somewhere on the file system, and the mother of them
+all is root, accessed with a /.&nbsp; Just change C: to / and you've
+got a good start.&nbsp; Since they are not drive letters anymore, how
+do you find your drives and use them?&nbsp; Well, they are all mounted
+under root.&nbsp; Many Linux systems choose to mount removable media
+under /media, and some will show up under /media/Lexar128M or some
+other name.&nbsp; The F: drive (or whatever Windows chose to call it)
+is equivalent to /media/Lexar128M. <br>
+<br>
+One more thing, Linux is case sensitive, so <span style="color: rgb(92, 67, 216);"><span style="font-weight: bold;">H</span>elp</span> and <span style="color: rgb(51, 204, 255);"><span style="font-weight: bold;">h</span>elp</span> are not the same. <br>
+<br>
+The other wonderful thing about Linux is that you can access a disk
+image (i.e. a file that contains all the bytes from your hard drive). This includes iso images, floppy images, etc.<br>
+<br>
+One further cool idea that Unix has is that everything is a file. You
+want to print to a screen? It's a file. You want to write to your
+monitor? It's a file. You want to write to your hard drive? You guessed
+it, file.&nbsp; Everything is done with open, read, write, close, and
+just for those cases you want to circumvent anything, there's ioctl.<br>
+<br>
+On Linux there is something called a loopback device, and it allows you
+to present a file as a block device (which is what hard drives are).
+You can do all kinds of horrible things to the block device but not
+actually write any data to the hard drive. It also allows you to save
+your drive so if you completly screw it up you can get it back.<br>
+<br>
+The raw disk devices are either hdx or sdx, where x is replaced by a
+consecutive run of letters (sorta like Windows), however the drive is
+accesed in a logical manner.<br>
+<br>
+Let's use sdb as an example. /dev/sdb is the whole drive. /dev/sdb1 is the first partition and so on.<br>
+<br>
+<h2>Dump the Hard Drive</h2>
+There is a nice utility called dd (dump data, I believe) and that's what it does (dumps data, that is).<br>
+<br>
+First, dd the data from the device while byte swapping it:<br>
+<br>
+<ol>
+  <li style="color: rgb(0, 146, 0);">dd if=/dev/sdb of=hp16500bs.img conv=swab</li>
+  <li>Remove the current fat modules (this means you will have to unmount all file systems using FAT): <span style="color: rgb(0, 146, 0);">sudo rmmod vfat fat</span><br>
+  </li>
+  <li>Modify the Linux fat driver found in fs/fat/inode.c in the Linux
+source, or use my build. That's a separate discussion for another page (<a href="HP16500CFatDriverReadme.html" target="_blank">Look Here</a>).</li>
+  <li>Install the driver (covered in 3): <span style="color: rgb(0, 146, 0);">sudo insmod fat; sudo insmod vfat</span><br>
+  </li>
+  <li>Create the mount point: <span style="color: rgb(0, 146, 0);">mkdir hp</span><br>
+  </li>
+  <li>Mount the driver: <span style="color: rgb(0, 146, 0);">sudo mount -o loop p16500bs.img hp</span>.</li>
+  <li>Make the destination directory: <span style="color: rgb(0, 146, 0);">mkdir hp.sav</span></li>
+  <li>Copy the files from the image: <span style="color: rgb(0, 146, 0);">cp -r hp/* hp.sav</span></li>
+  <li>Unmount the drive: <span style="color: rgb(0, 146, 0);">sudo umount hp</span></li>
+</ol>
+If you want to create a backup copy of your drive, use this:<br>
+<span style="color: rgb(0, 146, 0);">dd if=/dev/sdb of=hp16500bs.img</span><br>
+<br>
+This much is working, but I don't know if the kernel developers will like my patch to the fat driver.<br>
+<br>
+I have a plan to build a new working image from that file dump. It goes something like this:<br>
+<ol>
+  <li>Format the new device using FAT16 (HDD/Compact Flash).</li>
+  <li>dump the data to a file, so there's an image of that format.</li>
+  <li>Mount the image and copy all the files from the old drive, or from the floppies.</li>
+  <li>Unmount the image.<br>
+  </li>
+  <li>Write a simple program that morks the FAT boot block so it fits HP's wackiness.</li>
+  <li>Run said program on image.</li>
+  <li>dd the image back to the device and byte swap at the same time.<br>
+  </li>
+</ol>
+<br>
+<br>
+<br>
+</body></html>
