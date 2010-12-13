@@ -1,5 +1,6 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html><head><meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>HP16500C Linux Fat Driver Readme</title></head><body>
+<html><head>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>HP16500C Linux Fat Driver Readme</title></head><body>
 <h1 style="text-align: center;">HP16500C Linux Fat Driver Readme</h1>
 This driver is really very easy, and shouldn't mess up existing systems. <br>
 <br>
@@ -9,6 +10,8 @@ already have.<br>
 <br>
 So even if this new code is triggered, it should be a NOP.<br>
 <br>
+Get the tarball here:<br>
+<a href="hdd_driver.tar.bz2">hdd_driver.tar.bz2</a><br>
 Untar the tarball then go to that directory and type 'make'. You will
 need the Linux headers installed for your running kernel. If you use a
 debian package system, then use this commandto install them:<br>
@@ -26,5 +29,7 @@ sudo insmod vfat.ko<br>
 Your new modules should be running.<br>
 <br>
 Now you can mount that HP drive. I'm looking into doing the byteswap in the kernel as well, but that's really wacked.<br>
+<br>
+Let me know if it's not working. gpib at rickyrockrat&nbsp; net.<br>
 <br>
 </body></html>
