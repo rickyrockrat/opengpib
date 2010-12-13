@@ -1222,7 +1222,6 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	unsigned int media;
 	long error;
 	char buf[50];
-
 	/*
 	 * GFP_KERNEL is ok here, because while we do hold the
 	 * supeblock lock, memory pressure can't call back into
@@ -1251,8 +1250,28 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		printk(KERN_ERR "FAT: unable to read boot sector\n");
 		goto out_fail;
 	}
-
+  
 	b = (struct fat_boot_sector *) bh->b_data;
+	if(!strncmp(b->system_id,"HP16500",7) ){
+		u32 mult;
+		u8 x8;
+		u16 x16;
+		printk(KERN_INFO "FAT: found HP16500. Set blk to 512:");
+		x16=get_unaligned_le16(&b->sector_size);
+		mult=x16/512;
+		put_unaligned_le16(512,&b->sector_size);
+		/**now adjust all sector vars by mult.  */
+		x8=x16=mult;
+		
+		b->sec_per_clus*=x8;
+		put_unaligned_le16(x16*get_unaligned_le16(&b->reserved),&b->reserved);
+		put_unaligned_le16(x16*get_unaligned_le16(&b->sectors),&b->sectors);
+		put_unaligned_le16(x16*get_unaligned_le16(&b->fat_length),&b->fat_length);
+		put_unaligned_le16(x16*get_unaligned_le16(&b->secs_track),&b->secs_track);
+		put_unaligned_le32(mult*get_unaligned_le32(&b->hidden),&b->hidden);
+		put_unaligned_le32(mult*get_unaligned_le32(&b->total_sect),&b->total_sect);
+    
+	}
 	if (!b->reserved) {
 		if (!silent)
 			printk(KERN_ERR "FAT: bogus number of reserved sectors\n");
@@ -1280,6 +1299,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		goto out_invalid;
 	}
 	logical_sector_size = get_unaligned_le16(&b->sector_size);
+	
 	if (!is_power_of_2(logical_sector_size)
 	    || (logical_sector_size < 512)
 	    || (logical_sector_size > 4096)) {
@@ -1289,6 +1309,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		brelse(bh);
 		goto out_invalid;
 	}
+	
 	sbi->sec_per_clus = b->sec_per_clus;
 	if (!is_power_of_2(sbi->sec_per_clus)) {
 		if (!silent)
