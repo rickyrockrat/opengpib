@@ -232,9 +232,9 @@ int message_avail(struct gpib *g)
 void usage(void)
 {
 	fprintf(stderr,"Version %s: get_hp_16555_waveform <options>\n"
-	" -a addr set instrument address to addr (7)\n"
+	" -a addr set GPIB instrument address to addr (7)\n"
 	" -c fname put config data to fname\n"
-	" -d dev set path to device name\n"
+	" -d dev set path to device name (use ipaddress for hpip)\n"
 	" -m meth set method to meth (hpip)\n"
 	" -o fname put config lfDATAlf data to file called fname\n"
 	" -p set packed mode to packed for config only (unpacked)\n"
