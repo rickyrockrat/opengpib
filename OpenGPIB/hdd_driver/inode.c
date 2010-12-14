@@ -1265,11 +1265,19 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		
 		b->sec_per_clus*=x8;
 		put_unaligned_le16(x16*get_unaligned_le16(&b->reserved),&b->reserved);
-		put_unaligned_le16(x16*get_unaligned_le16(&b->sectors),&b->sectors);
+		if(0!=b->total_sect){
+			printk(KERN_INFO "FAT: total_sect %d. Changing!\n",b->total_sect);
+		}
+		put_unaligned_le32(mult*((u32)(get_unaligned_le16(&b->sectors))),&b->total_sect);
+		*(u16 *)b->sectors=0;
 		put_unaligned_le16(x16*get_unaligned_le16(&b->fat_length),&b->fat_length);
 		put_unaligned_le16(x16*get_unaligned_le16(&b->secs_track),&b->secs_track);
 		put_unaligned_le32(mult*get_unaligned_le32(&b->hidden),&b->hidden);
-		put_unaligned_le32(mult*get_unaligned_le32(&b->total_sect),&b->total_sect);
+		/*put_unaligned_le32(mult*get_unaligned_le32(&b->total_sect),&b->total_sect); */
+		printk(KERN_INFO "FAT: res %d flen %d sec/track %d hidden %d total %d\n",
+		get_unaligned_le16(&b->reserved),get_unaligned_le16(&b->fat_length),	
+		get_unaligned_le16(&b->secs_track),get_unaligned_le32(&b->hidden),
+		get_unaligned_le32(&b->total_sect));
     
 	}
 	if (!b->reserved) {
