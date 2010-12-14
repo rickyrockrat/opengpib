@@ -1,0 +1,3 @@
+sudo rmmod vfat fat
+sudo insmod fat.ko
+sudo insmod vfat.ko
