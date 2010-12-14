@@ -16,3 +16,7 @@ msdos-y := namei_msdos.o
 
 default:
 	make -C  ${KERNEL_SOURCE} SUBDIRS=`pwd` modules
+
+clean:
+	-rm *.o *.ko *.mod.* modules.order Module.symvers
+	
