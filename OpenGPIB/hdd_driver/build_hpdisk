@@ -1,0 +1,159 @@
+#!/bin/bash
+# \file ******************************************************************
+#\n\b File:        build_disk
+#\n\b Author:      Doug Springer
+#\n\b Company:     DNK Designs Inc.
+#\n\b Date:        12/15/2010  8:55 am
+#\n\b Description: Build a HP floppy disk for the 16500x series.
+#*/ /************************************************************************
+#Change Log: \n
+#
+
+
+#************************************************************************
+# find the first open loop device
+#************************************************************************
+find_loop () {
+echo "- Locating first free loopback device"
+loop=$(sudo losetup -f)
+if [ ! -e "$loop" ]; then
+	echo "unable to find a free loop device" 
+	exit 1
+fi
+}
+#************************************************************************
+# find a name that doesn't exist for mounting our loopback
+#************************************************************************
+find_mount () {
+rmnt="_build_disk"
+let I=0
+mnt="$rmnt$I"
+while [ -e "$mnt" ]; do
+	let I=I+1
+	mnt="$rmnt$I"
+done
+if [ -z "$mnt" ] || [ -e $mnt ]; then
+	echo "Unable to find suitable mount point"
+	exit 1
+fi
+mkdir -p $mnt
+err_exit "Unable to mkdir '$mnt'"
+}
+#************************************************************************
+# Exit if last cmd gave error
+#************************************************************************
+err_exit () {
+	if [ $? -ne 0 ]; then
+		if [ -n "$1" ]; then
+			echo "$1"
+		else
+			echo "last command failed"
+		fi
+		set +u
+		if [ -e "$mnt" ]; then
+			sudo umount $mnt
+		fi
+		if [ -n "$loop" ]; then
+			sudo losetup -d $loop
+		fi
+		exit 1
+	fi
+}
+#************************************************************************
+# Show usage
+#************************************************************************
+usage () {
+echo "build_hpdisk \$Revision: 1.1 $"
+echo "build_hpdisk <options>"
+echo " Options are:"
+echo "  -h this screen"
+echo "  -d x create disk number x, where x is 1-4,p(pvtest),d(demo)"
+echo "  -i fname set generic floppy image for creation to fname"
+echo "  -p path Set path to floppy content files"
+echo "     This should have directories called DISK1-DISK4,PVTEST,DEMO"
+echo "  -d, -i, and -p are required"
+exit 1
+
+}
+#************************************************************************
+# Begin script
+#************************************************************************
+loop=""
+mnt=""
+DISK=""
+IMAGE=""
+CPATH=""
+IDIR=""
+#check our input
+while  getopts d:hi:p: opt ; do
+  #echo "opt=$opt arg=$OPTARG"
+  case $opt in
+    d) DISK="$OPTARG" ;;
+    i) IMAGE="$OPTARG" ;;
+    h) usage;;
+    p) CPATH="$OPTARG" ;;
+    *) echo "Invalid option $OPTARG"
+       exit 1
+       ;;
+  esac
+done
+
+if [ -z "$DISK" ] || [ -z "$IMAGE" ] || [ -z "$CPATH" ]; then
+	usage
+fi
+#clean any trailing /
+CPATH=$(echo "$CPATH"|sed 's!/$!!')
+set -u
+#Make sure our disk no is valid
+case $DISK in
+	1|2|3|4) IDIR="$CPATH/DISK$DISK"; OUTDSK="disk$DISK.img" ;;
+	d) IDIR="$CPATH/DEMO"; OUTDSK="demo.img" ;;
+	p) IDIR="$CPATH/PVTEST"; OUTDSK="pvtest.img" ;;
+	*) echo "Invalid -d option '$DISK'"
+	   usage
+esac
+# Make sure our initial image exists
+if [ ! -e "$IMAGE" ]; then
+	echo "Image '$IMAGE' does not exist"
+	exit 1
+fi
+#make sure our source dir exists
+if [ ! -e "$IDIR" ]; then
+	echo "Image '$IDIR' does not exist"
+	exit 1
+fi
+# don't overwrite existing
+if [ -e "$OUTDSK" ]; then
+	echo "'$OUTDSK' Already exists. Please move it out of the way"
+	exit 1
+fi
+# find the first loop device
+find_loop
+# find mntdir
+find_mount
+# copy the image file
+echo "- Copying image file"
+cp $IMAGE $OUTDSK
+err_exit "Can't copy '$IMAGE' to '$OUTDSK'"
+# set up our loop back so we can mount
+echo "- Seting up the loopback"
+sudo losetup $loop $OUTDSK
+err_exit "losetup failed on '$loop' for '$OUTDSK'"
+# mount our new image
+echo "- Mounting the image"
+sudo mount $loop $mnt
+err_exit "Unable to mount '$loop' on '$mnt'"
+# clean it out
+echo "- Removing (if any) existing files from the copy of the generic image"
+sudo rm -r $mnt/*	2>&1 >>/dev/null
+# copy the new files in
+echo "- Copying the files from '$IDIR'"
+sudo cp "$IDIR"/* $mnt
+err_exit "Unable to copy from '$IDIR' to '$mnt'"
+echo "- Cleaning up"
+sudo umount $loop
+err_exit "Unable to unmount '$loop'"
+rm -r $mnt
+sudo losetup -d $loop
+echo "- Done! Disk is in '$OUTDSK'"
+
