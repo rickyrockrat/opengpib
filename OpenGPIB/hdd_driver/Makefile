@@ -14,9 +14,12 @@ fat-y := cache.o dir.o fatent.o file.o inode.o misc.o
 vfat-y := namei_vfat.o
 msdos-y := namei_msdos.o
 
-default:
+default: morkhp modules
+
+modules:
 	make -C  ${KERNEL_SOURCE} SUBDIRS=`pwd` modules
 
+
 clean:
-	-rm *.o *.ko *.mod.* modules.order Module.symvers
+	-rm -rf .* *.o *.ko *.mod.* modules.order Module.symvers
 	
