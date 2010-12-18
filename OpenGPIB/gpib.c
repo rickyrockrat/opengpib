@@ -124,11 +124,11 @@ int write_get_data (struct gpib *g, char *cmd)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int write_wait_for_data(char *msg, int sec, struct gpib *g)
+int write_wait_for_data(struct gpib *g, char *cmd, int sec)
 {
 	int i,rtn;
 	rtn =0;
-	write_string(g,msg);
+	write_string(g,cmd);
 	for (i=0; i<sec*2;++i){
 		if((rtn=read_string(g)))
 			break;

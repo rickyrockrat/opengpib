@@ -461,13 +461,13 @@ int main(int argc, char * argv[])
 		range[0]=period[0]=0;
 		/**set waveform to minimal waveform display, so it doesn't take forever to draw  */
 		sprintf(g->buf,":mach1:TWAV:RANGE?\n");
-		i=write_wait_for_data(g->buf,5,g);	
+		i=write_wait_for_data(g,g->buf,5);
 		if(i && i<100)
 			sprintf(range,"%s",g->buf);
 		if(0 != speriod){
 				/**set the sample period*/
 			sprintf(g->buf,":mach1:TTR:SPER?\n");
-			i=write_wait_for_data(g->buf,5,g);	
+			i=write_wait_for_data(g,g->buf,5);
 			if(i && i<100)
 				sprintf(period,"%s",g->buf);
 			sprintf(g->buf,":mach1:TTR:SPER %dE-9\n",speriod);

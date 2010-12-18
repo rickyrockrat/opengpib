@@ -95,7 +95,7 @@ int read_raw(struct gpib *g);
 int read_string(struct gpib *g);
 int write_string(struct gpib *g, char *msg);
 int write_get_data (struct gpib *g, char *cmd);
-int write_wait_for_data(char *msg, int sec, struct gpib *g);
+int write_wait_for_data(struct gpib *g, char *cmd, int sec);
 struct gpib *open_gpib(int ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
 int close_gpib (struct gpib *g);
 int gpib_option_to_type(char *op);
