@@ -92,7 +92,7 @@ struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct gpib *g
 	gi->addr=addr;
 	printf("Initializing PSG2400L\n");
 	write_string(gi->g,"*CLS");
-	if(0 == write_wait_for_data("*IDN?",3,gi->g)){
+	if(0 == write_wait_for_data(gi->g,"*IDN?",3)){
 		printf("No data for id for '%s'\n",PSG2400L_IDN_STR);
 		return NULL;
 	}
@@ -129,7 +129,7 @@ struct ginstrument *init_HP8595E(char *path, int type, int addr, struct gpib *g)
 		gi->g=g;
 	gi->addr=addr;
 	printf("Initializing %s\n",HP8595E_IDN_STR);
-	if(0 == write_get_data(gi->g,"ID?")){
+	if(0 == write_wait_for_data(gi->g,"ID?",5)){
 		printf("No data for write_get id\n");
 		return NULL;
 	}
@@ -185,7 +185,7 @@ int main(int argc, char * argv[])
 	int signalgen_addr,analyzer_addr, mode,c, verbose, follow;
 	float start, stop, inc, iter,slevel, rbw, span, sweeptime;
  	float level,freq, last_l, last_f,delta, x;
-	char *calname, *dname, lbuf[100];
+	char *calname, *dname, lbuf[1000];
 	FILE *cal, *data;
 	signalgen_inst=analyzer_inst=NULL;
 	signalgen_dev=analyzer_dev=calname=dname=NULL;
@@ -326,7 +326,7 @@ int main(int argc, char * argv[])
 		printf("Using spectrum analyzer controller for generator\n");
 		analyzer_dev=signalgen_dev;
 	}
-	if(CAL == mode){
+	if(CAL & mode){
 		if(NULL ==calname){
 			printf("Must specify -c when mode is CAL\n");
 			return 1;
@@ -365,11 +365,11 @@ int main(int argc, char * argv[])
 			float y;
 			if(verbose) printf("Looking at %f ",iter); 
 			sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",iter);
-			write_wait_for_data(lbuf,10,analyzer_inst->g);
+			write_wait_for_data(analyzer_inst->g,lbuf,10);
 			sscanf(analyzer_inst->g->buf,"%f",&level);
 			if(verbose) printf("%s ",analyzer_inst->g->buf); 
 			sprintf(lbuf,"MKF?");
-			write_wait_for_data(lbuf,10,analyzer_inst->g);
+			write_wait_for_data(analyzer_inst->g,lbuf,10);
 			sscanf(analyzer_inst->g->buf,"%f",&freq);
 			if(verbose) printf(" Peak at %f",freq);
 			y=fabs(fabs(level)-fabs(slevel/1000));
@@ -396,11 +396,11 @@ int main(int argc, char * argv[])
 		write_string(signalgen_inst->g,lbuf);
 		if(verbose) printf("Using %f for cf ",last_f);
 		sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",last_f);
-		write_wait_for_data(lbuf,10,analyzer_inst->g);
+		write_wait_for_data(analyzer_inst->g,lbuf,10);
 		sscanf(analyzer_inst->g->buf,"%f",&level);
 		if(verbose)printf("%s ",analyzer_inst->g->buf);
 		sprintf(lbuf,"MKF?");
-		write_wait_for_data(lbuf,10,analyzer_inst->g);
+		write_wait_for_data(analyzer_inst->g,lbuf,10);
 		sscanf(analyzer_inst->g->buf,"%f",&freq);
 		freq/=1000000; /**convert to Mhz  */
 		if( follow){
