@@ -1,0 +1,167 @@
+#!/bin/bash
+src="$2"
+set -u
+
+image_base="hp15600x"
+disk_image="$image_base.hp"
+image_mount="$image_base.mnt"
+me=$(whoami)
+if [ "root" = "$me" ]; then
+	makem="su $SUDO_USER -c make"
+else
+	makem="make"
+fi
+. ./com
+
+#************************************************************************
+# returns 0 if yes
+#************************************************************************
+confirm () {
+	if [ -n "$1" ]; then
+		echo "$1 y/N?"
+		read  -s CONFIRM
+	else
+		read -s -p "y/N?" CONFIRM
+	fi
+	if [ -z "$CONFIRM" ] || ( [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]); then
+		return 1
+	fi
+	return 0;
+}
+
+echo "- mkhp \$Revision: 1.1 $ "
+echo "- Sanity Checks:"
+if [ -e "$image_mount"  ] || [ -e "$disk_image" ]; then
+	echo "either '$image_mount' and/or '$disk_image' exists. Please remove before continuing."
+	exit 1
+fi
+# sanity checks. 
+if [ -z "$1" ]; then
+	echo "\$Revision: 1.1 $ Usage mkhp device"
+	exit 1
+fi
+if [ -z "$src" ] || [ ! -e "$src" ]; then
+	confirm "No source files found. Are you sure you want to continue?"
+	if [ $? -ne 0 ]; then
+		echo "- Nothing done."
+		exit 1
+	fi
+fi
+wholedisk=$(echo "$1" |grep -c "[0-9]")
+# check mounts
+while read dev g; do
+ 
+	if [ -h $dev ]; then
+		#echo "file is link. find device"
+		_d=$(ls -l $dev|sed 's!.*/!!')
+		dev="/dev/$_d"
+		#echo "'$_d' '$dev'"
+	fi
+	ispart=$(echo "$dev" |grep -c "[0-9]")
+	root=$(echo "$dev" |sed 's!\(.*\)[0-9]!\1!')
+	if [ "$wholedisk" != "0" ] && [ "$root" = "$dev" ]; then # accessing whole disk. Make sure no part is mounted.
+		echo "Using whole disk access, but a partition is mounted"
+		exit 1
+		
+	fi
+	if [ "$dev" = "$1" ]; then
+		echo "$dev is mounted. Refusing to continue."
+		exit 1
+	fi
+done <<EOF
+$(cat /proc/mounts)
+EOF
+# now check for any ms-dos mounted file systems
+fat_mounted=1
+while read dev mnt type g; do
+	#echo "$dev $mnt $type"
+	isfat=$(echo "$type"|grep -c fat)
+	if [ "$isfat" != "0" ]; then
+		echo "Have to unmount $dev ($mnt) to continue"
+		fat_mounted=0
+	fi
+done <<EOF
+$(cat /proc/mounts)
+EOF
+
+if [ "$fat_mounted" = "0" ]; then
+	echo "All fat file systems must be unmounted so the new drivers can be inserted"
+	exit 1
+fi
+# check for drivers
+if [ ! -e fat.ko ] || [ ! -e vfat.ko ]; then
+	echo "- Building new drivers"
+	# run as normal user
+	$makem
+	err_exit "Make failed. Are the linux headers installed?"
+fi
+#insert new drivers
+echo "- Insert new drivers"
+./rr
+err_exit "Unable to load drivers"
+loop=""
+if [ -e "$src" ]; then
+	echo "- Locating first free loopback device"
+	loop=$(sudo losetup -f)
+	if [ ! -e "$loop" ]; then
+		echo "unable to find a free loop device" 
+		exit 1
+	fi
+fi
+# determine destination disk size
+#this is defined on Linux in sys/mount.h and used in mkdosfs
+BLOCK_SIZE=1024
+let disk_limit=1614348288
+dsz=$(sudo fdisk -l $1|grep sdb:|sed 's!.*, \(.*\) byte.*!\1!')
+let d=dsz
+echo "disk size='$dsz'"
+if [ $d -gt $disk_limit ]; then
+	echo "Limit to 1.6G"
+	let blocks=disk_limit/1024
+else
+	let blocks=d/1024
+fi
+echo "Blocks at $blocks"
+#build fat system on device
+echo "- Making MSDos FAT 16 FS"
+echo "  You will get these warnings:"
+echo "      'sector size > 4086..'" 
+echo "     'Not enough clusters...'"
+echo " "
+mkdosfs -f 2 -S 32768 -s 1 -R 1 -F 16 -h 0 -I -C -n "B16500     " $disk_image $blocks
+err_exit "mkdosfs Failed"
+echo "- Making image file"
+# copy to initial disk image
+#sudo dd if=$1 of=$disk_image
+#sudo chown $me:$me $disk_image
+# Mork it
+echo "- Modifying the first 512 bytes of image"
+./morkhp -d $disk_image -w
+err_exit "Mork failed"
+./morkhp -d $disk_image
+
+if [ -n "$loop" ]; then
+  echo "- Using $loop. if this errors out, make sure you do 'sudo losetup -d $loop'"
+	echo "- Attempt to mount and copy files from '$src' to '$disk_image'"
+	sudo losetup $loop $disk_image
+	err_exit "Losetup failed"
+	mkdir -p $image_mount
+	err_exit "mkdir $image_mount failed"
+	sudo mount -t vfat $loop $image_mount
+	err_exit "loop mount failed"
+	echo "- Copying files"
+	sudo cp -r "$src"/* $image_mount
+	err_exit "copy failed"
+	sudo umount $image_mount
+	err_exit "umount failed"
+	sudo losetup -d $loop
+	err_exit "losetup delete failed"
+fi
+echo "- Removing drivers"
+sudo rmmod vfat fat
+err_exit "can't remove fat modules, but image is ready!"
+echo "- Writing image to device"
+sudo dd of=$1 if=$disk_image conv=swab
+sudo sync
+echo "- Done. Remove disk and let the smoke out!!"
+
