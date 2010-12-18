@@ -1,3 +1,8 @@
+#!/bin/bash
+. ./com
 sudo rmmod vfat fat
 sudo insmod fat.ko
+err_exit "fat insmod failed!"
 sudo insmod vfat.ko
+err_exit "vfat insmod failed!"
+exit 0
