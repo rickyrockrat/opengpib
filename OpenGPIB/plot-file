@@ -1,0 +1,23 @@
+# \file ******************************************************************
+#\n\b File:        plot-file
+#\n\b Author:      Doug Springer
+#\n\b Company:     DNK Designs Inc.
+#\n\b Date:        12/18/2010  6:49 am
+#\n\b Description: Plot a file with format X Y
+#*/ /************************************************************************
+#Change Log: \n
+#
+
+
+if [ $# -lt 2 ]; then
+	echo "plot-file file1 <file2 ...>"
+	exit 1
+fi
+for f in $@; do
+	if [ -n "$files" ]; then
+		files="$files, \"$f\" with lines"
+	else
+		files="\"$f\" with lines"
+	fi
+done
+echo -e "set terminal x11 persist\n plot $files" |gnuplot
