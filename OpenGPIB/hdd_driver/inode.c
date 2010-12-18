@@ -1252,7 +1252,11 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	}
   
 	b = (struct fat_boot_sector *) bh->b_data;
-	if(!strncmp(b->system_id,"HP16500",7) ){
+  logical_sector_size = get_unaligned_le16(&b->sector_size);
+	total_sectors = get_unaligned_le16(&b->sectors);
+	if (total_sectors == 0)
+		total_sectors = le32_to_cpu(b->total_sect);
+	if(logical_sector_size > 4096 && !strncmp(b->system_id,"HP16500",7) ){
 		u32 mult;
 		u8 x8;
 		u16 x16;
@@ -1265,11 +1269,12 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		
 		b->sec_per_clus*=x8;
 		put_unaligned_le16(x16*get_unaligned_le16(&b->reserved),&b->reserved);
+		
 		if(0!=b->total_sect){
 			printk(KERN_INFO "FAT: total_sect %d. Changing!\n",b->total_sect);
 		}
-		put_unaligned_le32(mult*((u32)(get_unaligned_le16(&b->sectors))),&b->total_sect);
-		*(u16 *)b->sectors=0;
+		put_unaligned_le32(mult*((u32)(total_sectors)),&b->total_sect);
+		*(u16 *)b->sectors=0;	/**0 is zero no matter how many endians  */
 		put_unaligned_le16(x16*get_unaligned_le16(&b->fat_length),&b->fat_length);
 		put_unaligned_le16(x16*get_unaligned_le16(&b->secs_track),&b->secs_track);
 		put_unaligned_le32(mult*get_unaligned_le32(&b->hidden),&b->hidden);
