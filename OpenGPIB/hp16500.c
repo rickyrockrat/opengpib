@@ -259,7 +259,7 @@ void config_show_labelmaps(struct section *sec, FILE *out)
 		
 	/**just for display purposes, set our bits to clock and 4 pods  */
 	memset(active,0,SIZEOF_ACTIVE_ARRAY);
-	active[4]=1; /**clk  */
+	active[4]=1; /**clk  */ 
 	for (i=0;i<2;++i){
 		int pod;
 		pod=0;
@@ -280,6 +280,7 @@ void config_show_labelmaps(struct section *sec, FILE *out)
 			}	
 		}
 	}
+	fprintf(stderr,"Pods Active ");	
 	for (i=0;i<5;++i)
 		fprintf(stderr,"%d ",active[i]);	
 	fprintf(stderr,"\n");
@@ -861,7 +862,7 @@ active[0] is clk, pod 4 is [1]
 ****************************************************************************/
 struct signal_data *show_vcd_label(char *a, struct labels *l)
 {
-	int i,bits, bs, be,p,bytes;
+	int i,bits, bs, be,p,bytes, bsset;
 	uint8 pod[26];
 	uint16 x;
 	static struct signal_data *d=NULL;
@@ -909,21 +910,24 @@ struct signal_data *show_vcd_label(char *a, struct labels *l)
 	/**now pod has clk top two indexes and lowest pod in 0,1, lsb in 0  */	
 	/**we start out off-by one on bit position (p)  */
 	bs=be=0;
+	bsset=0;
 	for (p=i=0;i<bytes;++i){
 		
 		for (x=1;x<0x100;x<<=1,++p){
 			
 			if(x&pod[i]){
+				/*fprintf(stderr,"p%d s%d e%d ",p,bs,be);  */
 				if(bs && be ){
 					fprintf(stderr,"Can't handle discontinous bits at bit %d for label %s\n",p,l->name);
 					return NULL;
 				}
-				if(!bs){
+				if(!bsset){
 					/*fprintf(stderr,"U%d ",p);  */
 					bs=p;	/**this is not off by one.  */
+					bsset=1;
 				}
 					
-			}else if(bs && !be) {
+			}else if(bsset && !be) {
 				be=p;
 				if(p)
 					--be;
