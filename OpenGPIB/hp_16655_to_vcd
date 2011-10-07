@@ -1,0 +1,10 @@
+#!/bin/bash
+if [ $# -lt 1 ]; then
+	echo "usage: $0 basefn"
+	echo "produces basefn.dat, basefn.cfg, and basefn.vcd"
+	exit 1
+fi
+
+
+./get_hp_16555_waveform -d 192.168.0.200 -t $1.dat -c $1.cfg
+./parse_16500_config -c $1.cfg -d $1.dat -v $1.vcd
