@@ -1,10 +1,27 @@
 #!/bin/bash
 if [ $# -lt 1 ]; then
-	echo "usage: $0 basefn"
-	echo "produces basefn.dat, basefn.cfg, and basefn.vcd"
+	echo "usage: $0 outdir <run>"
+	echo "produces outdir/hpdata, outdir/hpconfig, and outdir/gtkwave.vcd"
+	echo "if run is specified, will run GtkWave at conclusion"
 	exit 1
 fi
 
+if [ -e $1 ]; then
+	echo "Directory '$1' Exists. Refusing to overwrite"
+	exit 1
+fi
+mkdir -p $1
 
-./get_hp_16555_waveform -d 192.168.0.200 -t $1.dat -c $1.cfg
-./parse_16500_config -c $1.cfg -d $1.dat -v $1.vcd
+./get_hp_16555_waveform -d 192.168.0.200 -t $1/hpdata -c $1/hpconfig
+if [ $? -ne 0 ]; then
+	echo "Error reading from 16500. Is controller connected to LAN?"
+ 	rm -r $1
+	exit 1
+fi
+./parse_16500_config -c $1/hpconfig -d $1/hpdata -v $1/gtkwave.vcd
+echo "output in $1"
+if [ "$2" = "run" ]; then
+	echo "running gtkwave..."
+	gtkwave $1/gtkwave.vcd &
+fi
+
