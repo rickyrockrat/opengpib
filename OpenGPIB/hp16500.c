@@ -628,6 +628,7 @@ int get_next_datarow(struct data_preamble *p, char *buf)
 	static char *dstart;
 	static int state=0;
 	struct one_card_data *d;
+	static unsigned long off;
 	int i,k;
 	if(NULL == p || NULL ==buf){
 		state=0;
@@ -637,6 +638,7 @@ int get_next_datarow(struct data_preamble *p, char *buf)
 	if(0 == state){
 		dstart=get_trace_start(p);
 		state=1;
+		off=dstart-p->data;
 	}
 	if(dstart < p->data + p->data_sz){
 		d=(struct one_card_data *)dstart;
@@ -647,7 +649,16 @@ int get_next_datarow(struct data_preamble *p, char *buf)
 					k+=sprintf(&buf[k],"%02x%02x",d->pdata[i*2],d->pdata[1+(i*2)]);
 				}	
 		}
+		/** if( strncmp("000000000000",buf,12))
+			printf("%s",buf);*/
 		sprintf(&buf[k],"\n");
+#if 0 /**for debug, prints raw data +offset out  */		
+		off +=  ONE_CARD_ROWSIZE;
+		printf("%06lx",off);
+		for (i=0;i<12;++i)
+			printf(" %02x",((unsigned char *)dstart)[i]);
+		printf("\n");
+#endif
 		dstart+=ONE_CARD_ROWSIZE;
 		return 1;
 	}	
