@@ -121,62 +121,20 @@ number of valid rows.
 /***************************************************************************/
 /** .
 \n\b Arguments:
-\n\b Returns:
+\n\b Returns: slot number of card.
 ****************************************************************************/
-int init_instrument(struct gpib *g)	 
+int init_instrument(struct hp_common_options *o,struct gpib *g)	 
 {
-	int i,s;
-	int slots[5], osc;
-	fprintf(stderr,"Initializing Instrument\n");
-	g->control(g,CTL_SET_TIMEOUT,500);
-	while(read_string(g));
-	g->control(g,CTL_SET_TIMEOUT,50000);
-	/*write_string(g,"*CLS"); */
-	if(0 == write_get_data(g,"*IDN?"))
+	int slot;
+	if(-1 == (slot=hp16500_find_card(o->cardtype,o->cardno,g)) )
 		return -1;
-	/*fprintf(stderr,"Got %d bytes\n",i); */
-	if(NULL == strstr(g->buf,"HEWLETT PACKARD,16500C")){
-		fprintf(stderr,"Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",g->buf);
-		g->control(g,CTL_SEND_CLR,0);
-		return -1;
-	}
-	if(0 == write_get_data(g,":CARDCAGE?"))
-		return -1;
-	for (s=0;g->buf[s];++s)
-		if(isdigit(g->buf[s]))
-			break;
-	for (i=0,osc=-1;i<5;++i){
-		slots[i]=(int)get_value_col(i,&g->buf[s]);
-		fprintf(stderr,"Slot %c=%d",'A'+i,slots[i]);
-		print_card_model(slots[i], hp_cardlist);
-		fprintf(stderr,"\n");
-		if(CARDTYPE_16554M == slots[i])
-			osc=i;
-	}
-	if(-1 == osc){
-		fprintf(stderr,"Unable to find Sampling card\n");
-		return -1;
-	}
-	fprintf(stderr,"Found ");
-	print_card_model(slots[osc], hp_cardlist);
-	fprintf(stderr," in slot %c\n",'A'+osc);
+	select_hp_card(slot, g);
 	
-	write_get_data(g,":SELECT?");
-
-	if(osc+1 == (g->buf[0]-0x30)){
-		fprintf(stderr,"Card %c already selected\n",g->buf[0]+'A'-'0'-1);
-	}	else{
-		sprintf(g->buf,":SELECT %d",osc+1);
-		write_string(g,g->buf);	
-	}
-	write_get_data(g,":SELECT?");
-/*	i=write_get_data(g,":?"); */
-	fprintf(stderr,"Selected Card %c to talk to.\n",g->buf[0]+'A'-'0'-1);
 	sprintf(g->buf,"*OPC\n");
 	write_string(g,g->buf);	
-	sprintf(g->buf,":menu %d,0\n",osc+1);
+	sprintf(g->buf,":menu %d,0\n",slot+1);
 	write_string(g,g->buf);	
-	return osc;
+	return slot;
 /*34,-1,12,12,11,1,0,5,5,5 */
 	/** :WAV:REC FULL;:WAV:FORM ASC;:SELECT? */
 }
@@ -231,23 +189,20 @@ int message_avail(struct gpib *g)
 ****************************************************************************/
 void usage(void)
 {
-	fprintf(stderr,"Version %s: get_hp_16555_waveform <options>\n"
-	" -a addr set GPIB instrument address to addr (7)\n"
+	fprintf(stderr,"Version %s: get_hp_16555_waveform <options>\n",TOSTRING(VERSION));
+	show_common_usage();
+	/**common options are -a, -d, -n, -m, and -t */
+	fprintf(stderr,"\n"
 	" -c fname put config data to fname\n"
-	" -d dev set path to device name (use ipaddress for hpip)\n"
-	" -m meth set method to meth (hpip)\n"
 	" -o fname put config lfDATAlf data to file called fname\n"
 	" -p set packed mode to packed for config only (unpacked)\n"
 	" -r sample if !0, set sample period to sample ns and send run before getting data\n"
-	" -t fname put trace(data) to fname\n"
+	" -s fname put signal(data) to fname\n"
 #ifdef LA2VCD_LIB
 	" -v basename put vcd data to basename.vcd. Creates .dat and .cfg\n"
 #endif	
-	
-	"Make sure the 16550C Controller is connected to LAN for ip \nor to HPIB for prologix\n"
-	"\nHere are the supported controllers\n\n"
-	"",TOSTRING(VERSION));
-	show_gpib_supported_controllers();
+	"");
+	show_hp_connection_info();
 }
 
 
@@ -323,22 +278,29 @@ long int write_data_to_file(struct gpib *g, FILE *fd)
 int main(int argc, char * argv[])
 {
 	struct gpib *g;
+	struct hp_common_options copt;
+	
 	FILE *ofd,*cfd,*tfd,*vfd;
-	char *name, *ofname;
-	char *tname,*cname,*vname;
-	int i, c,inst_addr, rtn, raw,dtype,trigger,slot, speriod;
+	char *ofname;
+	char *sname,*cname,*vname;
+	int i, c, rtn, raw,trigger,slot, speriod;
 	long int total;
-	inst_addr=7;
 	rtn=1;
 	trigger=0;
-	name=ofname=tname=cname=vname=NULL;
+	ofname=sname=cname=vname=NULL;
 	vfd=tfd=cfd=ofd=NULL;
 	raw=0;
-	dtype=GPIB_CTL_HP16500C;
-	while( -1 != (c = getopt(argc, argv, "a:c:d:hmo:pr:t:v:")) ) {
+	handle_common_opts(0,NULL,&copt);
+	copt.cardtype=CARDTYPE_16554M;
+	while( -1 != (c = getopt(argc, argv, "c:ho:pr:s:v:"HP_COMMON_GETOPS)) ) {
 		switch(c){
 			case 'a':
-				inst_addr=atoi(optarg);
+			case 'd':
+			case 'm':
+			case 'n':
+			case 't':
+				if(handle_common_opts(c,optarg,&copt))
+					return -1;
 				break;
 			case 'c':
 				if(NULL != vname){
@@ -348,18 +310,9 @@ int main(int argc, char * argv[])
 				}
 				cname=strdup(optarg);
 				break;
-			case 'd':
-				name=strdup(optarg);
-				break;
 			case 'h':
 				usage();
 				return 1;
-			case 'm':
-				if(-1 == (dtype=gpib_option_to_type(optarg)))	{
-					fprintf(stderr,"'%s' method not supported\n",optarg);
-					return -1;
-				}
-				break;
 			case 'o':
 				ofname=strdup(optarg);
 				break;
@@ -377,17 +330,17 @@ int main(int argc, char * argv[])
 				
 				trigger=1;
 				break;
-			case 't':
+			case 's':
 				if(NULL != vname){
-					fprintf(stderr,"-v and -t are mutually exclusive.\n");
+					fprintf(stderr,"-v and -s are mutually exclusive.\n");
 					usage();
 					return 1;
 				}
-				tname=strdup(optarg);
+				sname=strdup(optarg);
 				break;
 			case 'v':
 #ifdef LA2VCD_LIB 
-				if(NULL != tname || NULL != cname){
+				if(NULL != sname || NULL != cname){
 					fprintf(stderr,"-v and -c/-tare mutually exclusive.\n");
 					usage();
 					return 1;
@@ -400,8 +353,8 @@ int main(int argc, char * argv[])
 				
 				cname=&vname[i];
 				i+=1+sprintf(cname,"%s.cfg",optarg);
-				tname=&vname[i];
-				sprintf(tname,"%s.dat",optarg);
+				sname=&vname[i];
+				sprintf(sname,"%s.dat",optarg);
 #else
 				fprintf(stderr,"-v not supported. Re-build with LA2VCD_LIB=/path/to/lib\n");
 				return 1;
@@ -412,27 +365,27 @@ int main(int argc, char * argv[])
 				return 1;
 		}
 	}
-	if(NULL != ofname && (NULL != tname || NULL != cname)){
+	if(NULL != ofname && (NULL != sname || NULL != cname)){
 		fprintf(stderr,"-o and -t/-c are mutually exclusive\n");
 		usage();
 		return 1;
 	}
-	if(NULL == ofname && NULL == tname && NULL == cname){
+	if(NULL == ofname && NULL == sname && NULL == cname){
 		fprintf(stderr,"must specify -t/-c or -o\n");
 		usage();
 		return 1;
 	} 
-	if(NULL != vname && (NULL == cname || NULL == tname)){
+	if(NULL != vname && (NULL == cname || NULL == sname)){
 		fprintf(stderr,"Must specify -c and -t with -v\n");
 		usage();
 		return 1;
 	}
-	if(NULL == (g=open_gpib(dtype,inst_addr,name,1048576))){
-		fprintf(stderr,"Can't open/init controller at %s. Fatal\n",name);
+	if(NULL == (g=open_gpib(copt.dtype,copt.iaddr,copt.dev,1048576))){
+		fprintf(stderr,"Can't open/init controller at %s. Fatal\n",copt.dev);
 		return 1;
 	}
 	
-	if(-1 == (slot=init_instrument(g)) ){
+	if(-1 == (slot=init_instrument(&copt,g)) ){
 		fprintf(stderr,"Unable to initialize instrument.\n");
 		fprintf(stderr,"Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
 		goto closem;
@@ -449,9 +402,9 @@ int main(int argc, char * argv[])
 				goto closem;
 			}
 		}
-		if(NULL !=tname){
-			if(NULL == (tfd=fopen(tname,"w+"))) {
-				fprintf(stderr,"Unable to open '%s' for writing\n",tname);
+		if(NULL !=sname){
+			if(NULL == (tfd=fopen(sname,"w+"))) {
+				fprintf(stderr,"Unable to open '%s' for writing\n",sname);
 				goto closem;
 			}
 		}
@@ -540,8 +493,8 @@ closem:
 			fprintf(stderr,"Unable to re-open '%s'\n",cname);
 			goto endvcd;
 		}	
-		if(NULL == (p=parse_data(tname,NULL,JUST_LOAD))){
-			fprintf(stderr,"Unable to re-open data file '%s'\n",tname);
+		if(NULL == (p=parse_data(sname,NULL,JUST_LOAD))){
+			fprintf(stderr,"Unable to re-open data file '%s'\n",sname);
 			goto endvcd;
 		}	
 		if(NULL ==(d=show_la2vcd(p,s,JUST_LOAD))){
