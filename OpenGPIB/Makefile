@@ -30,7 +30,7 @@
 
 #-std=c99
 
-VERSION = 0.09
+VERSION = 0.10
 
 PACKAGE = opengpib
 
