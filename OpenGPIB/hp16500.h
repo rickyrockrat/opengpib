@@ -31,6 +31,7 @@ Change Log: \n
 #ifndef _HP16500_H_
 #define _HP16500_H_ 1
 #include "common.h"
+#include "gpib.h"
 /** Id Number Card*/
 #define CARDTYPE_16515A  1         /** HP 16515A 1GHz Timing Master Card*/
 #define CARDTYPE_16516A  2         /** HP 16516A 1GHz Timing Expansion Card*/
@@ -39,7 +40,7 @@ Change Log: \n
 #define CARDTYPE_16530A  11        /** HP 16530A 400 MSa/s Oscilloscope Timebase Card*/
 #define CARDTYPE_16531A  12        /** HP 16531A Oscilloscope Acquisition Card*/
 #define CARDTYPE_16532A  13        /** HP 16532A 1GSa/s Oscilloscope Card*/
-#define CARDTYPE_16533A  14        /** HP 16533A or HP 16534A 32K GSa/s Oscilloscope Card*/
+#define CARDTYPE_16534A  14        /** HP 16533A or HP 16534A 32K GSa/s Oscilloscope Card*/
 #define CARDTYPE_16535A  15        /** HP 16535A MultiProbe 2-Output Module*/
 #define CARDTYPE_16520A  21        /** HP 16520A Pattern Generator Master Card*/
 #define CARDTYPE_16521A  22        /** HP 16521A Pattern Generator Expansion Card*/
@@ -56,59 +57,75 @@ Change Log: \n
 #define CARDTYPE_16542A  42        /** HP 16542A 2 MB Acquisition Logic Analyzer Master Card*/
 #define CARDTYPE_INVALID -1
 
-#define DESC_16515A "HP 16515A 1GHz Timing Master Card"
-#define DESC_16516A "HP 16516A 1GHz Timing Expansion Card"
-#define DESC_16517A "HP 16517A 4GHz Timing/1GHz State Analyzer Master Card"
-#define DESC_16518A "HP 16518A 4GHz Timing/1GHz State Analyzer Expansion Card"
-#define DESC_16530A "HP 16530A 400 MSa/s Oscilloscope Timebase Card"
-#define DESC_16531A "HP 16531A Oscilloscope Acquisition Card"
-#define DESC_16532A "HP 16532A 1GSa/s Oscilloscope Card"
-#define DESC_16533A "HP 16533A or HP 16534A 32K GSa/s Oscilloscope Card"
-#define DESC_16535A "HP 16535A MultiProbe 2-Output Module"
-#define DESC_16520A "HP 16520A Pattern Generator Master Card"
-#define DESC_16521A "HP 16521A Pattern Generator Expansion Card"
-#define DESC_16522AE "HP 16522A 200MHz Pattern Generator Expansion Card"
-#define DESC_16522AM "HP 16522A 200MHz Pattern Generator Master Card"
-#define DESC_16511B "HP 16511B Logic Analyzer Card"
-#define DESC_16510A "HP 16510A or B Logic Analyzer Card"
-#define DESC_16550AM "HP 16550A 100/500 MHz Logic Analyzer Master Card"
-#define DESC_16550AE "HP 16550A 100/500 MHz Logic Analyzer Expansion Card"
-#define DESC_16554M "HP 16554, 16555, or 16556 Logic Analyzer Master Card"
-#define DESC_16554E "HP 16554, 16555, or 16556 Logic Analyzer Expansion Card"
-#define DESC_16540A "HP 16540A 100/100 MHz Logic Analyzer Master Card"
-#define DESC_16541A "HP 16541A 100/100 MHz Logic Analyzer Expansion Card"
-#define DESC_16542A "HP 16542A 2 MB Acquisition Logic Analyzer Master Card"
+#define MODEL_16515A  "16515A"
+#define MODEL_16516A  "16516A"
+#define MODEL_16517A  "16517A"
+#define MODEL_16518A  "16518A"
+#define MODEL_16530A  "16530A"
+#define MODEL_16531A  "16531A"
+#define MODEL_16532A  "16532A"
+#define MODEL_16534A  "16533/34A"
+#define MODEL_16535A  "16535A"
+#define MODEL_16520A  "16520A"
+#define MODEL_16521A  "16521A"
+#define MODEL_16522AE "16522A"
+#define MODEL_16522AM "16522A"
+#define MODEL_16511B  "16511B"
+#define MODEL_16510A  "16510A/B"
+#define MODEL_16550AM "16550A"
+#define MODEL_16550AE "16550A"
+#define MODEL_16554M  "16554/16555/16556"
+#define MODEL_16554E  "16554/16555/16556"
+#define MODEL_16540A  "16540A"
+#define MODEL_16541A  "16541A"
+#define MODEL_16542A  "16542A"
+
+#define DESC_16515A  "1GHz Timing Master Card"
+#define DESC_16516A  "1GHz Timing Expansion Card"
+#define DESC_16517A  "4GHz Timing/1GHz State Analyzer Master Card"
+#define DESC_16518A  "4GHz Timing/1GHz State Analyzer Expansion Card"
+#define DESC_16530A  "400 MSa/s Oscilloscope Timebase Card"
+#define DESC_16531A  "Oscilloscope Acquisition Card"
+#define DESC_16532A  "1GSa/s Oscilloscope Card"
+#define DESC_16534A  "32K GSa/s Oscilloscope Card"
+#define DESC_16535A  "MultiProbe 2-Output Module"
+#define DESC_16520A  "Pattern Generator Master Card"
+#define DESC_16521A  "Pattern Generator Expansion Card"
+#define DESC_16522AE "200MHz Pattern Generator Expansion Card"
+#define DESC_16522AM "200MHz Pattern Generator Master Card"
+#define DESC_16511B  "Logic Analyzer Card"
+#define DESC_16510A  "Logic Analyzer Card"
+#define DESC_16550AM "100/500 MHz Logic Analyzer Master Card"
+#define DESC_16550AE "100/500 MHz Logic Analyzer Expansion Card"
+#define DESC_16554M  "Logic Analyzer Master Card"
+#define DESC_16554E  "Logic Analyzer Expansion Card"
+#define DESC_16540A  "100/100 MHz Logic Analyzer Master Card"
+#define DESC_16541A  "100/100 MHz Logic Analyzer Expansion Card"
+#define DESC_16542A  "2 MB Acquisition Logic Analyzer Master Card"
+
 struct hp_cards{
 	int type;
+	char *model;
 	char *desc;
 };
-#ifdef HP16500_COM_SYMBOLS
-struct hp_cards hp_cardlist[]=\
-{
-	{CARDTYPE_16515A,  DESC_16515A},
-	{CARDTYPE_16516A,  DESC_16516A},
-	{CARDTYPE_16517A,  DESC_16517A},
-	{CARDTYPE_16518A,  DESC_16518A},
-	{CARDTYPE_16530A,  DESC_16530A},
-	{CARDTYPE_16531A,  DESC_16531A},
-	{CARDTYPE_16532A,  DESC_16532A},
-	{CARDTYPE_16533A,  DESC_16533A},
-	{CARDTYPE_16535A,  DESC_16535A},
-	{CARDTYPE_16520A,  DESC_16520A},
-	{CARDTYPE_16521A,  DESC_16521A},
-	{CARDTYPE_16522AE,  DESC_16522AE},
-	{CARDTYPE_16522AM,  DESC_16522AM},
-	{CARDTYPE_16511B,  DESC_16511B},
-	{CARDTYPE_16510A,  DESC_16510A},
-	{CARDTYPE_16550AE,  DESC_16550AE},
-	{CARDTYPE_16550AM,  DESC_16550AM},
-	{CARDTYPE_16554M,  DESC_16554M },
-	{CARDTYPE_16554E,  DESC_16554E },
-	{CARDTYPE_16540A,  DESC_16540A},
-	{CARDTYPE_16541A,  DESC_16541A},
-	{CARDTYPE_16542A,  DESC_16542A},
-	{CARDTYPE_INVALID,NULL},
+
+struct card_info {
+	struct hp_cards *info;
+	int slot;
 };
+
+struct hp_common_options {
+	char *dev;
+	int iaddr;
+	int cardtype;
+	int cardno; 
+	int dtype;
+};
+
+#define HP_COMMON_GETOPS "a:d:m:n:t:"
+
+#ifdef HP16500_COM_SYMBOLS
+
 #endif
 
 struct hp_scope_preamble {
@@ -361,9 +378,25 @@ A three-card configuration has the following data arrangement per row:
 Clock Pod 1 < xxxx MLKJ MLKJ MLKJ >
 
 */
+/**generic functions  */
+int get_hp_info_card(int id);
+int print_card_model(int id);
+int select_hp_card(int slot, struct gpib *g);
+void show_known_hp_cards(void);
+int hp16500_find_card(int cardtype, int no, struct gpib *g);
+void show_hp_connection_info(void);
+void show_common_usage (void);
+int handle_common_opts(int c, char *optarg, struct hp_common_options *o);
+/**scope functions  */
+int oscope_parse_preamble(struct gpib *g, struct hp_scope_preamble *h);
+int check_oscope_channel(char *ch);
+int oscope_get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h);
+int get_oscope_data(struct gpib *g, char *ch);
+int init_oscope_instrument(int cardtype, int cardno, struct gpib *g); 
 
+/**logic analyzer functions  */
 int validate_sampleperiod(uint32 p);
-int print_card_model(int id, struct hp_cards *h);
+
 long int get_datsize(char *hdr);
 uint32 swap32(uint32 in);
 uint64 swap64(uint64 in);
