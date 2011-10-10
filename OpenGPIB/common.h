@@ -73,6 +73,8 @@ struct c_opts {
 	float div;
 	float mul;
 };
+
+int is_string_number(char *s);
 int next_col(struct c_opts *o);
 int get_col(struct c_opts *o, float *f);
 double format_eng_units(double val, int *m);

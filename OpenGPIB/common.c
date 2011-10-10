@@ -29,6 +29,21 @@ Change Log: \n
 */
 
 #include "common.h"
+
+/***************************************************************************/
+/** Tests to see if entire string is made of digits.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int is_string_number(char *s)
+{
+	while (*s){
+		if(!isdigit(*s))
+			return 0;
+		++s;
+	}
+	return 1;
+}
 /***************************************************************************/
 /** .
 \n\b Arguments:
