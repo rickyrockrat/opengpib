@@ -1,5 +1,5 @@
 /** \file ******************************************************************
-\n\b File:        get_hp_16530_waveform.c
+\n\b File:        get_hp_165xx_scope.c
 \n\b Author:      Doug Springer
 \n\b Company:     DNK Designs Inc.
 \n\b Date:        10/06/2008  6:43 am
@@ -30,6 +30,7 @@ Change Log: \n
 
 #include "common.h"
 #include "gpib.h"
+#include "hp16500.h"
 
 #include <ctype.h>
 
@@ -37,8 +38,6 @@ Change Log: \n
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define HP16500_COM_SYMBOLS 1
-#include "hp16500.h"
 /** 
 The channels correspond to Slot,channel number, so Slot D, channel 1 is D1.
 The first channel is the lowest slot, so if it starts with C1, the channels start at C1
@@ -115,140 +114,11 @@ Time= (point# -Xref)*Xinc + Xorigin
 
 */
 
-/***************************************************************************/
-/** FMT,TYPE,Points,Count,Xinc,Xorigin,Xref,Yinc,Yorigin,Yref.
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int parse_preamble(struct gpib *g, struct hp_scope_preamble *h)
-{
-	h->fmt=get_value_col(0,g->buf);
-	h->points=get_value_col(2,g->buf);
-	h->xinc=get_value_col(4,g->buf);
-	h->xorg=get_value_col(5,g->buf);
-	h->xref=get_value_col(6,g->buf);
-	h->yinc=get_value_col(7,g->buf);
-	h->yorg=get_value_col(8,g->buf);
-	h->yref=get_value_col(9,g->buf);
-	return 0;
-}
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int init_instrument(struct gpib *g)	 
-{
-	int i,s;
-	int slots[5], osc;
-	fprintf(stderr,"Initializing Instrument\n");
-	g->control(g,CTL_SET_TIMEOUT,500);
-	while(read_string(g));
-	g->control(g,CTL_SET_TIMEOUT,50000);
-	/*write_string(g,"*CLS"); */
-	if(0 == write_get_data(g,"*IDN?"))
-		return -1;
-	/*fprintf(stderr,"Got %d bytes\n",i); */
-	if(NULL == strstr(g->buf,"HEWLETT PACKARD,16500C")){
-		fprintf(stderr,"Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",g->buf);
-		return -1;
-	}
-	if(0 == write_get_data(g,":CARDCAGE?"))
-		return -1;
-	for (s=0;g->buf[s];++s)
-		if(isdigit(g->buf[s]))
-			break;
-	for (i=0,osc=-1;i<5;++i){
-		slots[i]=(int)get_value_col(i,&g->buf[s]);
-		fprintf(stderr,"Slot %c=%d\n",'A'+i,slots[i]);
-		if(CARDTYPE_16530A == slots[i])
-			osc=i;
-	}
-	if(-1 == osc){
-		fprintf(stderr,"Unable to find timebase card\n");
-		return -1;
-	}
-	fprintf(stderr,"Found Timbase in slot %c\n",'A'+osc);
-	
-	write_get_data(g,":SELECT?");
 
-	if(osc+1 == (g->buf[0]-0x30)){
-		fprintf(stderr,"Timebase %s already selected\n",g->buf);
-	}	else{
-		sprintf(g->buf,":SELECT %d",osc+1);
-		write_string(g,g->buf);	
-	}
-	
-	i=write_get_data(g,":WAV:REC FULL;:WAV:FORM BYTE;:SELECT?");
-	fprintf(stderr,"Selected Card %s to talk to.\n",g->buf);
 
-	return i;
-/*34,-1,12,12,11,1,0,5,5,5 */
-	/** :WAV:REC FULL;:WAV:FORM ASC;:SELECT? */
-}
 
-/***************************************************************************/
-/** returns the value of the digits at the end. 0 is invalid channel number.
-\n\b Arguments:
-\n\b Returns: 0 on error, channel no on success.
-****************************************************************************/
-int check_channel(char *ch)
-{
-	int i,b;
-	if(NULL ==ch)
-		return 0;
-	for (b=-1,i=0;ch[i];++i){
-		if(isdigit(ch[i])){
-			b=i;
-			break;
-		}
-	}
-	if( -1 == b ){
-		fprintf(stderr,"Channel '%s' is invalid\n",ch);
-		return 0;
-	}
-	return atoi(&ch[b]);
-}
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h)
-{
-	int i;
-	if(NULL == ch)
-		return -1;
-	if(0 == (i=check_channel(ch)))
-		return -1;
-	/*fprintf(stderr,"GetPre %d\n",i);	  */
-	sprintf(g->buf,":WAV:SOUR CHAN%d;PRE?",i);
-	if( write_get_data(g,g->buf) <=0){
-		fprintf(stderr,"No data from preamble (%d)\n",i);
-		return 0; 
-	}
-		
-	parse_preamble(g,h);
-	return 1;
-}
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int get_data(struct gpib *g, char *ch)
-{
-	int i;
-	if(NULL == ch)
-		return -1;
-	if(0 == (i=check_channel(ch)))
-		return -1;
-/*	fprintf(stderr,"GetData %d\n",i); */
-	sprintf(g->buf,":WAV:SOUR CHAN%d;DATA?",i);
-	i=write_get_data(g,g->buf);	
-	return i;
-	
-}
+
+
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -256,17 +126,19 @@ int get_data(struct gpib *g, char *ch)
 ****************************************************************************/
 void usage(void)
 {
-	fprintf(stderr,"get_hp_16530_waveform <options>\n"
-	" -a addr set instrument address to addr (7)\n"
-	" -c n Use channel n for data (ch1). ch1-ch?\n"
+	fprintf(stderr,"get_hp_16530_waveform <options>\n");
+	show_common_usage();
+	/**common options are -a, -d, -n, -m, and -t */
+	fprintf(stderr,"\n -c n Use channel n for data (ch1). ch1-ch?\n"
 	"    The -c option can be used multiple times. In this case, the fname\n"
 	"    is a base name, and the filename will have a .ch1 or .ch2, etc appended\n"
-	" -d dev set path to device name\n"
 	" -g set gnuplot mode, with x,y (time volts), one point per line\n"
 	" -o fname put output to file called fname\n"
 
 	" -r set raw mode (don't convert data to volts)\n"
-	"\n Channels are set up such that for C1 C2 D1 D2, C1= ch1, C2=ch2, D1=ch3, and D2=ch4\n"
+
+	
+	"\n Channels are set up such that for C1 C2 D1 D2, C1= ch1, C2=ch2, D1=ch3, D2=ch4, etc.\n"
 	" So if you want C1 use ch1 as the -c option.\n"
 	
 	"");
@@ -281,12 +153,14 @@ int main(int argc, char * argv[])
 {
 	struct gpib *g;
 	struct hp_scope_preamble h;
+	struct hp_common_options copt;
 	FILE *ofd;
-	char *name, *ofname, *channel[MAX_CHANNELS], *lbuf;
-	int i, c,inst_addr, rtn, ch_idx, raw,xy;
-	name="/dev/ttyUSB0";
-	inst_addr=7;
+	char *ofname, *channel[MAX_CHANNELS], *lbuf;
+	int i, c, rtn, ch_idx, raw,xy;
 	channel[0]="ch1";
+	
+	handle_common_opts(0,NULL,&copt);
+	copt.cardtype=CARDTYPE_16534A;
 	for (c=1;c<MAX_CHANNELS;++c){
 		channel[c] = NULL;
 	}
@@ -295,10 +169,15 @@ int main(int argc, char * argv[])
 	ofname=NULL;
 	ofd=NULL;
 	raw=xy=0;
-	while( -1 != (c = getopt(argc, argv, "a:d:gc:ho:r")) ) {
+	while( -1 != (c = getopt(argc, argv, "gc:ho:r"HP_COMMON_GETOPS)) ) {
 		switch(c){
 			case 'a':
-				inst_addr=atoi(optarg);
+			case 'd':
+			case 'm':
+			case 'n':
+			case 't':
+				if(handle_common_opts(c,optarg,&copt))
+					return -1;
 				break;
 			case 'c':
 				if(ch_idx>=MAX_CHANNELS){
@@ -306,22 +185,20 @@ int main(int argc, char * argv[])
 				}
 				channel[ch_idx++]=strdup(optarg);
 				break;
-			case 'd':
-				name=strdup(optarg);
-				break;
 			case 'h':
 				usage();
 				return 1;
 			case 'g':
 				xy=1;
 				break;
+			
 			case 'o':
 				ofname=strdup(optarg);
 				break;
-
 			case 'r':
 				raw=1;
 				break;
+			
 			default:
 				usage();
 				return 1;
@@ -335,18 +212,18 @@ int main(int argc, char * argv[])
 		++ch_idx;	
 	else {
 		for (c=0;c<ch_idx;++c){
-			if(0==check_channel(channel[c])){
+			if(0==check_oscope_channel(channel[c])){
 				fprintf(stderr,"Channel %s is invalid\n",channel[c]);
 				return 1;
 			}
 		}
 	}
-	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,-1))){
-		fprintf(stderr,"Can't open/init controller at %s. Fatal\n",name);
+	if(NULL == (g=open_gpib(copt.dtype,copt.iaddr,copt.dev,-1))){
+		fprintf(stderr,"Can't open/init controller at %s. Fatal\n",copt.dev);
 		return 1;
 	}
 	
-	if(-1 == init_instrument(g)){
+	if(-1 == init_oscope_instrument(copt.cardtype,copt.cardno,g)){
 		fprintf(stderr,"Unable to initialize instrument.\n");
 		fprintf(stderr,"Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
 		goto closem;
@@ -381,14 +258,14 @@ int main(int argc, char * argv[])
 				goto closem;
 			}
 			fprintf(stderr,"Reading Channel %s\n",channel[c]);
-			if( 0 >= (i=get_preamble(g,channel[c],&h))){
+			if( 0 >= (i=oscope_get_preamble(g,channel[c],&h))){
 				fprintf(stderr,"Preable failed on %s\n",channel[c]);
 				goto closem;
 			}
 	/** Voltage=(Value-Yreference)*Yinc +Yorigin
 			Time= (point# -Xref)*Xinc + Xorigin */
 			fwrite(g->buf,1,i,ofd);	
-			if(-1 == (i=get_data(g,channel[c])) ){
+			if(-1 == (i=get_oscope_data(g,channel[c])) ){
 				fprintf(stderr,"Unable to get waveform??\n");
 				goto closem;
 			}	
