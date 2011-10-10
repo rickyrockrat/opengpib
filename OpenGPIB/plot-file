@@ -9,7 +9,7 @@
 #
 
 
-if [ $# -lt 2 ]; then
+if [ $# -lt 1 ]; then
 	echo "plot-file file1 <file2 ...>"
 	exit 1
 fi
