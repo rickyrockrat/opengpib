@@ -34,9 +34,10 @@ VERSION = 0.09
 
 PACKAGE = opengpib
 
-TARGETS=tek2gplot get_tek_waveform get_hp_16530_waveform get_hp_16555_waveform calc_area_under_curve networkanalyzer parse_16500_config
+TARGETS=tek2gplot get_tek_waveform get_hp_1653xx_scope get_hp_16555_waveform \
+calc_area_under_curve networkanalyzer parse_16500_config hp16500
 
-CSRCS = common.c get_hp_16530_waveform.c get_tek_waveform.c gpib.c networkanalyzer.c \
+CSRCS = common.c get_hp_1653xx_scope.c get_tek_waveform.c gpib.c networkanalyzer.c \
 prologixs.c serial.c tek2gplot.c calc_area_under_curve.c parse_16500_config.c get_hp_16555_waveform.c
 HDRS = common.h gpib.h prologixs.h serial.h hp16500.h
 
@@ -95,12 +96,18 @@ hp16500.lib: hp16500.o
 get_tek_waveform:	get_tek_waveform.o gpib.lib
 	gcc -lm -o $@ $^
 	
-get_hp_16530_waveform.o get_hp_16555_waveform.o parse_16500_config.o: hp16500.h
+get_hp_1653xx_scope.o get_hp_16555_waveform.o parse_16500_config.o: hp16500.h
 
-get_hp_16530_waveform: get_hp_16530_waveform.o gpib.lib
+get_hp_1653xx_scope: get_hp_1653xx_scope.o hp16500.o gpib.lib
 	gcc -lm -o $@ $^
 	
 get_hp_16555_waveform: get_hp_16555_waveform.o gpib.lib  hp16500.lib $(LA2VCD_LIB)
+	gcc -lm -o $@ $^
+	
+hp16500.main.o: hp16500.c  hp16500.h	Makefile
+	gcc -DMAIN_QUERY  -c -o $@ hp16500.c
+
+hp16500: hp16500.main.o gpib.lib
 	gcc -lm -o $@ $^
 	
 test: test.o gpib.lib
