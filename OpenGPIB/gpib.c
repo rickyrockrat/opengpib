@@ -254,9 +254,25 @@ int gpib_option_to_type(char *op)
 void show_gpib_supported_controllers(void)
 {
 	int i;
-	fprintf(stderr,"Type Option Name\n");
+	fprintf(stderr,"Type 'Option' Name\n");
 	for (i=0; NULL != s_dev[i].name;++i){
 		fprintf(stderr,"%d    '%s' %s\n",gpib_option_to_type(s_dev[i].option),s_dev[i].option, s_dev[i].name);
 	}
+}
+
+/***************************************************************************/
+/** Set up timeouts and send the id string.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int init_id(struct gpib *g, char *idstr)
+{
+	g->control(g,CTL_SET_TIMEOUT,500);
+	while(read_string(g));
+	g->control(g,CTL_SET_TIMEOUT,50000);
+	/*write_string(g,"*CLS"); */
+	if(0 == write_get_data(g,idstr))
+		return -1;
+	return 0;
 }
 

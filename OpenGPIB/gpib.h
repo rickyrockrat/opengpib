@@ -81,6 +81,7 @@ struct gpib {
 	char *buf;														/**GPIB buffer  */
 	int buf_len;													/**buffer length  */
 	char *dev_path;																/**physical device path.  */
+	void *inst;                                   /**instrument-specific structure, if any  */
 };
 
 /**structure to talk to the instrument  */
@@ -100,5 +101,6 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path,int buf_size); /**ope
 int close_gpib (struct gpib *g);
 int gpib_option_to_type(char *op);
 void show_gpib_supported_controllers(void);
+int init_id(struct gpib *g, char *idstr);
 #endif
 
