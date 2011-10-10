@@ -12,7 +12,7 @@ if [ -e $1 ]; then
 fi
 mkdir -p $1
 
-./get_hp_16555_waveform -d 192.168.0.200 -t $1/hpdata -c $1/hpconfig
+./get_hp_16555_waveform -d 192.168.0.200 -s $1/hpdata -c $1/hpconfig
 if [ $? -ne 0 ]; then
 	echo "Error reading from 16500. Is controller connected to LAN?"
  	rm -r $1
