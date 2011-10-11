@@ -201,7 +201,7 @@ char * get_string_col( int col, char *buf)
 			break;
 	}
 	if(c<col)
-		return "NOTFOUND";
+		return strdup("NOTFOUND");
 	tbuf[i]=0;
 	/*printf("Found %d->%s",col,tbuf);   */
 	return(strdup(tbuf));	 
@@ -221,9 +221,9 @@ double get_value_col( int col, char *buf)
 	if(!strcmp("NOTFOUND",v) ){ 
 		x=-1;
 	}else
-		x=strtof(v, NULL);
+		x=strtod(v, NULL);
 	
-	/*printf(" : %f\n",x); */
+	/*printf("'%s' : %f\n",v,x);  */
 	free(v);
 	return(x );	 
 }
