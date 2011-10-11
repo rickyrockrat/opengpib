@@ -31,9 +31,10 @@ Change Log: \n
 #include "common.h"
 #include "gpib.h"
 #include "hp16500.h"
-
 #include <ctype.h>
-
+#ifdef LA2VCD_LIB
+#include "la2vcd.h"
+#endif
 /**for open...  */
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -116,9 +117,6 @@ Time= (point# -Xref)*Xinc + Xorigin
 
 
 
-
-
-
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -132,11 +130,15 @@ void usage(void)
 	fprintf(stderr,"\n -c n Use channel n for data (ch1). ch1-ch?\n"
 	"    The -c option can be used multiple times. In this case, the fname\n"
 	"    is a base name, and the filename will have a .ch1 or .ch2, etc appended\n"
+  " -f set the format. 0=ASCII, 1=byte, and 2=word. If not set, then set according to instrument\n"
 	" -g set gnuplot mode, with x,y (time volts), one point per line\n"
 	" -o fname put output to file called fname\n"
 
 	" -r set raw mode (don't convert data to volts)\n"
-
+  " -u set unprocess mode, dump preamble at top and raw data after\n"
+#ifdef LA2VCD_LIB
+	" -v put vcd data to fname.vcd. Creates .chx also\n"
+#endif	
 	
 	"\n Channels are set up such that for C1 C2 D1 D2, C1= ch1, C2=ch2, D1=ch3, D2=ch4, etc.\n"
 	" So if you want C1 use ch1 as the -c option.\n"
@@ -155,12 +157,20 @@ int main(int argc, char * argv[])
 	struct hp_scope_preamble h;
 	struct hp_common_options copt;
 	FILE *ofd;
+  double time_inc;
 	char *ofname, *channel[MAX_CHANNELS], *lbuf;
-	int i, c, rtn, ch_idx, raw,xy;
+	int i, c, rtn, ch_idx, raw,xy, data_size, process;
+#ifdef LA2VCD_LIB	/**it doesn't support floating point data  */  
+  char *vbuf;
+  int vcd=0;
+  struct la2vcd *l;
+#endif
+  process=1;
 	channel[0]="ch1";
 	
 	handle_common_opts(0,NULL,&copt);
 	copt.cardtype=CARDTYPE_16534A;
+  copt.fmt=FMT_WORD;
 	for (c=1;c<MAX_CHANNELS;++c){
 		channel[c] = NULL;
 	}
@@ -169,7 +179,7 @@ int main(int argc, char * argv[])
 	ofname=NULL;
 	ofd=NULL;
 	raw=xy=0;
-	while( -1 != (c = getopt(argc, argv, "gc:ho:r"HP_COMMON_GETOPS)) ) {
+	while( -1 != (c = getopt(argc, argv, "f:gc:ho:ruv"HP_COMMON_GETOPS)) ) {
 		switch(c){
 			case 'a':
 			case 'd':
@@ -185,6 +195,10 @@ int main(int argc, char * argv[])
 				}
 				channel[ch_idx++]=strdup(optarg);
 				break;
+
+      case 'f':
+        copt.fmt=atoi(optarg);
+        break;
 			case 'h':
 				usage();
 				return 1;
@@ -198,12 +212,27 @@ int main(int argc, char * argv[])
 			case 'r':
 				raw=1;
 				break;
-			
+      case 'u':
+        process=0;
+        break;
+#ifdef LA2VCD_LIB	  			
+      case 'v':
+				++vcd;
+				break;
+#endif        
 			default:
 				usage();
 				return 1;
 		}
 	}
+  if(FMT_WORD == copt.fmt)
+    data_size=2;
+  else if(FMT_BYTE == copt.fmt)
+    data_size=1;
+  else {
+    printf("Can't handle data format %d\n",copt.fmt);
+    return -1;
+  }
 	if(NULL == ofname){
 		ofd=fdopen(1,"w+");
 	}
@@ -223,7 +252,7 @@ int main(int argc, char * argv[])
 		return 1;
 	}
 	
-	if(-1 == init_oscope_instrument(copt.cardtype,copt.cardno,g)){
+	if(-1 == init_oscope_instrument(&copt,g)){
 		fprintf(stderr,"Unable to initialize instrument.\n");
 		fprintf(stderr,"Did you forget to set 16500C controller 'Connected To:' HPIB?\n");
 		goto closem;
@@ -238,76 +267,152 @@ int main(int argc, char * argv[])
 			if(x>i)
 				i=x;
 		}
-		i+=5;
+		i+=10;
 		/**allocate buffer for all fnames.  */
 		if(NULL == (lbuf=malloc(strlen(ofname)+i)) ){
 			fprintf(stderr,"Out of mem for lbuf alloc\n");
 			goto closem;
 		}
-		fprintf(stderr,"f\n");
-	}else
-		lbuf=NULL;
+	}else{
+    lbuf=NULL;
+#ifdef LA2VCD_LIB	
+    fprintf(stderr,"Can't output .vcd to stdout\n");
+    vcd=0;
+  }
+
+  if(vcd){
+    sprintf(lbuf,"%s.vcd",ofname);
+    if(NULL==(l=open_la2vcd(lbuf,NULL,1,0,"Oscilliscope"))){ 
+			fprintf(stderr,"Unable to open la2vcd lib\n");
+      vcd=0;
+		}	  
+    if(vcd){
+      if(vcd_add_file(l,NULL,2,64,V_REAL)){ /**set the sample size up  */
+    	 fprintf(stderr,"Failed to add input file\n");
+       vcd=0;
+      }   
+      if(NULL == (vbuf=malloc(100))){
+        fprintf(stderr,"Out of mem allocating 100 byte vcd buffer\n");
+        vcd=0;
+      }
+      if(vcd) {
+        for (c=0;c<ch_idx && NULL != channel[c];++c)
+          vcd_add_signal (l,V_REAL, 0, 0,channel[c]);
+        if(-1 == write_vcd_header (l)){
+    			fprintf(stderr,"VCD Header write failed\n");
+    			vcd=0;
+    		}
+    		fprintf(stderr,"Wrote VCD Hdr\n");  
+        fflush(NULL);
+      }
+    }
+  }
+#else
+  }  
+#endif        
+    
 	fprintf(stderr,"Channel loop\n");
 	/**channel loop. Open file, dump data, close file, repeat  */
 	for (c=0;c<ch_idx && NULL != channel[c];++c){
 		int point;
-		if(NULL != ofname && NULL != lbuf ){ /**we have valid filename & channel, open  */
-			sprintf(lbuf,"%s.%s",ofname,channel[c]);
-			if(NULL == (ofd=fopen(lbuf,"w+"))) {
-				fprintf(stderr,"Unable to open '%s' for writing\n",lbuf);
-				goto closem;
-			}
-			fprintf(stderr,"Reading Channel %s\n",channel[c]);
-			if( 0 >= (i=oscope_get_preamble(g,channel[c],&h))){
-				fprintf(stderr,"Preable failed on %s\n",channel[c]);
-				goto closem;
-			}
-	/** Voltage=(Value-Yreference)*Yinc +Yorigin
-			Time= (point# -Xref)*Xinc + Xorigin */
-			fwrite(g->buf,1,i,ofd);	
-			if(-1 == (i=get_oscope_data(g,channel[c])) ){
-				fprintf(stderr,"Unable to get waveform??\n");
-				goto closem;
-			}	
-			point=0;
-			h.xinc*=1000000000;
-			while(i>0){	/**suck out all data from cmd above  */
+    if(NULL != ofname && NULL != lbuf ){ /**we have valid filename & channel, open  */
+      sprintf(lbuf,"%s.%s",ofname,channel[c]);
+      if(NULL == (ofd=fopen(lbuf,"w+"))) {
+        fprintf(stderr,"Unable to open '%s' for writing\n",lbuf);
+        goto closem;
+      }
+    }  
+  	fprintf(stderr,"Reading Channel %s\n",channel[c]);
+  	if( 0 >= (i=oscope_get_preamble(g,channel[c],&h))){
+  		fprintf(stderr,"Preable failed on %s\n",channel[c]);
+  		goto closem;
+  	}
+#ifdef LA2VCD_LIB	
+    if(vcd && NULL !=l)/**marvelous hack...  */
+      l->time_delta=h.xinc;
+#endif
+      /*fprintf(stderr,"Got %d bytes of preamble '%s'\n",i,g->buf); */
+  /** Voltage=(Value-Yreference)*Yinc +Yorigin
+  	Time= (point# -Xref)*Xinc + Xorigin */
+    if(!process)
+  	  fwrite(g->buf,1,i,ofd);	
+  	if(-1 == (i=get_oscope_data(g,channel[c],&h)) ){
+  		fprintf(stderr,"Unable to get waveform??\n");
+  		goto closem;
+  	}	
+    /*fprintf(stderr,"data_len=%ld, Start of Data %d (%02x %02x)\n",h.point_len, h.point_start,g->buf[h.point_start-1],g->buf[h.point_start]); */
+      
+  	point=0;
+  	time_inc=h.xinc*h.xincmult;
+    if(xy)
+      fprintf(ofd,"%s Volts\n",h.xunits);
+  	while(i>0){	/**process the first block of data received  */
+      if(process){
 				int x;
-				for (x=0;x<i;++x){
+				for (x=h.point_start;x<i;x+=data_size){
 					float volts;
 					float time;
-					time=h.xinc*(float)point;
+          unsigned int rawdat;
+          fflush(NULL);
+          rawdat=g->buf[x];
+          if(2 == data_size){
+            rawdat<<=8;
+            rawdat+=g->buf[x+1];
+          }
+            
+					time=time_inc*(float)(point-h.xref)+h.xorg;
 					if(0==point)
 						fprintf(stderr,"%d %f %f \n",point,h.xinc,time); 
-					volts=(g->buf[x]-h.yref)*h.yinc + h.yorg;
+					volts=(rawdat-h.yref)*h.yinc + h.yorg;
 					if(xy){
 						if(raw)
-							fprintf(ofd,"%f %d\n",time,g->buf[x]);
+							fprintf(ofd,"%f %d\n",time,rawdat);
 						else
 							fprintf(ofd,"%f %f\n",time,volts);	
 					}	else {
 						if(raw)
-							fprintf(ofd,"%d,",g->buf[x]);
+							fprintf(ofd,"%d,",rawdat);
 						else
 							fprintf(ofd,"%f,",volts);	
 					}
+#ifdef LA2VCD_LIB
+          if(vcd && NULL != vbuf){
+            l->first_input_file->buf=vbuf;
+            snprintf(vbuf,99,"%f",volts);
+				    vcd_read_sample(l); 
+				     write_vcd_data (l);
+				    advance_time (l);
+          }
+
+#endif
 					++point;
-				}
-				/*fwrite(g->buf,1,i,ofd); */
-				i=read_string(g);
-			}
-		}
+				} /**end x loop  */
+      } else { /**! process  */
+        fwrite(g->buf,1,i,ofd);
+      }
+		  i=read_string(g);
+      h.point_start=0;
+  	} /**end read block loop  */
 		
 		/*fwrite(g->buf,1,i,ofd);	 */
-		if(NULL != ofd){
+		if(NULL != ofname && NULL != ofd){
 			fclose(ofd);
 			ofd=NULL;
 		}
-	}
+	} /**end channel loop  */
+  
 	rtn=0;
+  /*fprintf(stderr,"Done!\n"); */
+  fflush(NULL);
 closem:
+#ifdef LA2VCD_LIB
+  if(vcd)
+    close_la2vcd(l);  
+#endif
 	if(NULL != ofd)
 		fclose(ofd);
 	close_gpib(g);
 	return rtn;
 }
+
+
