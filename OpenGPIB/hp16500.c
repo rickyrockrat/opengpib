@@ -149,6 +149,7 @@ void show_known_hp_cards( void )
 /***************************************************************************/
 /** Make sure we are talking to the right piece of test equipment and 
  the correct card is found.
+
 \n\b Arguments: if card type is -1, assume we just want to print out the slots.
 \n\b      If no is 0, we use the last card found.
 \n\b Returns: card number found.
@@ -194,7 +195,7 @@ int hp16500_find_card(int cardtype, int no, struct gpib *g)
 		fprintf(stderr,"\n");
 		if(cardtype == slots[i]){
 			++ccount;
-			if(0== no || ccount == no){
+			if((-1 ==slot && 0== no) || ccount == no){
 				slot=i;
 				if(-1 != cardtype) ((struct card_info *)g->inst)->slot=i;	
 			}
@@ -241,10 +242,11 @@ void show_common_usage (void)
 	" -a addr set GPIB instrument address to addr (ip address automatically sets -d)\n"
 	" -d dev set path to device name (use ipaddress for hpip)\n"
 	" -m meth set access method to meth, currently hpip or prologixs\n"
-	" -n num Set card number, use for multiple cards in system. 0 selects last card found.\n"
+	" -n num Set card number, use for multiple cards in system. 0 selects first card found.\n"
 	" -t type Set scope type (14)\n"
 	"   Current types are 11=16530, 13=16532, 14=16534\n"
 	"");
+	show_known_hp_cards();
 }
 
 
@@ -300,6 +302,12 @@ int handle_common_opts(int c, char *optarg, struct hp_common_options *o)
 			  fprintf(stderr,"'-t: %s' Invalid card type\n",optarg);							
 			  return 1;
 			}
+      if(FMT_NONE == o->fmt){
+        if(CARDTYPE_16530A == o->cardtype )
+          o->fmt=FMT_BYTE;
+        else
+          o->fmt=FMT_WORD;
+      }  
 			break;
 		}
 	return 0;
@@ -310,6 +318,8 @@ int handle_common_opts(int c, char *optarg, struct hp_common_options *o)
 enum {
 	QID=0,
 	QCARD,
+	QCMD,
+  QTEST,
 };
 /***************************************************************************/
 /** .
@@ -320,6 +330,7 @@ void usage(void)
 {
 	printf("hp16500, the HP16500 Query tool\n");
 	show_common_usage();
+	printf(" -c cmd execute command\n");
 	printf(" -q type Set query type to: \n"
 				 "   id - just print instrument ID\n"
 	       "   cards - show cards in instrument\n"
@@ -335,12 +346,14 @@ int main(int argc, char * argv[])
 {
 	struct gpib *g;
 	struct hp_common_options copt;
-	int i, c, query,rtn;
+	int i, c, query,rtn,slot;
+	char *cmd;
 	handle_common_opts(0,NULL,&copt);
 	rtn=0;
 	i=-2;
-	query=QID;
-	while( -1 != (c = getopt(argc, argv, "q:h"HP_COMMON_GETOPS)) ) {
+	query=QTEST;
+	cmd=NULL;
+	while( -1 != (c = getopt(argc, argv, "c:q:h"HP_COMMON_GETOPS)) ) {
 		i=1;
 		switch(c){
 			case 'a':
@@ -350,6 +363,10 @@ int main(int argc, char * argv[])
 			case 't':
 			  if(handle_common_opts(c,optarg,&copt))
 			  	return -1;
+				break;
+			case 'c':
+				cmd=strdup(optarg);
+				query=QCMD;
 				break;
 			case 'h':
 				usage();
@@ -391,8 +408,26 @@ int main(int argc, char * argv[])
 			printf("%s\n",g->buf);
 			break;
 		case QCARD:
-			hp16500_find_card(13,copt.cardno,g);
+			hp16500_find_card(copt.cardtype,copt.cardno,g);
 			break;
+		case QCMD:
+			if(-1 == (slot=hp16500_find_card(copt.cardtype,copt.cardno,g)) ) {
+				fprintf(stderr,"Unable to find timebase card\n");
+				return -1;
+			}
+			select_hp_card(slot, g);
+			sprintf(g->buf,"%s",cmd);
+	    write_get_data(g,g->buf);	
+			printf("%s\n",g->buf);
+			break;
+    case QTEST:
+      if(-1 == (slot=hp16500_find_card(copt.cardtype,copt.cardno,g)) ) {
+				fprintf(stderr,"Unable to find timebase card\n");
+				return -1;
+			}
+			select_hp_card(slot, g);
+      printf("Trigger source is %d\n",get_trigger_source(g));
+      break;
 	}
 close:
 	close_gpib(g);
@@ -521,9 +556,47 @@ void parse_options(struct options *o)
 }
 #endif
 
-/**  This section contains oscilliscope interfacing  */
+/**#######################################################################
+                     oscilliscope functionality
+   #######################################################################*/
 
 
+/***************************************************************************/
+/** Look for the trigger source, comes back as:
+CHANNEL1
+CHANNEL2
+CHANNELx
+EXTERNAL
+\n\b Arguments:
+\n\b Returns: 0 for external, or 1-x for channel, or -1 on error
+****************************************************************************/
+int get_trigger_source (struct gpib *g)
+{
+  sprintf(g->buf,":TRIG:SOUR?");
+  if(0 == write_get_data(g,g->buf))
+    return -1;
+  if(!strncmp(g->buf,"EXTERNAL",8) )
+    return 0;
+  return(atoi(&g->buf[7]) );
+}
+
+/***************************************************************************/
+/** We want the multiplier that takes our xinc value from xe-y to xe0.
+we also want to use ms,us, etc, so do it by powers of 1000.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+double get_xinc_mult(double v, int *x)
+{
+  double i;
+  int z;
+  /**for some reason, if you use 1 here, apparently 1e-6 *1e6 != 1   */
+  for (z=0,i=1;(double)(v*i)<(double)(.99999999e+0);++z,i*=1000);
+/*    printf("%d %e %e -> %e (%d)\n",z,i,v,v*i,(int)(v*i)); */
+    
+  *x=z;
+  return i;
+}
 /***************************************************************************/
 /** FMT,TYPE,Points,Count,Xinc,Xorigin,Xref,Yinc,Yorigin,Yref.
 \n\b Arguments:
@@ -532,15 +605,29 @@ void parse_options(struct options *o)
 int oscope_parse_preamble(struct gpib *g, struct hp_scope_preamble *h)
 {
 	h->fmt=get_value_col(0,g->buf);
+	h->type=get_value_col(1,g->buf);
 	h->points=get_value_col(2,g->buf);
+  h->count=get_value_col(3,g->buf);
 	h->xinc=get_value_col(4,g->buf);
 	h->xorg=get_value_col(5,g->buf);
 	h->xref=get_value_col(6,g->buf);
 	h->yinc=get_value_col(7,g->buf);
 	h->yorg=get_value_col(8,g->buf);
 	h->yref=get_value_col(9,g->buf);
+  h->xincmult=get_xinc_mult(h->xinc,&h->xinc_thou);
+  switch(h->xinc_thou){
+    case 0: snprintf(h->xunits,3,"S"); break;
+    case 1: snprintf(h->xunits,3,"mS"); break;
+    case 2: snprintf(h->xunits,3,"uS"); break;
+    case 3: snprintf(h->xunits,3,"nS"); break;
+    case 4: snprintf(h->xunits,3,"pS"); break;
+    default: snprintf(h->xunits,3,"?S"); break;  
+  }
+  fprintf(stderr,"fmt %d type %d points %d count %d xinc %e xorg %e xref %e yinc %e yorg %e yref %e xmult %e inc_thou %d '%s'\n",
+  h->fmt, h->type,h->points, h->count,h->xinc,h->xorg,h->xref,h->yinc,h->yorg,h->yref,h->xincmult,h->xinc_thou,h->xunits);
 	return 0;
 }
+
 
 /***************************************************************************/
 /** returns the value of the digits at the end. 0 is invalid channel number.
@@ -576,15 +663,25 @@ int oscope_get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h)
 		return -1;
 	if(0 == (i=check_oscope_channel(ch)))
 		return -1;
+  /**check to see if there is valid data  */
+  sprintf(g->buf,":WAV:VAL?");
+  if( write_get_data(g,g->buf) <=0){
+		fprintf(stderr,"Unable to check valid data\n");
+		return 0; 
+	}
+  if('0' ==  g->buf[0]){
+    fprintf(stderr,"There is no valid data. Have you triggered the scope?\n");
+    return 0;
+  }
 	/*fprintf(stderr,"GetPre %d\n",i);	  */
 	sprintf(g->buf,":WAV:SOUR CHAN%d;PRE?",i);
-	if( write_get_data(g,g->buf) <=0){
+	if( (i=write_get_data(g,g->buf)) <=0){
 		fprintf(stderr,"No data from preamble (%d)\n",i);
 		return 0; 
 	}
 		
 	oscope_parse_preamble(g,h);
-	return 1;
+	return i;
 }
 
 /***************************************************************************/
@@ -592,9 +689,9 @@ int oscope_get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_oscope_data(struct gpib *g, char *ch)
+int get_oscope_data(struct gpib *g, char *ch, struct hp_scope_preamble *h)
 {
-	int i;
+	int i,x;
 	if(NULL == ch)
 		return -1;
 	if(0 == (i=check_oscope_channel(ch)))
@@ -602,6 +699,9 @@ int get_oscope_data(struct gpib *g, char *ch)
 /*	fprintf(stderr,"GetData %d\n",i); */
 	sprintf(g->buf,":WAV:SOUR CHAN%d;DATA?",i);
 	i=write_get_data(g,g->buf);	
+  h->point_len=strtol(&g->buf[2],NULL,10);
+  for (x=2;g->buf[x] && isdigit(g->buf[x]); ++x);
+  h->point_start=x; /**point to start of data  */
 	return i;
 }
 
@@ -610,25 +710,37 @@ int get_oscope_data(struct gpib *g, char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init_oscope_instrument(int cardtype, int cardno, struct gpib *g)	 
+int init_oscope_instrument(struct hp_common_options *o, struct gpib *g)	 
 {
 	int slot,i;
+  char buf[20];
 	
-	if(-1 == (slot=hp16500_find_card(cardtype, cardno,g)) ){
+	if(-1 == (slot=hp16500_find_card(o->cardtype, o->cardno,g)) ){
 		fprintf(stderr,"Unable to find timebase card\n");
 		return -1;
 	}
 	select_hp_card(slot, g);
+  switch(o->fmt){
+    case FMT_ASCII: sprintf(buf,"ASCII");  break;
+    
+    case FMT_WORD: sprintf(buf,"WORD");  break;
+    case FMT_BYTE: 
+    default:
+     sprintf(buf,"BYTE");  break;
+  }
 	
-	i=write_get_data(g,":WAV:REC FULL;:WAV:FORM BYTE;:SELECT?");
+  sprintf(g->buf,":WAV:REC FULL;:WAV:FORM %s;:SELECT?",buf);
+	i=write_get_data(g,g->buf);
 	fprintf(stderr,"Selected Card %s to talk to.\n",g->buf);
 
 	return i;
 /*34,-1,12,12,11,1,0,5,5,5 */
 	/** :WAV:REC FULL;:WAV:FORM ASC;:SELECT? */
 }
+/**#######################################################################
+                     logic analyzer functionality
+   #######################################################################*/
 
-/**this is for the logic analyzer functionality.   */
 
 /***************************************************************************/
 /** Make sure the sample period is valid.
