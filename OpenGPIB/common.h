@@ -81,7 +81,7 @@ double format_eng_units(double val, int *m);
 double get_value( char *f, char *buf);
 double get_value_col( int col, char *buf);
 char * get_string( char *f, char *buf);
-char * get_string_col( int col, char *buf);
+char * get_string_col( int col, char *buf); /**make sure resulting char * is has free() called on it  */
 void _usleep(int usec);
 #endif 
 
