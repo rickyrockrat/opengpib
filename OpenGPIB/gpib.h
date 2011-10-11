@@ -49,6 +49,7 @@ enum {
 enum {
 	GPIB_CTL_PROLOGIXS=0,
 	GPIB_CTL_HP16500C,
+  GPIB_CTL_FILEIO,
 	GPIB_CTL_NONE,
 };
 /**controller commands  */

@@ -35,6 +35,7 @@ Change Log: \n
 #include "serial.h"
 #include "prologixs.h"
 #include "hp16500ip.h"
+#include "fileio.h"
 struct supported_dev {
 	int type;
 	char *option;
@@ -43,6 +44,7 @@ struct supported_dev {
 static struct supported_dev s_dev[]={\
 	{GPIB_CTL_PROLOGIXS,"prologixs","Prologix Serial GPIB Controller"},														
 	{GPIB_CTL_HP16500C,"hpip","HP 16500C LAN Controller"},
+  {GPIB_CTL_FILEIO,"file","File Reader"},
 	{-1,NULL,NULL},
 };
 
@@ -198,6 +200,12 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 			break;
 		case GPIB_CTL_HP16500C:
 			if(register_hp16500c(g))
+				goto err1;
+			if(g->open(g,dev_path))
+				goto err;
+			break;
+    case GPIB_CTL_FILEIO:
+			if(register_fileio(g))
 				goto err1;
 			if(g->open(g,dev_path))
 				goto err;

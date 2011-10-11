@@ -38,8 +38,9 @@ TARGETS=tek2gplot get_tek_waveform get_hp_1653xx_scope get_hp_16555_waveform \
 calc_area_under_curve networkanalyzer parse_16500_config hp16500
 
 CSRCS = common.c get_hp_1653xx_scope.c get_tek_waveform.c gpib.c networkanalyzer.c \
-prologixs.c serial.c tek2gplot.c calc_area_under_curve.c parse_16500_config.c get_hp_16555_waveform.c
-HDRS = common.h gpib.h prologixs.h serial.h hp16500.h
+prologixs.c serial.c tek2gplot.c calc_area_under_curve.c parse_16500_config.c \
+get_hp_16555_waveform.c fileio.c
+HDRS = common.h gpib.h prologixs.h serial.h hp16500.h fileio.h
 
 MISC = COPYING README Makefile makepng runcal ChangeLog
 
@@ -83,7 +84,7 @@ serial.o: serial.h serial.c	Makefile
 
 gpib.o: gpib.c gpib.h	Makefile
 
-gpib.lib: gpib.o prologixs.o serial.o common.o hp16500ip.o
+gpib.lib: gpib.o prologixs.o serial.o common.o hp16500ip.o fileio.o
 	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
 	
 hp16500.o: hp16500.c  hp16500.h	Makefile
