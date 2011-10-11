@@ -29,6 +29,7 @@ Change Log: \n
 */
 
 #include "common.h"
+#include <ctype.h>
 
 /***************************************************************************/
 /** Tests to see if entire string is made of digits.
