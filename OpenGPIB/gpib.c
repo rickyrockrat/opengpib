@@ -103,7 +103,7 @@ int write_string(struct gpib *g, char *msg)
 /***************************************************************************/
 /** Write a string, then print error message.	FIXME malloc xbuf.
 \n\b Arguments:
-\n\b Returns: 0 on fail
+\n\b Returns: 0 on fail or number of chars read on success.
 ****************************************************************************/
 int write_get_data (struct gpib *g, char *cmd)
 {
@@ -178,6 +178,8 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 	g->addr=addr;
 	if(0>= buf_size)
 		buf_size=8096;
+  /**make sure it's a 8-byte multiple, so we stop on largest data boundry  */
+  buf_size=((buf_size+7)/8)*8;
 	if(NULL == (g->buf=malloc(buf_size) ) ){
 		fprintf(stderr,"Out of mem on buf size of %d\n",buf_size);
 		free(g);
