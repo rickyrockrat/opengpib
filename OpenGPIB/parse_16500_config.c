@@ -29,9 +29,6 @@ Change Log: \n
 */
 
 #include "hp16500.h"
-#ifdef LA2VCD_LIB
-#include "la2vcd.h"
-#endif
 
 /***************************************************************************/
 /** .
@@ -132,7 +129,7 @@ int main(int argc, char *argv[])
 						if(NULL!=(l=open_la2vcd(vname,NULL,p->a1.sampleperiod*1e-12,0,NULL==s?NULL:s->data))){ 
 							fprintf(stderr,"Opened la2vcd lib\n");
 							
-							if(vcd_add_file(l,NULL,16,d->bits)){
+							if(vcd_add_file(l,NULL,16,d->bits,V_WIRE)){
 								fprintf(stderr,"Failed to add input file\n");
 								goto closevcd;
 							}
@@ -140,7 +137,7 @@ int main(int argc, char *argv[])
 							/**Add our signal descriptions in  */
 /*							vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0); */
 							for (x=d;x;x=x->next){
-								vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,x->name, x->lsb, x->msb);
+								vcd_add_signal (l,V_WIRE, x->msb, x->lsb,x->name);
 								/*printf("Added '%s' %d %d\n",x->name,x->msb,x->lsb); */
 							}
 	  					if(-1 == write_vcd_header (l)){
@@ -162,7 +159,6 @@ int main(int argc, char *argv[])
 								
     					}
 
-  						write_vcd_trailer (l);
 closevcd:
 						 close_la2vcd(l);
 						}	

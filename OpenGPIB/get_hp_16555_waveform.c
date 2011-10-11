@@ -31,9 +31,6 @@ Change Log: \n
 #include "common.h"
 #include "gpib.h"
 #include "hp16500.h"
-#ifdef LA2VCD_LIB
-#include "la2vcd.h"
-#endif
 #include <ctype.h>
 /**for open...  */
 #include <sys/stat.h>
@@ -505,7 +502,7 @@ closem:
 			fprintf(stderr,"Unable to open la2vcd lib\n");
 			goto endvcd;
 		}	
-    if(vcd_add_file(l,NULL,16,d->bits)){
+    if(vcd_add_file(l,NULL,16,d->bits, V_WIRE)){
 			fprintf(stderr,"Failed to add input file\n");
 			goto endvcd;
 		}
@@ -513,7 +510,7 @@ closem:
 		/**Add our signal descriptions in  */
 /*		vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0); */
 		for (x=d;x;x=x->next){
-			vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,x->name, x->lsb, x->msb);
+			vcd_add_signal (l,V_WIRE, x->msb, x->lsb,x->name);
 			/*fprintf(stderr,"Added '%s' %d %d\n",x->name,x->msb,x->lsb); */
 		}
 			if(-1 == write_vcd_header (l)){
@@ -533,8 +530,6 @@ closem:
 			} else
 				break;
 		}
-
-		write_vcd_trailer (l);
 		close_la2vcd(l);
 	}	
 	
