@@ -32,6 +32,11 @@ Change Log: \n
 #define _HP16500_H_ 1
 #include "common.h"
 #include "gpib.h"
+#ifdef LA2VCD_LIB
+#include "la2vcd.h"
+#else
+  #warning "LA2VCD_LIB Not Defined! You loose vcd functionality"
+#endif
 /** Id Number Card*/
 #define CARDTYPE_16515A  1         /** HP 16515A 1GHz Timing Master Card*/
 #define CARDTYPE_16516A  2         /** HP 16516A 1GHz Timing Expansion Card*/
@@ -115,12 +120,18 @@ struct card_info {
 };
 
 struct hp_common_options {
-	char *dev;
-	int iaddr;
-	int cardtype;
-	int cardno; 
-	int dtype;
+	char *dev;    /**Either device name, i.e. /dev/ttyxxx or the IP address  */
+	int iaddr;    /**instrument address for GPIB  */
+	int cardtype; /**Type of card to talk to  */
+	int cardno;   /**which card, if multiple cards  */
+	int dtype;    /**transport type, i.e. LAN, GPIB, etc.  */
+  int fmt;      /**data format. 0=ascii 1=byte,2=word  */
 };
+#define FMT_ASCII 0
+#define FMT_BYTE  1
+#define FMT_WORD  2
+#define FMT_NONE  -1
+
 
 #define HP_COMMON_GETOPS "a:d:m:n:t:"
 
@@ -129,14 +140,21 @@ struct hp_common_options {
 #endif
 
 struct hp_scope_preamble {
-	float xinc;
-	float xorg;
-	float xref;
-	float yinc;
-	float yorg;
-	float yref;
+	float xinc;  /**time value between consecutive data points. Time between samples in FULL mode, the only mode we run in.  */
+	float xorg;  /**Time of first data point in memory with respect to the trigger.  */
+	float xref;  /** X value of first data point in memory always zero  */
+	float yinc;  /**Voltage difference between consecutive data values  */
+	float yorg;  /**value of voltage at center screen  */
+	float yref;  /**The value at center screen where the Y-origin occurs  */
+  int xinc_thou;  /**number of powers of 1000  to get xinc to >=1*/
+  float xincmult;  /**multiplier to remove -e exponet, i.e. 2e-6*1000000=2  */
+  char xunits[3]; /**units, i.e. ms,us,ns,ps  */
 	int points;
+	int type;
 	int fmt;
+  int count;
+  long point_len; /**number of bytes that follow on data stream  */
+  int point_start; /**location in buffer where points start.  */
 };
 
 #define HP_FMT_ASC 	0
@@ -336,10 +354,10 @@ struct three_card_data {
 
 struct signal_data {
 	int bits; /**width of signal in bits  */
-	int ena; /**is signal enabled in menu  */
-	int lsb; /**lowest number bit where signal starts  */
-	int msb; /**highes number bit where signal ends  */
-	int pol; /**polarity of signal 1=normal (+), 0= inverted (-) */
+	int ena;  /**is signal enabled in menu  */
+	int lsb;  /**lowest number bit where signal starts  */
+	int msb;  /**highes number bit where signal ends  */
+	int pol;  /**polarity of signal 1=normal (+), 0= inverted (-) */
 	char *name;
 	struct signal_data *next;
 };
@@ -388,11 +406,12 @@ void show_hp_connection_info(void);
 void show_common_usage (void);
 int handle_common_opts(int c, char *optarg, struct hp_common_options *o);
 /**scope functions  */
+int get_trigger_source(struct gpib *g);
 int oscope_parse_preamble(struct gpib *g, struct hp_scope_preamble *h);
 int check_oscope_channel(char *ch);
 int oscope_get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h);
-int get_oscope_data(struct gpib *g, char *ch);
-int init_oscope_instrument(int cardtype, int cardno, struct gpib *g); 
+int get_oscope_data(struct gpib *g, char *ch, struct hp_scope_preamble *h);
+int init_oscope_instrument(struct hp_common_options *o, struct gpib *g); 
 
 /**logic analyzer functions  */
 int validate_sampleperiod(uint32 p);
