@@ -98,14 +98,15 @@ get_tek_waveform:	get_tek_waveform.o gpib.lib
 	
 get_hp_1653xx_scope.o get_hp_16555_waveform.o parse_16500_config.o: hp16500.h
 
-get_hp_1653xx_scope: get_hp_1653xx_scope.o hp16500.o gpib.lib
+
+get_hp_1653xx_scope: get_hp_1653xx_scope.o gpib.lib hp16500.lib $(LA2VCD_LIB)
 	gcc -lm -o $@ $^
 	
 get_hp_16555_waveform: get_hp_16555_waveform.o gpib.lib  hp16500.lib $(LA2VCD_LIB)
 	gcc -lm -o $@ $^
 	
 hp16500.main.o: hp16500.c  hp16500.h	Makefile
-	gcc -DMAIN_QUERY  -c -o $@ hp16500.c
+	gcc $(CFLAGS) -DMAIN_QUERY  -c -o $@ hp16500.c
 
 hp16500: hp16500.main.o gpib.lib
 	gcc -lm -o $@ $^
