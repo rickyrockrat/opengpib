@@ -1,3 +1,4 @@
+#!/bin/bash
 # \file ******************************************************************
 #\n\b File:        plot-file
 #\n\b Author:      Doug Springer
@@ -5,19 +6,342 @@
 #\n\b Date:        12/18/2010  6:49 am
 #\n\b Description: Plot a file with format X Y
 #*/ /************************************************************************
-#Change Log: \n
-#
+#set multiplot
+#set yrange[-11.358404:21.699175]
+#set origin 0,0.75
+#set size 1,0.25
+#set bmargin 0
+#set tmargin 1
+#set format x ""
+#set xlabel ""
+
+#plot 'p1.ch1' every ::3 title "CH1" ls 1  with lines
+#set yrange[-11.358404:21.699175]
+#set origin 0,0.5
+#set size 1,0.25
+#set bmargin 0
+#set tmargin 0
+#set format x ""
+#set xlabel ""
 
 
+#plot 'p1.ch2' every ::3 title "CH2" ls 2  with lines
+#set yrange[-11.358404:21.699175]
+#set origin 0,0.25
+#set size 1,0.25
+#set bmargin 0
+#set tmargin 0
+#set format x ""
+#set xlabel ""
+#plot 'p1.ch3' every ::3 title "CH3" ls 3  with lines
+#set yrange[-11.358404:21.699175]
+#set origin 0,0
+#set size 1,0.25
+#set bmargin 0
+#set tmargin 0
+#set format x ""
+#set xlabel ""
+#plot 'p1.ch4' every ::3 title "CH4" ls 4  with lines
+WDIR=$(dirname $0)
+float_scale=6
+. "$WDIR/bcommon"
+
+
+get_x11_linecolor () {
+	case $plotfile in 
+	  red) return 1;;
+	  grn) return 2;;
+	  blu) return 3;;
+	  mag) return 4;; #magenta
+	  cyn) return 5;; #cyan
+	  brn) return 6;; #sienna
+	  org) return 7;; #orange
+	  pea) return 8;; #peach/coral
+	  *) return 2;;
+	esac
+}
+
+# file label
+do_ylabel(){
+  echo "set ylabel \"$1\"" >>"$plotfile"
+}
+# file label
+do_xlabel () {
+  echo "set xlabel \"$1\"">> "$plotfile"
+}
+# file min max
+do_yrange () {
+  echo "set yrange[$1:$2]" >>"$plotfile"
+}
+# file min max
+do_xrange () {
+  echo "set xrange[$1:$2]" >>"$plotfile"
+}
+#file title
+do_title () {
+  echo "set title \"$1\"" >>"$plotfile"
+}
+# x y
+do_trigger () {
+  echo "set label 2 'T' at $1,$2 front" >>"$plotfile"
+}
+#  term window_title
+# types: x11 png
+do_term () {
+if [ "$1" = "x11" ]; then
+  if [ -n "$2" ]; then
+    XTITLE="title \"$2\""
+   else
+   XTITLE=""
+  fi
+  echo "set terminal x11 $XTITLE persist" >>"$plotfile"
+fi
+if [ "$1" = "png" ]; then
+  echo "set terminal png medium size 640,480 \\" >>"$plotfile"
+  echo "xffffff x000000 x404040 \\">>"$plotfile"
+	echo "xff0000 x00ff00 x66cdaa xcdb5cd \\">>"$plotfile"
+	echo "xadd8e6 x0000ff xdda0dd x9500d3 ">>"$plotfile"
+fi
+}
+# srcfile every title xtitle xmin xmax plottitle
+# this dumps the plots into a variable.
+# every is an every statment, used to skip data at top of file
+plot_file () {
+	# multiplot: first?"\nplot ":",\\\n"
+	# single file "\nplot "
+	#smoothing="smooth csplines"
+	plt=".88" #set plot area - depends on bmargin/tmargin below to get symetrical
+	adder=$(float_eval "(1-$plt)/2")
+	ysz=$(float_eval "$plt/($multi)")
+	yorg=$(float_eval "1-($ysz*$fileno)")
+	if [ $multi -gt 1 ]; then
+	 if [ $fileno -eq 1 ]; then # top graph
+	   if [ -n "$7" ]; then
+	     mtit="set title \"$7\"\n"
+	   else
+	     mtit=""
+	   fi
+	   marg="${mtit}set bmargin 0\nset tmargin 2\nset format x \"\"\nunset xlabel\n"
+	   yorg=$(float_eval "$yorg-$adder")
+	   ysz=$(float_eval "$ysz+$adder")
+	 else
+	   if [ $fileno -eq $multi ]; then #bottom graph
+	     #marg="set xlabel \"$4\"\nset bmargin 3\nset tmargin 0\nset xrange [$5:$6]\n"
+	     marg="set xlabel \"$4\"\nset bmargin 2\nset tmargin 0\nset format x \"%.1E\"\n"
+	     yorg=$(float_eval "$yorg-(2*$adder)")
+	     ysz=$(float_eval "$ysz+$adder")
+	   else #middle graph
+	     yorg=$(float_eval "$yorg-$adder")
+	     marg="set bmargin 0\nset tmargin 0\nset title \"\"\nset format x \"\"\nunset xlabel\n"
+	   fi
+	 fi  
+	 
+	 
+#set origin 0,0.75
+#set size 1,0.25
+#set bmargin 0
+#set tmargin 1
+#set format x ""
+#set xlabel ""
+
+	  mthis="set origin 0,$yorg\nset size 1,$ysz\n"
+	else
+	  mthis=""
+	  mcom=""
+	fi 
+	tmp="plot '$1' $2 title \"$3\" ls $fileno $smoothing with lines"
+
+	if [ $multi -gt 1 ]; then
+	  echo -e "$marg$mthis$tmp" >> "$plotfile"
+	else
+	  echo -e "$tmp" >>"$plotfile"
+	fi
+	let fileno=fileno+1
+	}
+# type out
+plot_all () {
+ if [ "$1" = "png" ]; then
+   gnuplot "$plotfile" > $2
+ fi
+ if [ "$1" = "x11" ]; then
+   gnuplot "$plotfile"
+ fi
+}
+
+#  multiplot
+do_header () {
+  echo "set lmargin 13" >> "$plotfile"
+  echo "set tmargin 5" >>"$plotfile"
+  #echo "set bmargin 5" >>"$plotfile"
+  echo "set rmargin 2" >>"$plotfile"
+  #echo "set xtics 0,41.000000" >>"$plotfile"
+  echo "set style line 1 lt 1 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 2 lt 2 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 3 lt 3 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 4 lt 4 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 5 lt 5 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 6 lt 6 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 7 lt 7 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 8 lt 8 lw 2.000 pointtype 4" >>"$plotfile"
+
+  if [ $1 -gt 1 ]; then
+    if [ -n "$2" ]; then
+      echo "set multiplot layout $1, 1 title \"$2\"" >>"$plotfile"
+    else
+      echo "set multiplot" >>"$plotfile"
+    fi  
+  else
+    if [ -n "$2" ]; then
+      echo "set title \"$2\"" >>"$plotfile"
+    fi
+  fi
+  #plot 'pacbatshort.test' title "CH1" ls 2 with lines
+  #,\
+  #'series.o.series.ch2' title "CH2" ls 3 with lines,\
+  #'series.o.diff' title "diff" ls 4 with lines
+}
+# 
+do_trailer () {
+	echo -e "unset multiplot\nset bmargin 20\n" >> "$plotfile"
+}
+useage() {
+  echo "plot-file <options> file1 <file2 ...>"
+	echo " where options are:"
+	echo "  -f fmt - set format to 0, 1 , or 2 header lines. (0)"
+	echo "  -k kind set plot kind to x11 or png (required)"
+	echo "  -p fname set plot file to fname (required)"
+	#echo "  -l type name set label to 'name', where type is:"
+  echo "      x or y and in format -l \"x this is my x label\""
+	echo "  -o outfile set png file to fname (requred if type is png)"
+	echo "  -t tname plot title to tname"
+	exit 1
+}
 if [ $# -lt 1 ]; then
-	echo "plot-file file1 <file2 ...>"
+	useage
 	exit 1
 fi
-for f in $@; do
-	if [ -n "$files" ]; then
-		files="$files, \"$f\" with lines"
-	else
-		files="\"$f\" with lines"
-	fi
+let fileno=1
+MODE="ready"
+PLOTS=""
+let args=0
+while  getopts f:k:hl:o:p:t: opt ; do
+  let args=args+2
+  #echo "opt=$opt arg=$OPTARG"
+  case $opt in																			 
+    f) case $OPTARG in
+        0) MODE="ready"
+           start=1;;
+        1) MODE="title"
+           start=2;;
+        2) MODE="minmax"
+           start=3;;
+        *) echo "Invalid -f option $OPTARG"
+           useage;;
+       esac ;;
+    k) plottype="$OPTARG"
+       case $plottype in
+         x11|png) ;;
+         *) echo "Unknown type ($OPTARG) for -t"
+                 usage;;
+       esac;;
+    h) useage;; 
+   # l) for l in $OPTARG; do
+   #      if [ "$l" = "x" ]; then
+    p) plotfile="$OPTARG";;
+    o) outfile="$OPTARG";;
+    t) plottitle="$OPTARG" ;;
+    *) echo "Invalid option $OPTARG"
+    	usage
+       exit 1
+       ;;
+  esac
 done
-echo -e "set terminal x11 persist\n plot $files" |gnuplot
+if [ -z "$plotfile" ] || [ -z "$plottype" ]; then
+  echo "must specify plotfile and plot type"
+  usage
+fi
+if [ "png" = "$plottype" ] && [ -z "$outfile" ]; then
+  echo "must specify out file witn plot type png"
+  usage
+fi
+rm "$plotfile"
+# set up single/multi plot
+let multi=0
+do_term "$plottype"
+if [ "ready" = "$MODE" ]; then
+
+if [ $# -gt 1 ]; then
+  let multi=$#
+fi
+do_header  "$multi"
+set_ylabel "Volts"
+for f in $@; do
+  plot_file "$f" "" "CH$fileno"
+done
+plot_all "$plottype" "$outfile"
+exit
+fi
+
+shift $args
+echo "$args: $@"
+if [ $# -gt 1 ]; then
+  let multi=$#
+fi
+
+maxx="0"
+maxy="-1000"
+miny="1000"
+
+for f in $@; do
+  let i=0
+  #xorg lasttime miny maxy
+  while read a b c d; do
+    if [ $i -eq 0 ]; then 
+      if [ "minmax" = "$MODE" ]; then
+        MAXT="$b"
+        MINY="$c"
+        MAXY="$d"
+        EVERY="every ::3"
+      elif [ "title" = "$MODE" ]; then
+        XTITLE="$a"
+        YTITLE="$b"
+        EVERY="every ::2"
+      fi
+    elif [ $i -eq 1 ]; then
+      if [ "minmax" = "$MODE" ]; then
+        XTITLE="$a"
+        YTITLE="$b"
+      fi  
+    fi
+    let i=i+1
+    done << EOF
+$(head -n 2 $f)
+EOF
+echo "$f: $MAXT $MINY $MAXY $XTITLE $YTITLE"  
+if [ "minmax" = "$MODE" ]; then
+ if float_cond "$maxx < $MAXT"; then
+   maxx="$MAXT"
+ fi
+ if float_cond "$maxy < $MAXY"; then
+   maxy="$MAXY"
+ fi 
+ if float_cond "$miny > $MINY"; then
+   miny="$MINY"
+ fi
+fi
+if [ $fileno -eq 1 ]; then
+   do_xlabel  "$XTITLE" "$plottitle"
+   do_xrange  "0" "$maxx"
+  #echo -e "set bmargin 5\n" >>"$plotfile"
+  do_header  "$multi"
+fi
+do_ylabel "$YTITLE"
+do_yrange "$miny" "$maxy"
+plot_file "$f" "$EVERY" "CH$fileno" "$XTITLE" "0" "$maxx" "$plottitle"
+done 
+#file loop
+
+do_trailer
+#do_xlabel  "$XTITLE"
+
+plot_all "$plottype" "$outfile"
