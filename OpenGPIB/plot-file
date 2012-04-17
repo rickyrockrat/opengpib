@@ -109,7 +109,6 @@ fi
 plot_file () {
 	# multiplot: first?"\nplot ":",\\\n"
 	# single file "\nplot "
-	#smoothing="smooth csplines"
 	plt=".84" #set plot area - depends on bmargin/tmargin below to get symetrical
 	tbmarg="3" #top/bottom margin for title and xaxis labels/title
 	adder=$(float_eval "(1-$plt)/2")
@@ -150,7 +149,7 @@ plot_file () {
 	  mthis=""
 	  mcom=""
 	fi 
-	tmp="plot '$1' $2 title \"$3\" ls $fileno $smoothing with lines"
+	tmp="plot '$1' $2 title \"$3\" ls $fileno $SMOOTHING with lines"
 
 	if [ $multi -gt 1 ]; then
 	  echo -e "$marg$mthis$tmp" >> "$plotfile"
@@ -205,6 +204,8 @@ do_header () {
 do_trailer () {
 	echo -e "unset multiplot\nset bmargin 20\n" >> "$plotfile"
 }
+#smoothing types: bezier  csplines acsplines 
+
 usage() {
   echo "plot-file <options> file1 <file2 ...>"
 	echo " where options are:"
@@ -215,6 +216,8 @@ usage() {
 	#echo "  -l type name set label to 'name', where type is:"
   echo "      x or y and in format -l \"x this is my x label\""
 	echo "  -o outfile set png file to fname (requred if type is png)"
+	echo "  -s x Add smoothing style x to waveform:"
+	echo "     1=csplines 2=bezier 3=acsplines 4=unique 5=frequency 6=sbezier "
 	echo "  -t tname plot title to tname"
 	echo "  -x range set xrange to range: ex -x \"10:20\""
 	exit 1
@@ -228,7 +231,7 @@ MODE="ready"
 XRANGE=""
 GSIZE="640,480"
 let args=0
-while  getopts f:g:k:hl:o:p:t:x: opt ; do
+while  getopts f:g:k:hl:o:p:s:t:x: opt ; do
   let args=args+2
   #echo "opt=$opt arg=$OPTARG"
   case $opt in																			 
@@ -254,6 +257,16 @@ while  getopts f:g:k:hl:o:p:t:x: opt ; do
    #      if [ "$l" = "x" ]; then
     p) plotfile="$OPTARG";;
     o) outfile="$OPTARG";;
+    s) case $OPTARG in 
+        1) SMOOTHING="smooth csplines";;
+        2) SMOOTHING="smooth bezier";;
+        3) SMOOTHING="smooth acsplines";;
+        4) SMOOTHING="smooth unique";;
+        5) SMOOTHING="smooth frequency";;
+        6) SMOOTHING="smooth sbezier";;
+        *) echo "Unknown smoothing '$OPTARG'";;
+       esac
+       ;;
     t) plottitle="$OPTARG" ;;
     x) XRANGE="$OPTARG";;
     *) echo "Invalid option $OPTARG"
