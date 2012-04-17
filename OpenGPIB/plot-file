@@ -75,7 +75,7 @@ do_yrange () {
 }
 # file min max
 do_xrange () {
-  echo "set xrange[$1:$2]" >>"$plotfile"
+  echo "set xrange[$1]" >>"$plotfile"
 }
 #file title
 do_title () {
@@ -85,19 +85,19 @@ do_title () {
 do_trigger () {
   echo "set label 2 'T' at $1,$2 front" >>"$plotfile"
 }
-#  term window_title
+#  term size window_title
 # types: x11 png
 do_term () {
 if [ "$1" = "x11" ]; then
-  if [ -n "$2" ]; then
-    XTITLE="title \"$2\""
+  if [ -n "$3" ]; then
+    XTITLE="title \"$3\""
    else
    XTITLE=""
   fi
   echo "set terminal x11 $XTITLE persist" >>"$plotfile"
 fi
 if [ "$1" = "png" ]; then
-  echo "set terminal png medium size 640,480 \\" >>"$plotfile"
+  echo "set terminal png medium size $2 \\" >>"$plotfile"
   echo "xffffff x000000 x404040 \\">>"$plotfile"
 	echo "xff0000 x00ff00 x66cdaa xcdb5cd \\">>"$plotfile"
 	echo "xadd8e6 x0000ff xdda0dd x9500d3 ">>"$plotfile"
@@ -110,7 +110,8 @@ plot_file () {
 	# multiplot: first?"\nplot ":",\\\n"
 	# single file "\nplot "
 	#smoothing="smooth csplines"
-	plt=".88" #set plot area - depends on bmargin/tmargin below to get symetrical
+	plt=".84" #set plot area - depends on bmargin/tmargin below to get symetrical
+	tbmarg="3" #top/bottom margin for title and xaxis labels/title
 	adder=$(float_eval "(1-$plt)/2")
 	ysz=$(float_eval "$plt/($multi)")
 	yorg=$(float_eval "1-($ysz*$fileno)")
@@ -121,13 +122,13 @@ plot_file () {
 	   else
 	     mtit=""
 	   fi
-	   marg="${mtit}set bmargin 0\nset tmargin 2\nset format x \"\"\nunset xlabel\n"
+	   marg="${mtit}set bmargin 0\nset tmargin $tbmarg\nset format x \"\"\nunset xlabel\n"
 	   yorg=$(float_eval "$yorg-$adder")
 	   ysz=$(float_eval "$ysz+$adder")
 	 else
 	   if [ $fileno -eq $multi ]; then #bottom graph
 	     #marg="set xlabel \"$4\"\nset bmargin 3\nset tmargin 0\nset xrange [$5:$6]\n"
-	     marg="set xlabel \"$4\"\nset bmargin 2\nset tmargin 0\nset format x \"%.1E\"\n"
+	     marg="set xlabel \"$4\"\nset bmargin $tbmarg\nset tmargin 0\nset xlabel \"$4\"\nset format x \"%.2sE%.0S\"\n"
 	     yorg=$(float_eval "$yorg-(2*$adder)")
 	     ysz=$(float_eval "$ysz+$adder")
 	   else #middle graph
@@ -161,7 +162,7 @@ plot_file () {
 # type out
 plot_all () {
  if [ "$1" = "png" ]; then
-   gnuplot "$plotfile" > $2
+   gnuplot "$plotfile" > "$2"
  fi
  if [ "$1" = "x11" ]; then
    gnuplot "$plotfile"
@@ -204,16 +205,18 @@ do_header () {
 do_trailer () {
 	echo -e "unset multiplot\nset bmargin 20\n" >> "$plotfile"
 }
-useage() {
+usage() {
   echo "plot-file <options> file1 <file2 ...>"
 	echo " where options are:"
 	echo "  -f fmt - set format to 0, 1 , or 2 header lines. (0)"
+	echo "  -g set grahpic size (640,480)"
 	echo "  -k kind set plot kind to x11 or png (required)"
 	echo "  -p fname set plot file to fname (required)"
 	#echo "  -l type name set label to 'name', where type is:"
   echo "      x or y and in format -l \"x this is my x label\""
 	echo "  -o outfile set png file to fname (requred if type is png)"
 	echo "  -t tname plot title to tname"
+	echo "  -x range set xrange to range: ex -x \"10:20\""
 	exit 1
 }
 if [ $# -lt 1 ]; then
@@ -222,9 +225,10 @@ if [ $# -lt 1 ]; then
 fi
 let fileno=1
 MODE="ready"
-PLOTS=""
+XRANGE=""
+GSIZE="640,480"
 let args=0
-while  getopts f:k:hl:o:p:t: opt ; do
+while  getopts f:g:k:hl:o:p:t:x: opt ; do
   let args=args+2
   #echo "opt=$opt arg=$OPTARG"
   case $opt in																			 
@@ -236,8 +240,9 @@ while  getopts f:k:hl:o:p:t: opt ; do
         2) MODE="minmax"
            start=3;;
         *) echo "Invalid -f option $OPTARG"
-           useage;;
+           usage;;
        esac ;;
+    g) GSIZE="$OPTARG";;
     k) plottype="$OPTARG"
        case $plottype in
          x11|png) ;;
@@ -250,6 +255,7 @@ while  getopts f:k:hl:o:p:t: opt ; do
     p) plotfile="$OPTARG";;
     o) outfile="$OPTARG";;
     t) plottitle="$OPTARG" ;;
+    x) XRANGE="$OPTARG";;
     *) echo "Invalid option $OPTARG"
     	usage
        exit 1
@@ -267,7 +273,7 @@ fi
 rm "$plotfile"
 # set up single/multi plot
 let multi=0
-do_term "$plottype"
+do_term "$plottype" "$GSIZE" "$plottitle"
 if [ "ready" = "$MODE" ]; then
 
 if [ $# -gt 1 ]; then
@@ -317,7 +323,7 @@ for f in $@; do
     done << EOF
 $(head -n 2 $f)
 EOF
-echo "$f: $MAXT $MINY $MAXY $XTITLE $YTITLE"  
+echo -n "$f: $MAXT $MINY $MAXY $XTITLE $YTITLE"  
 if [ "minmax" = "$MODE" ]; then
  if float_cond "$maxx < $MAXT"; then
    maxx="$MAXT"
@@ -331,12 +337,20 @@ if [ "minmax" = "$MODE" ]; then
 fi
 if [ $fileno -eq 1 ]; then
    do_xlabel  "$XTITLE" "$plottitle"
-   do_xrange  "0" "$maxx"
+   if [ -n "$XRANGE" ]; then
+     do_xrange "$XRANGE"
+   else
+     do_xrange  "0:$maxx"
+   fi
   #echo -e "set bmargin 5\n" >>"$plotfile"
   do_header  "$multi"
 fi
 do_ylabel "$YTITLE"
-do_yrange "$miny" "$maxy"
+ADDER=$(float_eval "($MAXY - $MINY)*0.05")
+MINY=$(float_eval "$MINY - $ADDER")
+MAXY=$(float_eval "$MAXY + $ADDER")
+echo " ... $ADDER $MINY $MAXY"
+do_yrange "$MINY" "$MAXY"
 plot_file "$f" "$EVERY" "CH$fileno" "$XTITLE" "0" "$maxx" "$plottitle"
 done 
 #file loop
