@@ -204,7 +204,7 @@ point.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-char *load_preamble(int fd, int *offset)
+char *load_tek_preamble(int fd, int *offset)
 {
 	char buf[256], *end;
 	int i,x,k;
@@ -633,7 +633,7 @@ RPPARTIAL. (Positive integer -partial)
 ****************************************************************************/
 void usage( void)
 {
-	printf("tek2gplot: $Revision: 1.21 $\n"
+	printf("tek2gplot: $Revision: 1.22 $\n"
 	" -a text Append descriptive text to graph at bottom left.\n"
 	" -c channelfname Set the channel no for the trigger file name. i.e. \n"
 	"    which channel is trigger source. This must match an -i.\n"
@@ -870,7 +870,7 @@ int load_data(struct plot_data *p)
 			return 1;
 		}
 		build_oname(&p->trace[c],p->basename);
-		if(NULL == (preamble=load_preamble(id, &data))){
+		if(NULL == (preamble=load_tek_preamble(id, &data))){
 			printf("Unable to load preamble for file %s\n",p->trace[c].iname);
 			goto closeid;
 		}
