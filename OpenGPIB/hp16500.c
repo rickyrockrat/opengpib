@@ -46,7 +46,8 @@ struct valid_bits {
 
 struct hp_cards hp_cardlist[]=\
 {
-	{CARDTYPE_16515A,   MODEL_16515A,  DESC_16515A},
+	{CARDTYPE_16500C,   MODEL_16500C,  DESC_16500C},
+  {CARDTYPE_16515A,   MODEL_16515A,  DESC_16515A},
 	{CARDTYPE_16516A,   MODEL_16516A,  DESC_16516A},
 	{CARDTYPE_16517A,   MODEL_16517A,  DESC_16517A},
 	{CARDTYPE_16518A,   MODEL_16518A,  DESC_16518A},
@@ -107,7 +108,7 @@ int print_card_model(int id)
 }
 /***************************************************************************/
 /** .
-\n\b Arguments:
+\n\b Arguments: slot is 1-5
 \n\b Returns:
 ****************************************************************************/
 int select_hp_card(int slot, struct gpib *g)
@@ -119,15 +120,15 @@ int select_hp_card(int slot, struct gpib *g)
 		model=((struct card_info *)g->inst)->info->model;
 	write_get_data(g,":SELECT?");
 
-	if(slot+1 == (g->buf[0]-0x30)){
-		fprintf(stderr,"Slot %c (%s) %s already selected\n",g->buf[0]+'A'-'0'-1,model,g->buf);
+	if(slot == (g->buf[0]-0x30)){
+		fprintf(stderr,"Slot %c (%s) %s already selected\n",0x30!=g->buf[0]?g->buf[0]+'A'-'0'-1:g->buf[0],model,g->buf);
 	}	else{
-		sprintf(g->buf,":SELECT %d",slot+1);
+		sprintf(g->buf,":SELECT %d",slot);
 		write_string(g,g->buf);	
 	}
 	write_get_data(g,":SELECT?");
 /*	i=write_get_data(g,":?"); */
-	fprintf(stderr,"Selected Card %c to talk to.\n",g->buf[0]+'A'-'0'-1);
+	fprintf(stderr,"Selected Card %c to talk to.\n",0x30!=g->buf[0]?g->buf[0]+'A'-'0'-1:g->buf[0]);
 	return 0;
 
 }
@@ -152,7 +153,7 @@ void show_known_hp_cards( void )
 
 \n\b Arguments: if card type is -1, assume we just want to print out the slots.
 \n\b      If no is 0, we use the last card found.
-\n\b Returns: card number found.
+\n\b Returns: card number found (1-5). 0 is system.
 ****************************************************************************/
 int hp16500_find_card(int cardtype, int no, struct gpib *g)
 {
@@ -180,38 +181,43 @@ int hp16500_find_card(int cardtype, int no, struct gpib *g)
 		fprintf(stderr,"Unable to find 'HEWLETT PACKARD,16500C' in id string '%s'\n",g->buf);
 		return -1;
 	}
-	if(0 == write_get_data(g,":CARDCAGE?")){
-		fprintf(stderr,"Error sending Cardcage command\n");
-		return -1;
-	}
+  if(CARDTYPE_16500C == cardtype){ /**talking to system  */
+    return SLOTNO_16500C;
+  }else{
+    if(0 == write_get_data(g,":CARDCAGE?")){
+  		fprintf(stderr,"Error sending Cardcage command\n");
+  		return -1;
+  	}
+  	
+  	for (s=0;g->buf[s];++s)
+  		if(isdigit(g->buf[s]))
+  			break;
+  	for (ccount=i=0;i<5;++i){
+  		slots[i]=(int)get_value_col(i,&g->buf[s]);
+  		fprintf(stderr,"Slot %c = %d - ",'A'+i,slots[i]);
+  		print_card_model(slots[i]);
+  		fprintf(stderr,"\n");
+  		if(cardtype == slots[i]){
+  			++ccount;
+  			if((-1 ==slot && 0== no) || ccount == no){
+  				slot=i;
+  				if(-1 != cardtype) ((struct card_info *)g->inst)->slot=i;	
+  			}
+  		}
+  	}
+  	if( -1 != cardtype){
+  		if(-1 == slot){
+  			fprintf(stderr,"Unable to find %s card\n",hp_cardlist[info].model);
+  		}	else{
+  			fprintf(stderr,"Found ");
+  			print_card_model(slots[slot]);
+  			fprintf(stderr," in slot %c\n",'A'+slot);	
+  		}		
+  		return slot+1;
+  	}
+  	return 0;  
+  }
 	
-	for (s=0;g->buf[s];++s)
-		if(isdigit(g->buf[s]))
-			break;
-	for (ccount=i=0;i<5;++i){
-		slots[i]=(int)get_value_col(i,&g->buf[s]);
-		fprintf(stderr,"Slot %c = %d - ",'A'+i,slots[i]);
-		print_card_model(slots[i]);
-		fprintf(stderr,"\n");
-		if(cardtype == slots[i]){
-			++ccount;
-			if((-1 ==slot && 0== no) || ccount == no){
-				slot=i;
-				if(-1 != cardtype) ((struct card_info *)g->inst)->slot=i;	
-			}
-		}
-	}
-	if( -1 != cardtype){
-		if(-1 == slot){
-			fprintf(stderr,"Unable to find %s card\n",hp_cardlist[info].model);
-		}	else{
-			fprintf(stderr,"Found ");
-			print_card_model(slots[slot]);
-			fprintf(stderr," in slot %c\n",'A'+slot);	
-		}		
-		return slot;
-	}
-	return 0;
 	
 }
 
@@ -257,6 +263,7 @@ void show_common_usage (void)
 ****************************************************************************/
 int handle_common_opts(int c, char *optarg, struct hp_common_options *o)
 {
+  int i;
 	if(0 == c && NULL == optarg){
 		o->iaddr=7;
 		o->cardno=0;
@@ -296,9 +303,12 @@ int handle_common_opts(int c, char *optarg, struct hp_common_options *o)
 		
 		case 't':
 			o->cardtype=atoi(optarg);
-			if(o->cardtype != CARDTYPE_16534A &&
-				 o->cardtype != CARDTYPE_16532A &&
-			   o->cardtype != CARDTYPE_16530A){
+      for (i=0;CARDTYPE_INVALID != hp_cardlist[i].type;++i){
+        if(hp_cardlist[i].type == o->cardtype )
+          break;
+      }
+        
+			if(CARDTYPE_INVALID == hp_cardlist[i].type){
 			  fprintf(stderr,"'-t: %s' Invalid card type\n",optarg);							
 			  return 1;
 			}
@@ -418,7 +428,7 @@ int main(int argc, char * argv[])
 			select_hp_card(slot, g);
 			sprintf(g->buf,"%s",cmd);
 	    write_get_data(g,g->buf);	
-			printf("%s\n",g->buf);
+      fprintf(stderr,"Sent '%s' Command. Reply: '%s'\n",cmd,g->buf);
 			break;
     case QTEST:
       if(-1 == (slot=hp16500_find_card(copt.cardtype,copt.cardno,g)) ) {
@@ -561,6 +571,28 @@ void parse_options(struct options *o)
    #######################################################################*/
 
 
+
+/***************************************************************************/
+/** ":CHAN1:OFFS 0;:CHAN2:OFFS 0;:CHAN3:OFFS 0;:CHAN4:OFFS 0".
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int set_channel_offset(struct gpib *g, int channel, float offset)
+{
+  return -1;
+}
+
+
+/***************************************************************************/
+/** ":CHAN1:RANG 1.6;:CHAN2:RANG 1.6;:CHAN3:RANG 1.6;:CHAN4:RANG 1.6" .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int set_channel_range(struct gpib *g)
+{
+  return -1;
+}
+
 /***************************************************************************/
 /** Look for the trigger source, comes back as:
 CHANNEL1
@@ -591,9 +623,8 @@ double get_xinc_mult(double v, int *x)
   double i;
   int z;
   /**for some reason, if you use 1 here, apparently 1e-6 *1e6 != 1   */
-  for (z=0,i=1;(double)(v*i)<(double)(.99999999e+0);++z,i*=1000);
+  for (z=0,i=1;(double)(v*i)<(double)(1);++z,i*=1000);
 /*    printf("%d %e %e -> %e (%d)\n",z,i,v,v*i,(int)(v*i)); */
-    
   *x=z;
   return i;
 }
@@ -609,7 +640,9 @@ int oscope_parse_preamble(struct gpib *g, struct hp_scope_preamble *h)
 	h->points=get_value_col(2,g->buf);
   h->count=get_value_col(3,g->buf);
 	h->xinc=get_value_col(4,g->buf);
-	h->xorg=get_value_col(5,g->buf);
+	h->xorg=get_value_col(5,g->buf); /**first data point (in seconds) w/respect to trigger, i.e.  */
+                                   /**trigger point is this value * -1, and data point number=
+                                       xorg/xinc. */
 	h->xref=get_value_col(6,g->buf);
 	h->yinc=get_value_col(7,g->buf);
 	h->yorg=get_value_col(8,g->buf);
@@ -623,6 +656,7 @@ int oscope_parse_preamble(struct gpib *g, struct hp_scope_preamble *h)
     case 4: snprintf(h->xunits,3,"pS"); break;
     default: snprintf(h->xunits,3,"?S"); break;  
   }
+  fprintf(stderr,"%s\n",g->buf);
   fprintf(stderr,"fmt %d type %d points %d count %d xinc %e xorg %e xref %e yinc %e yorg %e yref %e xmult %e inc_thou %d '%s'\n",
   h->fmt, h->type,h->points, h->count,h->xinc,h->xorg,h->xref,h->yinc,h->yorg,h->yref,h->xincmult,h->xinc_thou,h->xunits);
 	return 0;
@@ -1556,7 +1590,7 @@ active[0] is clk, pod 4 is [1]
 ****************************************************************************/
 struct signal_data *show_vcd_label(char *a, struct labels *l)
 {
-	int i,bits, bs, be,p,bytes, bsset;
+	int i,bits, bs, be,p,bytes, bsset,beset;
 	uint8 pod[26];
 	uint16 x;
 	static struct signal_data *d=NULL;
@@ -1604,9 +1638,9 @@ struct signal_data *show_vcd_label(char *a, struct labels *l)
 	/**now pod has clk top two indexes and lowest pod in 0,1, lsb in 0  */	
 	/**we start out off-by one on bit position (p)  */
 	bs=be=0;
-	bsset=0;
+	beset=bsset=0;
 	for (p=i=0;i<bytes;++i){
-		
+		fprintf(stderr,"P0x%02x:",pod[i]);
 		for (x=1;x<0x100;x<<=1,++p){
 			
 			if(x&pod[i]){
@@ -1621,14 +1655,16 @@ struct signal_data *show_vcd_label(char *a, struct labels *l)
 					bsset=1;
 				}
 					
-			}else if(bsset && !be) {
+			}else if(bsset && !beset) {
+        beset=1;
 				be=p;
 				if(p)
 					--be;
 				/*fprintf(stderr,"D%d ",p);  */
 			}
 		}
-	}	
+	}
+  printf("%s:%d-%d\n",l->name,bs,be);
 	if(NULL ==d)
 		d=add_signal(NULL, l->polarity,l->enable, bits, bs,be,l->name);
 	else
