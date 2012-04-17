@@ -1,0 +1,70 @@
+#!/bin/bash
+# range is V/Div *4, so for 2V/div, use 8
+# ":MMEM:LOAD:CONF '0CALSKEW' ,INT0"
+
+WDIR=$(dirname $0)
+float_scale=2
+. "$WDIR/bcommon"
+usage () {
+  echo "Usage $0 <options>"
+  echo " Where options are:"
+  echo "  -a auto set offset to middle of range"
+  echo "  -c cmd - send cmd to unit"
+  echo "  -h this screen"
+  echo "  -l conf load file named conf from HDD"
+  echo "  -o off" 
+  echo "  -s slot number in hp16500C"
+  echo "  -v volt/div"
+  echo "Where offset is positive to shift waveform down"
+  exit 1
+}
+
+#if [ $# -lt 1 ]; then 
+# usage
+#fi
+set -f
+CMD=""
+let SLOT=14
+while  getopts ac:hl:o:s:v: opt ; do
+  #echo "opt=$opt arg=$OPTARG"
+  case $opt in
+    a) AUTO=1;;
+    c) UCMD="$OPTARG";;
+    l) CONF="$OPTARG";;
+    o) OFF=$OPTARG ;;
+    s) SLOT=$OPTARG ;;
+    v) VDIV=$OPTARG ;;
+    h) usage; exit 1;;
+    *) echo "Invalid option $OPTARG"
+       exit 1
+       ;;
+  esac
+done
+if [ -n "$CONF" ]; then #load config file first
+  ./hp16500 -a 192.168.0.200 -t 0 -c ":MMEM:LOAD:CONF '$CONF' ,INT0"
+fi
+if [ -n "$VDIV" ]; then
+RANGE=$(float_eval "$VDIV*4")
+ CMD=":CHAN1:RANG $RANGE; :CHAN2:RANG $RANGE;:CHAN3:RANG $RANGE;:CHAN4:RANG $RANGE;"
+ if [ "1" = "$AUTO" ]; then
+   OFF=$(float_eval "$VDIV/2")
+ fi
+fi
+
+if [ -n "$OFF" ]; then
+ CMD="${CMD}:CHAN1:OFFS $OFF;:CHAN2:OFFS $OFF;:CHAN3:OFFS $OFF;:CHAN4:OFFS $OFF;"
+fi
+if [ -z "$CMD" ]; then
+  if [ -z "$UCMD" ]; then
+    if [ -z "$CONF" ]; then
+      echo "nothing to do"
+      usage
+    fi
+   else
+     CMD="$UCMD"
+  fi
+elif [ -n "$UCMD" ]; then
+  echo "Ignorning -c ($UCMD)"
+fi
+echo "cmd=$CMD"
+./hp16500 -a 192.168.0.200 -t $SLOT -c "$CMD"
