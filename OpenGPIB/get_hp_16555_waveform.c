@@ -125,11 +125,12 @@ int init_instrument(struct hp_common_options *o,struct gpib *g)
 	int slot;
 	if(-1 == (slot=hp16500_find_card(o->cardtype,o->cardno,g)) )
 		return -1;
-	select_hp_card(slot, g);
+  if(SLOTNO_16500C != slot)
+	  select_hp_card(slot, g);
 	
 	sprintf(g->buf,"*OPC\n");
 	write_string(g,g->buf);	
-	sprintf(g->buf,":menu %d,0\n",slot+1);
+	sprintf(g->buf,":menu %d,0\n",slot);
 	write_string(g,g->buf);	
 	return slot;
 /*34,-1,12,12,11,1,0,5,5,5 */
