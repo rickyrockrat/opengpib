@@ -37,7 +37,9 @@ Change Log: \n
 #else
   #warning "LA2VCD_LIB Not Defined! You loose vcd functionality"
 #endif
+#define SLOTNO_16500C    0 /**0 to talk to system  */
 /** Id Number Card*/
+#define CARDTYPE_16500C  0         /** HP 16500C system  */
 #define CARDTYPE_16515A  1         /** HP 16515A 1GHz Timing Master Card*/
 #define CARDTYPE_16516A  2         /** HP 16516A 1GHz Timing Expansion Card*/
 #define CARDTYPE_16517A  4         /** HP 16517A 4GHz Timing/1GHz State Analyzer Master Card*/
@@ -62,6 +64,7 @@ Change Log: \n
 #define CARDTYPE_16542A  42        /** HP 16542A 2 MB Acquisition Logic Analyzer Master Card*/
 #define CARDTYPE_INVALID -1
 
+#define MODEL_16500C  "16500C"
 #define MODEL_16515A  "16515A"
 #define MODEL_16516A  "16516A"
 #define MODEL_16517A  "16517A"
@@ -85,6 +88,7 @@ Change Log: \n
 #define MODEL_16541A  "16541A"
 #define MODEL_16542A  "16542A"
 
+#define DESC_16500C  "16500C System"
 #define DESC_16515A  "1GHz Timing Master Card"
 #define DESC_16516A  "1GHz Timing Expansion Card"
 #define DESC_16517A  "4GHz Timing/1GHz State Analyzer Master Card"
@@ -151,15 +155,13 @@ struct hp_scope_preamble {
   char xunits[3]; /**units, i.e. ms,us,ns,ps  */
 	int points;
 	int type;
-	int fmt;
+	int fmt;    /**ascii, byte, word  */
+  int data_size; /**related to fmt, above.  */
   int count;
   long point_len; /**number of bytes that follow on data stream  */
   int point_start; /**location in buffer where points start.  */
 };
 
-#define HP_FMT_ASC 	0
-#define HP_FMT_BYTE 1
-#define HP_FMT_WORD 2
 
 #define CLK_START 0
 #define POD_START 2
