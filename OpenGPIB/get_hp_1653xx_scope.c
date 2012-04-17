@@ -133,9 +133,9 @@ void usage(void)
   " -f set the format. 0=ASCII, 1=byte, and 2=word. If not set, then set according to instrument\n"
 	" -g set gnuplot mode, with x,y (time volts), one point per line\n"
 	" -o fname put output to file called fname\n"
-
+  " -p hno Prefix file header to hno. 0=none,just x y. 1= title for x y, 2 = full header(2)\n"
 	" -r set raw mode (don't convert data to volts)\n"
-  " -u set unprocess mode, dump preamble at top and raw data after\n"
+  " -u set unprocess mode, dump preamble at top and raw data after. -r,-g have no effect.\n"
 #ifdef LA2VCD_LIB
 	" -v put vcd data to fname.vcd. Creates .chx also\n"
 #endif	
@@ -145,7 +145,9 @@ void usage(void)
 	
 	"");
 }
-
+#define HDR_NONE  0
+#define HDR_TITLE 1
+#define HDR_FULL  2
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -157,11 +159,10 @@ int main(int argc, char * argv[])
 	struct hp_scope_preamble h;
 	struct hp_common_options copt;
 	FILE *ofd;
-  double time_inc;
+  float miny, maxy, time, time_inc;
 	char *ofname, *channel[MAX_CHANNELS], *lbuf;
-	int i, c, rtn, ch_idx, raw,xy, data_size, process;
-#ifdef LA2VCD_LIB	/**it doesn't support floating point data  */  
-  char *vbuf;
+	int i, c, rtn, ch_idx, raw,xy,process,hdr;
+#ifdef LA2VCD_LIB	 
   int vcd=0;
   struct la2vcd *l;
 #endif
@@ -179,7 +180,8 @@ int main(int argc, char * argv[])
 	ofname=NULL;
 	ofd=NULL;
 	raw=xy=0;
-	while( -1 != (c = getopt(argc, argv, "f:gc:ho:ruv"HP_COMMON_GETOPS)) ) {
+  hdr=HDR_FULL;
+	while( -1 != (c = getopt(argc, argv, "f:gc:hp:o:ruv"HP_COMMON_GETOPS)) ) {
 		switch(c){
 			case 'a':
 			case 'd':
@@ -209,6 +211,12 @@ int main(int argc, char * argv[])
 			case 'o':
 				ofname=strdup(optarg);
 				break;
+      case 'p':
+        hdr=atoi(optarg);
+        if(hdr< HDR_NONE || hdr>HDR_FULL){
+          fprintf(stderr,"Invalid -p option (%d)\n",hdr);
+        }
+        break;
 			case 'r':
 				raw=1;
 				break;
@@ -225,10 +233,11 @@ int main(int argc, char * argv[])
 				return 1;
 		}
 	}
+  h.fmt=copt.fmt;
   if(FMT_WORD == copt.fmt)
-    data_size=2;
+    h.data_size=2;
   else if(FMT_BYTE == copt.fmt)
-    data_size=1;
+    h.data_size=1;
   else {
     printf("Can't handle data format %d\n",copt.fmt);
     return -1;
@@ -291,10 +300,6 @@ int main(int argc, char * argv[])
     	 fprintf(stderr,"Failed to add input file\n");
        vcd=0;
       }   
-      if(NULL == (vbuf=malloc(100))){
-        fprintf(stderr,"Out of mem allocating 100 byte vcd buffer\n");
-        vcd=0;
-      }
       if(vcd) {
         for (c=0;c<ch_idx && NULL != channel[c];++c)
           vcd_add_signal (l,V_REAL, 0, 0,channel[c]);
@@ -344,47 +349,65 @@ int main(int argc, char * argv[])
       
   	point=0;
   	time_inc=h.xinc*h.xincmult;
-    if(xy)
-      fprintf(ofd,"%s Volts\n",h.xunits);
+    if(xy){
+		/*save room for our min/max y*/
+    if(HDR_FULL == hdr)
+	     fprintf(ofd,"                                                         ");
+    if(HDR_FULL == hdr||HDR_TITLE == hdr)  
+	    fprintf(ofd,"%s Volts\n",h.xunits);
+	  miny=maxy=0;
+    }
   	while(i>0){	/**process the first block of data received  */
       if(process){
 				int x;
-				for (x=h.point_start;x<i;x+=data_size){
+        
+				for (x=h.point_start;x<i;x+=h.data_size){
 					float volts;
-					float time;
           unsigned int rawdat;
           fflush(NULL);
           rawdat=g->buf[x];
-          if(2 == data_size){
+          if(2 == h.data_size){
             rawdat<<=8;
             rawdat+=g->buf[x+1];
           }
             
-					time=time_inc*(float)(point-h.xref)+h.xorg;
-					if(0==point)
-						fprintf(stderr,"%d %f %f \n",point,h.xinc,time); 
-					volts=(rawdat-h.yref)*h.yinc + h.yorg;
-					if(xy){
-						if(raw)
-							fprintf(ofd,"%f %d\n",time,rawdat);
-						else
-							fprintf(ofd,"%f %f\n",time,volts);	
-					}	else {
-						if(raw)
-							fprintf(ofd,"%d,",rawdat);
-						else
-							fprintf(ofd,"%f,",volts);	
-					}
-#ifdef LA2VCD_LIB
-          if(vcd && NULL != vbuf){
-            l->first_input_file->buf=vbuf;
-            snprintf(vbuf,99,"%f",volts);
-				    vcd_read_sample(l); 
-				     write_vcd_data (l);
-				    advance_time (l);
+					time=(time_inc*(float)(point)-h.xref);
+          
+					if(0==point){
+            fprintf(stderr,"%f %f %f %f %f\n",(float)point,h.xinc,time, time_inc,h.xorg); 
           }
-
+						
+					volts=(rawdat-h.yref)*h.yinc + h.yorg;
+          /**skip values that are out of range.  */
+					if(401 > volts && -401 < volts) {
+  					if(xy){
+  						if(volts>maxy) maxy=volts;
+  						if(volts<miny) miny=volts;
+  						if(raw)
+  							fprintf(ofd,"%f %d\n",time,rawdat);
+  						else
+  							fprintf(ofd,"%f %f\n",time,volts);	
+  					}	else {
+  						if(raw)
+  							fprintf(ofd,"%d,",rawdat);
+  						else
+  							fprintf(ofd,"%f,",volts);	
+  					}
+          
+#ifdef LA2VCD_LIB
+          
+            if(vcd ){
+  				    vcd_read_sample_real(l,volts); 
+  	          write_vcd_data (l);
+  				    advance_time (l);
+            }
+          }else if(vcd)
+            fprintf(stderr,"Discarding %f %f\n",time,volts);
+            advance_time(l);
+#else
+          }
 #endif
+          
 					++point;
 				} /**end x loop  */
       } else { /**! process  */
@@ -396,6 +419,11 @@ int main(int argc, char * argv[])
 		
 		/*fwrite(g->buf,1,i,ofd);	 */
 		if(NULL != ofname && NULL != ofd){
+      if(HDR_FULL == hdr){
+        fseek(ofd,0,SEEK_SET);
+  			fprintf(ofd,"%f %f %f %f\n",h.xorg,time,miny,maxy);  
+      }
+			
 			fclose(ofd);
 			ofd=NULL;
 		}
