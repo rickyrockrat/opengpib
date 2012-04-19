@@ -1,18 +1,55 @@
 #!/bin/bash
 # range is V/Div *4, so for 2V/div, use 8
 # ":MMEM:LOAD:CONF '0CALSKEW' ,INT0"
+# :CHAN1:RANG 0.1;OFFS
+# :TRIG:SOUR CHAN2;LEV 0.05
+
+#RANG is 10 * sec/div, DELay is time from trig to center screen, 32768 points.
+# Sample rate seems to be 500:1 S/Div:S/s
+# S/Div goes in 1-2-5 sequenc with S/S in a 1-2-4 sequence..500ps is the exception.
+# :TIM:MODE TRIG;RANG ;DEL ;
 
 WDIR=$(dirname $0)
 float_scale=2
 . "$WDIR/bcommon"
+
+save_timebase () {
+	TDLY=$(./hp16500 -a 192.168.0.200 -t $SLOT -c ":TIM:DEL?")
+	TRAN=$(./hp16500 -a 192.168.0.200 -t $SLOT -c ":TIM:RANG?")
+	TMOD=$(./hp16500 -a 192.168.0.200 -t $SLOT -c ":TIM:MODE?")
+	echo -n ":TIM:MODE $TMOD;RANG $TRAN; DEL $TDLY;" > "$1"
+}
+save_trigger () {
+	TSRC=$(./hp16500 -a 192.168.0.200 -t $SLOT -c ":TRIG:SOUR?")
+	TLEV=$(./hp16500 -a 192.168.0.200 -t $SLOT -c ":TRIG:LEV?")
+	TSLP=$(./hp16500 -a 192.168.0.200 -t $SLOT -c ":TRIG:SLOP?")
+	echo -n ":TRIG:SOUR $TSRC;LEV $TLEV;SLOP $TSLP;" >> "$1"
+}
+# channel file
+save_channel () {
+	R=$(./hp16500 -a 192.168.0.200 -t $SLOT -c ":CHAN$1:RANG?")
+	O=$(./hp16500 -a 192.168.0.200 -t $SLOT -c ":CHAN$1:OFFS?")
+	echo -n ":CHAN$1:RANG $R;OFFS $O;">> "$2"
+}
+save_config () {
+	save_timebase "$1"
+	save_trigger "$1"
+	for i in 1 2 3 4; do
+	  save_channel $i "$1"
+	done
+	echo "Setting in $1"
+	exit 0
+}
 usage () {
   echo "Usage $0 <options>"
   echo " Where options are:"
   echo "  -a auto set offset to middle of range"
   echo "  -c cmd - send cmd to unit"
+  echo "  -g fname get settings and put in fname"
   echo "  -h this screen"
   echo "  -l conf load file named conf from HDD"
   echo "  -o off" 
+  echo "  -p fname put settings from fname to scope"
   echo "  -s slot number in hp16500C"
   echo "  -v volt/div"
   echo "Where offset is positive to shift waveform down"
@@ -25,21 +62,33 @@ usage () {
 set -f
 CMD=""
 let SLOT=14
-while  getopts ac:hl:o:s:v: opt ; do
+while  getopts ac:g:hl:o:p:s:v: opt ; do
   #echo "opt=$opt arg=$OPTARG"
   case $opt in
     a) AUTO=1;;
     c) UCMD="$OPTARG";;
+    g) GFILE="$OPTARG";;
     l) CONF="$OPTARG";;
     o) OFF=$OPTARG ;;
+    p) PFILE="$OPTARG";;
     s) SLOT=$OPTARG ;;
     v) VDIV=$OPTARG ;;
     h) usage; exit 1;;
-    *) echo "Invalid option $OPTARG"
+    *) echo "Invalid option $opt"
        exit 1
        ;;
   esac
 done
+if [ -n "$GFILE" ]; then
+  save_config "$GFILE"
+fi
+if [ -n "$PFILE" ]; then
+  if [ ! -1 "$PFILE" ]; then
+    echo "file '$PFILE' Doesn't exist."
+    exit 1;
+  fi
+  UCMD=$(cat "$PFILE")
+fi
 if [ -n "$CONF" ]; then #load config file first
   ./hp16500 -a 192.168.0.200 -t 0 -c ":MMEM:LOAD:CONF '$CONF' ,INT0"
 fi
