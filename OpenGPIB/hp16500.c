@@ -165,9 +165,9 @@ int hp16500_find_card(int cardtype, int no, struct gpib *g)
 			show_known_hp_cards();
 			return -1;
 		}	
-		printf("Looking for card %s\n",hp_cardlist[info].model);
+		fprintf(stderr,"Looking for card %s\n",hp_cardlist[info].model);
 		if(NULL == (g->inst=calloc(1,sizeof(struct card_info))) ){
-			printf("Out of memory allocating card_info structure\n");
+			fprintf(stderr,"Out of memory allocating card_info structure\n");
 			return -1;
 		}
 		((struct card_info *)g->inst)->info=&hp_cardlist[info];
@@ -387,7 +387,7 @@ int main(int argc, char * argv[])
 				else if(!strcmp(optarg,"cards"))
 					query=QCARD;
 				else{
-					printf("Unknown query '%s'\n",optarg);
+					fprintf(stderr,"Unknown query '%s'\n",optarg);
 					return 1;
 				}
 				break;
@@ -401,7 +401,7 @@ int main(int argc, char * argv[])
 		return 1;
 	}
 	if(NULL ==copt.dev){
-		printf("Must specify device, or -a with ipaddress\n");
+		fprintf(stderr,"Must specify device, or -a with ipaddress\n");
 		return -1;
 	}
 	if(NULL == (g=open_gpib(copt.dtype,copt.iaddr,copt.dev,1048576))){
@@ -414,8 +414,8 @@ int main(int argc, char * argv[])
 				rtn=1;
 				goto close;
 			}
-			printf(" Addr %d, Method %d, device %s\n",copt.iaddr,copt.dtype,copt.dev);
-			printf("%s\n",g->buf);
+			fprintf(stderr," Addr %d, Method %d, device %s\n",copt.iaddr,copt.dtype,copt.dev);
+			fprintf(stderr,"%s\n",g->buf);
 			break;
 		case QCARD:
 			hp16500_find_card(copt.cardtype,copt.cardno,g);
@@ -429,6 +429,7 @@ int main(int argc, char * argv[])
 			sprintf(g->buf,"%s",cmd);
 	    write_get_data(g,g->buf);	
       fprintf(stderr,"Sent '%s' Command. Reply: '%s'\n",cmd,g->buf);
+      fprintf(stdout,"%s",g->buf);
 			break;
     case QTEST:
       if(-1 == (slot=hp16500_find_card(copt.cardtype,copt.cardno,g)) ) {
@@ -436,7 +437,7 @@ int main(int argc, char * argv[])
 				return -1;
 			}
 			select_hp_card(slot, g);
-      printf("Trigger source is %d\n",get_trigger_source(g));
+      fprintf(stderr,"Trigger source is %d\n",get_trigger_source(g));
       break;
 	}
 close:
