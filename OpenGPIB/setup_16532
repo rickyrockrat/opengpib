@@ -31,7 +31,7 @@ save_channel () {
 	O=$(./hp16500 -a 192.168.0.200 -t $SLOT -c ":CHAN$1:OFFS?")
 	echo -n ":CHAN$1:RANG $R;OFFS $O;">> "$2"
 }
-save_config () {
+save_config_old () {
 	save_timebase "$1"
 	save_trigger "$1"
 	for i in 1 2 3 4; do
@@ -39,6 +39,42 @@ save_config () {
 	done
 	echo "Setting in $1"
 	exit 0
+}
+# offset value cmd
+# Create CSET from $3
+find_rep (){
+	let c=0
+	for z in $3; do
+	  if [ $c -eq $1 ]; then
+	    CSET="$CSET$z $2"
+	    return
+	  fi
+	  let c=c+1
+	done
+}
+# we send a series of queries, then when it comes back, we replace
+# the ? with space in original cmd & ; with spaces for values
+# the count spaces in orig cmd (find_rep) and when match, insert the value.
+# outfile
+save_config () {
+	CCMD=":TIM:DEL?;RANG?;MODE?;:TRIG:SOUR?;LEV?;SLOP?;"
+	for i in 1 2 3 4; do
+	  CH="$CH:CHAN$i:RANG?;OFFS?;"
+	done
+	CCMD="$CCMD$CH"
+	HPCONF=$(./hp16500 -a 192.168.0.200 -t $SLOT -c "$CCMD"|sed 's!;! !g')
+  echo "CONF='$HPCONF"
+  SCCMD=$(echo "$CCMD"|sed 's!\?! !g')
+  echo "CCMD=$CCMD"
+  echo "HPCONF=$HPCONF"
+  echo "SSCMD=$SCCMD"
+  let x=0
+  for i in $HPCONF; do
+    find_rep $x $i "$SCCMD"
+    let x=x+1
+  done
+  echo "$CSET">"$1"
+  exit
 }
 usage () {
   echo "Usage $0 <options>"
@@ -79,19 +115,23 @@ while  getopts ac:g:hl:o:p:s:v: opt ; do
        ;;
   esac
 done
+
 if [ -n "$GFILE" ]; then
   save_config "$GFILE"
 fi
+if [ -n "$CONF" ]; then #load config file first
+  ./hp16500 -a 192.168.0.200 -t 0 -c ":MMEM:LOAD:CONF '$CONF' ,INT0"
+  echo "Sleeping 5"
+  sleep 5
+fi
 if [ -n "$PFILE" ]; then
-  if [ ! -1 "$PFILE" ]; then
+  if [ ! -e "$PFILE" ]; then
     echo "file '$PFILE' Doesn't exist."
     exit 1;
   fi
   UCMD=$(cat "$PFILE")
 fi
-if [ -n "$CONF" ]; then #load config file first
-  ./hp16500 -a 192.168.0.200 -t 0 -c ":MMEM:LOAD:CONF '$CONF' ,INT0"
-fi
+
 if [ -n "$VDIV" ]; then
 RANGE=$(float_eval "$VDIV*4")
  CMD=":CHAN1:RANG $RANGE; :CHAN2:RANG $RANGE;:CHAN3:RANG $RANGE;:CHAN4:RANG $RANGE;"
