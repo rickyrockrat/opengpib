@@ -57,11 +57,11 @@ find_rep (){
 # the count spaces in orig cmd (find_rep) and when match, insert the value.
 # outfile
 save_config () {
-	CCMD=":TIM:DEL?;RANG?;MODE?;:TRIG:SOUR?;LEV?;SLOP?;"
+	CCMD=":TIM:DEL?;RANG?;MODE?;"
 	for i in 1 2 3 4; do
 	  CH="$CH:CHAN$i:RANG?;OFFS?;"
 	done
-	CCMD="$CCMD$CH"
+	CCMD="$CCMD${CH}:TRIG:SOUR?;LEV?;SLOP?;"
 	HPCONF=$(./hp16500 -a 192.168.0.200 -t $SLOT -c "$CCMD"|sed 's!;! !g')
   echo "CONF='$HPCONF"
   SCCMD=$(echo "$CCMD"|sed 's!\?! !g')
@@ -121,8 +121,9 @@ if [ -n "$GFILE" ]; then
 fi
 if [ -n "$CONF" ]; then #load config file first
   ./hp16500 -a 192.168.0.200 -t 0 -c ":MMEM:LOAD:CONF '$CONF' ,INT0"
-  echo "Sleeping 5"
-  sleep 5
+  STIME=10
+  echo "Sleeping $STIME"
+  sleep $STIME
 fi
 if [ -n "$PFILE" ]; then
   if [ ! -e "$PFILE" ]; then
