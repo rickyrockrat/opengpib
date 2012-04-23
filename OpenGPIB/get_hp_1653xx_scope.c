@@ -348,7 +348,7 @@ int main(int argc, char * argv[])
     /*fprintf(stderr,"data_len=%ld, Start of Data %d (%02x %02x)\n",h.point_len, h.point_start,g->buf[h.point_start-1],g->buf[h.point_start]); */
       
   	point=0;
-  	time_inc=h.xinc*h.xincmult;
+  	time_inc=(h.xinc*h.xincmult)-h.xorg;
     if(xy){
 		/*save room for our min/max y*/
     if(HDR_FULL == hdr)
@@ -401,9 +401,11 @@ int main(int argc, char * argv[])
   	          write_vcd_data (l);
   				    advance_time (l);
             }
-          }else if(vcd)
+          }else if(vcd) {
             fprintf(stderr,"Discarding %f %f\n",time,volts);
             advance_time(l);
+          }
+            
 #else
           }
 #endif
