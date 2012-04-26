@@ -624,7 +624,11 @@ double get_xinc_mult(double v, int *x)
   double i;
   int z;
   /**for some reason, if you use 1 here, apparently 1e-6 *1e6 != 1   */
-  for (z=0,i=1;(double)(v*i)<(double)(1);++z,i*=1000);
+  for (z=0,i=1;(double)(v*i)<(double)(.0001);++z,i*=1000);
+  if(0 &&z){/**allow .1-.9  */
+    --z;
+    i/=1000;
+  }  
 /*    printf("%d %e %e -> %e (%d)\n",z,i,v,v*i,(int)(v*i)); */
   *x=z;
   return i;
