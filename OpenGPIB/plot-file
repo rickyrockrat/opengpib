@@ -43,10 +43,37 @@
 #set xlabel ""
 #plot 'p1.ch4' every ::3 title "CH4" ls 4  with lines
 WDIR=$(dirname $0)
-float_scale=6
+float_scale=12
 . "$WDIR/bcommon"
 
-
+set_rgb_colors () {
+#blu
+ echo "set style line 1 lt 1 lc rgb \"#0000FF\" lw 1">>"$plotfile" 
+#red
+ echo "set style line 2 lt 2 lc rgb \"#FF0000\" lw 1" >>"$plotfile"
+#yel
+  echo "set style line 3 lt 3 lc rgb \"#EEEE00\" lw 1">>"$plotfile"
+#grn
+  echo "set style line 4 lt 4 lc rgb \"#00D000\" lw 1">>"$plotfile"
+#cyn
+ echo "set style line 5 lt 5 lc rgb \"#05FFFF\" lw 1">>"$plotfile" 
+#mag
+ echo "set style line 6 lt 6 lc rgb \"#FF00FF\" lw 1" >>"$plotfile"
+#Ygrn
+ echo "set style line 7 lt 7 lc rgb \"#FFFF00\" lw 1">>"$plotfile"
+#LGN
+ echo "set style line 8 lt 8 lc rgb \"#00FF00\" lw 1">>"$plotfile"
+}
+set_old_linestyle () {
+	echo "set style line 1 lt 1 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 2 lt 2 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 3 lt 3 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 4 lt 4 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 5 lt 5 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 6 lt 6 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 7 lt 7 lw 2.000 pointtype 4" >>"$plotfile"
+  echo "set style line 8 lt 8 lw 2.000 pointtype 4" >>"$plotfile"
+}
 get_x11_linecolor () {
 	case $plotfile in 
 	  red) return 1;;
@@ -175,14 +202,7 @@ do_header () {
   #echo "set bmargin 5" >>"$plotfile"
   echo "set rmargin 2" >>"$plotfile"
   #echo "set xtics 0,41.000000" >>"$plotfile"
-  echo "set style line 1 lt 1 lw 2.000 pointtype 4" >>"$plotfile"
-  echo "set style line 2 lt 2 lw 2.000 pointtype 4" >>"$plotfile"
-  echo "set style line 3 lt 3 lw 2.000 pointtype 4" >>"$plotfile"
-  echo "set style line 4 lt 4 lw 2.000 pointtype 4" >>"$plotfile"
-  echo "set style line 5 lt 5 lw 2.000 pointtype 4" >>"$plotfile"
-  echo "set style line 6 lt 6 lw 2.000 pointtype 4" >>"$plotfile"
-  echo "set style line 7 lt 7 lw 2.000 pointtype 4" >>"$plotfile"
-  echo "set style line 8 lt 8 lw 2.000 pointtype 4" >>"$plotfile"
+  set_rgb_colors
 
   if [ $1 -gt 1 ]; then
     if [ -n "$2" ]; then
@@ -203,6 +223,27 @@ do_header () {
 # 
 do_trailer () {
 	echo -e "unset multiplot\nset bmargin 20\n" >> "$plotfile"
+}
+find_gmaxx (){
+	if [ "minmax" != "$MODE" ]; then
+	  return
+	fi
+	let i=0
+ for f in "$@"; do
+  #xorg lasttime miny maxy
+  while read a b c d; do
+      if [ $i -eq 0 ]; then
+        MAXT="$b"
+      fi
+      let i=i+1
+  done << EOF
+$(head -n 2 "$f")
+EOF
+  if float_cond "$gmaxx < $MAXT"; then
+   gmaxx="$MAXT"
+    #keep track of maxx of all files.
+  fi
+ done
 }
 #smoothing types: bezier  csplines acsplines 
 
@@ -294,28 +335,32 @@ if [ $# -gt 1 ]; then
 fi
 do_header  "$multi"
 set_ylabel "Volts"
-for f in $@; do
+for f in "$@"; do
   plot_file "$f" "" "CH$fileno"
 done
 plot_all "$plottype" "$outfile"
 exit
 fi
-
+echo "$#: $@"
 shift $args
 echo "$args: $@"
 if [ $# -gt 1 ]; then
   let multi=$#
 fi
 
-maxx="0"
+maxx="-99999"
 maxy="-1000"
 miny="1000"
-
-for f in $@; do
+gmaxx="0"
+find_gmaxx "$@"
+echo "gmaxx=$gmaxx"
+# read min/max, title, and get first two X data points
+for f in "$@"; do
   let i=0
   #xorg lasttime miny maxy
   while read a b c d; do
-    if [ $i -eq 0 ]; then 
+    case $i in 
+     0) 
       if [ "minmax" = "$MODE" ]; then
         MAXT="$b"
         MINY="$c"
@@ -325,18 +370,20 @@ for f in $@; do
         XTITLE="$a"
         YTITLE="$b"
         EVERY="every ::2"
-      fi
-    elif [ $i -eq 1 ]; then
+      fi;;
+    1)
       if [ "minmax" = "$MODE" ]; then
         XTITLE="$a"
         YTITLE="$b"
-      fi  
-    fi
+      fi;;
+      2) x1="$a";;
+      3) x2="$a";;  
+    esac
     let i=i+1
     done << EOF
-$(head -n 2 $f)
+$(head -n 4 "$f")
 EOF
-echo -n "$f: $MAXT $MINY $MAXY $XTITLE $YTITLE"  
+ 
 if [ "minmax" = "$MODE" ]; then
  if float_cond "$maxx < $MAXT"; then
    maxx="$MAXT"
@@ -348,23 +395,39 @@ if [ "minmax" = "$MODE" ]; then
    miny="$MINY"
  fi
 fi
+echo -n "$f: $MAXT ($maxx) $MINY $MAXY $XTITLE $YTITLE" 
 if [ $fileno -eq 1 ]; then
    do_xlabel  "$XTITLE" "$plottitle"
    if [ -n "$XRANGE" ]; then
      do_xrange "$XRANGE"
-   else
+   elif [ "minmax" = "$MODE" ]; then
      do_xrange  "0:$maxx"
    fi
   #echo -e "set bmargin 5\n" >>"$plotfile"
   do_header  "$multi"
 fi
 do_ylabel "$YTITLE"
+# add a litte headroom for the Y-axis plot
 ADDER=$(float_eval "($MAXY - $MINY)*0.05")
 MINY=$(float_eval "$MINY - $ADDER")
 MAXY=$(float_eval "$MAXY + $ADDER")
 echo " ... $ADDER $MINY $MAXY"
 do_yrange "$MINY" "$MAXY"
-plot_file "$f" "$EVERY" "CH$fileno" "$XTITLE" "0" "$maxx" "$plottitle"
+#calculate the x data offset
+if float_cond "$MAXT < $gmaxx"; then
+  #fixme. We assume if it's less, we are looking at the '32, which only
+  # has 8000 points as opposed to the 34 with 32768 points
+  #THISOFF=$(float_eval "((32768-8000)/2)*$xdelta") 
+  THISOFF=$(float_eval "(($gmaxx-$MAXT)/2)")
+  echo "g$gmaxx m$MAXT T$THISOFF"
+  USING="using (\$1+$THISOFF):2"
+  #USING="using 1:2"
+else
+  #save our x delta
+  xdelta=$(float_eval "$x2-$x1")
+  USING="using 1:2"
+fi
+plot_file "$f" "$USING $EVERY" "CH$fileno" "$XTITLE" "0" "$maxx" "$plottitle"
 done 
 #file loop
 
