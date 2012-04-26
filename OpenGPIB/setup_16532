@@ -81,12 +81,13 @@ usage () {
   echo " Where options are:"
   echo "  -a auto set offset to middle of range"
   echo "  -c cmd - send cmd to unit"
-  echo "  -g fname get settings and put in fname"
+  echo "  -g fname get settings and put in fname (fname gets slot.set appended)"
+  echo "   example -g myset -s 13 = myset-13.set"
   echo "  -h this screen"
   echo "  -l conf load file named conf from HDD"
   echo "  -o off" 
   echo "  -p fname put settings from fname to scope"
-  echo "  -s slot number in hp16500C"
+  echo "  -s slot number in hp16500C 13/14(14)"
   echo "  -v volt/div"
   echo "Where offset is positive to shift waveform down"
   exit 1
@@ -103,7 +104,7 @@ while  getopts ac:g:hl:o:p:s:v: opt ; do
   case $opt in
     a) AUTO=1;;
     c) UCMD="$OPTARG";;
-    g) GFILE="$OPTARG";;
+    g) GFILE="${OPTARG}-13.set";;
     l) CONF="$OPTARG";;
     o) OFF=$OPTARG ;;
     p) PFILE="$OPTARG";;
