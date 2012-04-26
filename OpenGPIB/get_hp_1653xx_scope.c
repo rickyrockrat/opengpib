@@ -159,7 +159,7 @@ int main(int argc, char * argv[])
 	struct hp_scope_preamble h;
 	struct hp_common_options copt;
 	FILE *ofd;
-  float miny, maxy, time, time_inc;
+  double miny, maxy, time, time_inc,toff;
 	char *ofname, *channel[MAX_CHANNELS], *lbuf;
 	int i, c, rtn, ch_idx, raw,xy,process,hdr;
 #ifdef LA2VCD_LIB	 
@@ -348,7 +348,9 @@ int main(int argc, char * argv[])
     /*fprintf(stderr,"data_len=%ld, Start of Data %d (%02x %02x)\n",h.point_len, h.point_start,g->buf[h.point_start-1],g->buf[h.point_start]); */
       
   	point=0;
-  	time_inc=(h.xinc*h.xincmult)-h.xorg;
+    time=0;
+  	time_inc=(h.xinc*h.xincmult);
+    toff= (h.xref*h.xincmult)+(h.xorg*h.xincmult);
     if(xy){
 		/*save room for our min/max y*/
     if(HDR_FULL == hdr)
@@ -362,7 +364,7 @@ int main(int argc, char * argv[])
 				int x;
         
 				for (x=h.point_start;x<i;x+=h.data_size){
-					float volts;
+					double volts;
           unsigned int rawdat;
           fflush(NULL);
           rawdat=g->buf[x];
@@ -370,14 +372,14 @@ int main(int argc, char * argv[])
             rawdat<<=8;
             rawdat+=g->buf[x+1];
           }
-            
-					time=(time_inc*(float)(point)-h.xref);
-          
+          time+=time_inc;  
+					/*time=((time_inc*(double)(point))); */
+          volts=((double)(rawdat)-h.yref)*h.yinc + h.yorg;
 					if(0==point){
-            fprintf(stderr,"%f %f %f %f %f\n",(float)point,h.xinc,time, time_inc,h.xorg); 
+            fprintf(stderr,"%e %e %e %e v%e\n",h.xinc,time, time_inc,h.xorg,volts); 
           }
 						
-					volts=(rawdat-h.yref)*h.yinc + h.yorg;
+					
           /**skip values that are out of range.  */
 					if(401 > volts && -401 < volts) {
   					if(xy){
@@ -386,12 +388,12 @@ int main(int argc, char * argv[])
   						if(raw)
   							fprintf(ofd,"%f %d\n",time,rawdat);
   						else
-  							fprintf(ofd,"%f %f\n",time,volts);	
+  							fprintf(ofd,"%e %e\n",time,volts);	
   					}	else {
   						if(raw)
   							fprintf(ofd,"%d,",rawdat);
   						else
-  							fprintf(ofd,"%f,",volts);	
+  							fprintf(ofd,"%e,",volts);	
   					}
           
 #ifdef LA2VCD_LIB
@@ -423,7 +425,7 @@ int main(int argc, char * argv[])
 		if(NULL != ofname && NULL != ofd){
       if(HDR_FULL == hdr){
         fseek(ofd,0,SEEK_SET);
-  			fprintf(ofd,"%f %f %f %f\n",h.xorg,time,miny,maxy);  
+  			fprintf(ofd,"%e %e %e %e\n",h.xorg,time,miny,maxy);  
       }
 			
 			fclose(ofd);
