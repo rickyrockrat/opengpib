@@ -144,14 +144,14 @@ struct hp_common_options {
 #endif
 
 struct hp_scope_preamble {
-	float xinc;  /**time value between consecutive data points. Time between samples in FULL mode, the only mode we run in.  */
-	float xorg;  /**Time of first data point in memory with respect to the trigger.  */
-	float xref;  /** X value of first data point in memory always zero  */
-	float yinc;  /**Voltage difference between consecutive data values  */
-	float yorg;  /**value of voltage at center screen  */
-	float yref;  /**The value at center screen where the Y-origin occurs  */
+	double xinc;  /**time value between consecutive data points. Time between samples in FULL mode, the only mode we run in.  */
+	double xorg;  /**Time of first data point in memory with respect to the trigger.  */
+	double xref;  /** X value of first data point in memory always zero  */
+	double yinc;  /**Voltage difference between consecutive data values  */
+	double yorg;  /**value of voltage at center screen  */
+	double yref;  /**The value at center screen where the Y-origin occurs  */
   int xinc_thou;  /**number of powers of 1000  to get xinc to >=1*/
-  float xincmult;  /**multiplier to remove -e exponet, i.e. 2e-6*1000000=2  */
+  double xincmult;  /**multiplier to remove -e exponet, i.e. 2e-6*1000000=2  */
   char xunits[3]; /**units, i.e. ms,us,ns,ps  */
 	int points;
 	int type;

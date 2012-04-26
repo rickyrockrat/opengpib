@@ -29,8 +29,8 @@
 #
 #
 
-analyzer_dev=/dev/ttyUSB1
-signal_dev=/dev/ttyUSB0
+analyzer_dev=/dev/ttyUSB0
+signal_dev=/dev/ttyUSB1
 analyzer_addr=18
 signal_addr=9
 
