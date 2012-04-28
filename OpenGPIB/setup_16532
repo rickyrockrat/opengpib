@@ -1,4 +1,30 @@
 #!/bin/bash
+# \file ******************************************************************
+#\n\b File:        setup_16532
+#\n\b Author:      Doug Springer
+#\n\b Company:     DNK Designs Inc.
+#\n\b Date:        08/05/2010 
+#\n\b Description: Get and restore settings for the HP 1653xx series of scope
+# cards
+#*/ /************************************************************************
+# This file is part of OpenGPIB.
+#
+#    OpenGPIB is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License version 3 
+#    as published by the Free Software Foundation. Note that permission 
+#    is not granted to redistribute this program under the terms of any
+#    other version of the General Public License.
+#
+#    OpenGPIB is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+#    
+#		The License should be in the file called COPYING.
+#
 # range is V/Div *4, so for 2V/div, use 8
 # ":MMEM:LOAD:CONF '0CALSKEW' ,INT0"
 # :CHAN1:RANG 0.1;OFFS
@@ -55,26 +81,25 @@ find_rep (){
 # we send a series of queries, then when it comes back, we replace
 # the ? with space in original cmd & ; with spaces for values
 # the count spaces in orig cmd (find_rep) and when match, insert the value.
-# outfile
+# slot outfile
 save_config () {
 	CCMD=":TIM:DEL?;RANG?;MODE?;"
 	for i in 1 2 3 4; do
 	  CH="$CH:CHAN$i:RANG?;OFFS?;"
 	done
 	CCMD="$CCMD${CH}:TRIG:SOUR?;LEV?;SLOP?;"
-	HPCONF=$(./hp16500 -a 192.168.0.200 -t $SLOT -c "$CCMD"|sed 's!;! !g')
-  echo "CONF='$HPCONF"
+	HPCONF=$(./hp16500 -a 192.168.0.200 -t $1 -c "$CCMD"|sed 's!;! !g')
+  #echo "CONF='$HPCONF"
   SCCMD=$(echo "$CCMD"|sed 's!\?! !g')
-  echo "CCMD=$CCMD"
+  #echo "CCMD=$CCMD"
   echo "HPCONF=$HPCONF"
-  echo "SSCMD=$SCCMD"
+  #echo "SSCMD=$SCCMD"
   let x=0
   for i in $HPCONF; do
     find_rep $x $i "$SCCMD"
     let x=x+1
   done
-  echo "$CSET">"$1"
-  exit
+  echo "$CSET">"$2"
 }
 usage () {
   echo "Usage $0 <options>"
@@ -87,7 +112,7 @@ usage () {
   echo "  -l conf load file named conf from HDD"
   echo "  -o off" 
   echo "  -p fname put settings from fname to scope"
-  echo "  -s slot number in hp16500C 13/14(14)"
+  echo "  -s slot number in hp16500C 13/14(14) mulitple -s can be run for -g, assuming same base filename"
   echo "  -v volt/div"
   echo "Where offset is positive to shift waveform down"
   exit 1
@@ -98,17 +123,17 @@ usage () {
 #fi
 set -f
 CMD=""
-let SLOT=14
+SLOT=""
 while  getopts ac:g:hl:o:p:s:v: opt ; do
   #echo "opt=$opt arg=$OPTARG"
   case $opt in
     a) AUTO=1;;
     c) UCMD="$OPTARG";;
-    g) GFILE="${OPTARG}-13.set";;
+    g) GFILE="$OPTARG";;
     l) CONF="$OPTARG";;
     o) OFF=$OPTARG ;;
     p) PFILE="$OPTARG";;
-    s) SLOT=$OPTARG ;;
+    s) SLOT="$SLOT $OPTARG" ;;
     v) VDIV=$OPTARG ;;
     h) usage; exit 1;;
     *) echo "Invalid option $opt"
@@ -116,9 +141,15 @@ while  getopts ac:g:hl:o:p:s:v: opt ; do
        ;;
   esac
 done
-
+echo "SLOT='$SLOT'"
+if [ -z "$SLOT" ]; then
+  SLOT=14
+fi
 if [ -n "$GFILE" ]; then
-  save_config "$GFILE"
+  for s in $SLOT; do
+    save_config $s "$GFILE-$s.set"
+  done
+  exit
 fi
 if [ -n "$CONF" ]; then #load config file first
   ./hp16500 -a 192.168.0.200 -t 0 -c ":MMEM:LOAD:CONF '$CONF' ,INT0"
@@ -126,36 +157,39 @@ if [ -n "$CONF" ]; then #load config file first
   echo "Sleeping $STIME"
   sleep $STIME
 fi
-if [ -n "$PFILE" ]; then
-  if [ ! -e "$PFILE" ]; then
-    echo "file '$PFILE' Doesn't exist."
-    exit 1;
-  fi
-  UCMD=$(cat "$PFILE")
-fi
-
-if [ -n "$VDIV" ]; then
-RANGE=$(float_eval "$VDIV*4")
- CMD=":CHAN1:RANG $RANGE; :CHAN2:RANG $RANGE;:CHAN3:RANG $RANGE;:CHAN4:RANG $RANGE;"
- if [ "1" = "$AUTO" ]; then
-   OFF=$(float_eval "$VDIV/2")
- fi
-fi
-
-if [ -n "$OFF" ]; then
- CMD="${CMD}:CHAN1:OFFS $OFF;:CHAN2:OFFS $OFF;:CHAN3:OFFS $OFF;:CHAN4:OFFS $OFF;"
-fi
-if [ -z "$CMD" ]; then
-  if [ -z "$UCMD" ]; then
-    if [ -z "$CONF" ]; then
-      echo "nothing to do"
-      usage
-    fi
-   else
-     CMD="$UCMD"
-  fi
-elif [ -n "$UCMD" ]; then
-  echo "Ignorning -c ($UCMD)"
-fi
-echo "cmd=$CMD"
-./hp16500 -a 192.168.0.200 -t $SLOT -c "$CMD"
+for s in $SLOT; do
+	if [ -n "$PFILE" ]; then
+	  if [ ! -e "$PFILE-$s.set" ]; then
+	    echo "file '$PFILE-$s.set' Doesn't exist."
+	    exit 1;
+	  fi
+	  UCMD=$(cat "$PFILE-$s.set")
+	fi
+	
+	if [ -n "$VDIV" ]; then
+	RANGE=$(float_eval "$VDIV*4")
+	 CMD=":CHAN1:RANG $RANGE; :CHAN2:RANG $RANGE;:CHAN3:RANG $RANGE;:CHAN4:RANG $RANGE;"
+	 if [ "1" = "$AUTO" ]; then
+	   OFF=$(float_eval "$VDIV/2")
+	 fi
+	fi
+	
+	if [ -n "$OFF" ]; then
+	 CMD="${CMD}:CHAN1:OFFS $OFF;:CHAN2:OFFS $OFF;:CHAN3:OFFS $OFF;:CHAN4:OFFS $OFF;"
+	fi
+	if [ -z "$CMD" ]; then
+	  if [ -z "$UCMD" ]; then
+	    if [ -z "$CONF" ]; then
+	      echo "nothing to do"
+	      usage
+	    fi
+	   else
+	     CMD="$UCMD"
+	  fi
+	elif [ -n "$UCMD" ]; then
+	  echo "Ignoring -c ($UCMD)"
+	fi
+	echo "cmd=$CMD"
+	./hp16500 -a 192.168.0.200 -t $s -c "$CMD"
+	CMD=""
+done
