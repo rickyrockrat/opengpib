@@ -6,6 +6,24 @@
 #\n\b Date:        12/18/2010  6:49 am
 #\n\b Description: Plot a file with format X Y
 #*/ /************************************************************************
+# This file is part of OpenGPIB.
+#
+#    OpenGPIB is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License version 3 
+#    as published by the Free Software Foundation. Note that permission 
+#    is not granted to redistribute this program under the terms of any
+#    other version of the General Public License.
+#
+#    OpenGPIB is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+#    
+#		The License should be in the file called COPYING.
+
 #set multiplot
 #set yrange[-11.358404:21.699175]
 #set origin 0,0.75
@@ -45,24 +63,27 @@
 WDIR=$(dirname $0)
 float_scale=12
 . "$WDIR/bcommon"
-
+get_rgb (){
+	case $1 in
+	 1) RGB="\"#0000FF\"";;#blu
+	 2) RGB="\"#FF0000\"";;#red
+	 3) RGB="\"#DDDD00\"";;#DKyel
+	 4) RGB="\"#00D000\"";;#grn
+	 5) RGB="\"#05FFFF\"";;#cyn
+	 6) RGB="\"#FF00FF\"";;#mag
+	 7) RGB="\"#EEEE00\"";;#LtYel
+	 8) RGB="\"#00FF00\"";;#LGN
+	 *) RGB="\"#000000\"";;#BLK
+	 esac
+	 
+}
 set_rgb_colors () {
-#blu
- echo "set style line 1 lt 1 lc rgb \"#0000FF\" lw 1">>"$plotfile" 
-#red
- echo "set style line 2 lt 2 lc rgb \"#FF0000\" lw 1" >>"$plotfile"
-#yel
-  echo "set style line 3 lt 3 lc rgb \"#EEEE00\" lw 1">>"$plotfile"
-#grn
-  echo "set style line 4 lt 4 lc rgb \"#00D000\" lw 1">>"$plotfile"
-#cyn
- echo "set style line 5 lt 5 lc rgb \"#05FFFF\" lw 1">>"$plotfile" 
-#mag
- echo "set style line 6 lt 6 lc rgb \"#FF00FF\" lw 1" >>"$plotfile"
-#Ygrn
- echo "set style line 7 lt 7 lc rgb \"#FFFF00\" lw 1">>"$plotfile"
-#LGN
- echo "set style line 8 lt 8 lc rgb \"#00FF00\" lw 1">>"$plotfile"
+	let i=1
+	while [ $i -lt 9 ]; do
+	  get_rgb $i
+	  echo "set style line $i lt $i lc rgb $RGB lw 1">>"$plotfile"
+	  let i=i+1
+	done
 }
 set_old_linestyle () {
 	echo "set style line 1 lt 1 lw 2.000 pointtype 4" >>"$plotfile"
@@ -162,8 +183,10 @@ plot_file () {
 	     marg="set bmargin 0\nset tmargin 0\nset title \"\"\nset format x \"\"\nunset xlabel\n"
 	   fi
 	 fi  
+	 ymid=$(float_eval "$yorg+($ysz/2)")
+	 get_rgb $fileno
 	 
-	 
+  #echo "set label 100 \"LAB$fileno\" at graph -.139,$ymid tc rgb $RGB">>"$plotfile"
 #set origin 0,0.75
 #set size 1,0.25
 #set bmargin 0
@@ -194,7 +217,16 @@ plot_all () {
    gnuplot "$plotfile"
  fi
 }
-
+set_grid () {
+# remove border on top and right and set color to gray
+echo "set style line 11 lc rgb '#808080' lt 1">>"$plotfile"
+# 1 bot 2 left 4 top 8 right
+echo "set border 15 back ls 11">>"$plotfile"
+echo "set tics nomirror">>"$plotfile"
+# define grid 
+echo "set style line 12 lc rgb '#808080' lt 0 lw 1">>"$plotfile"
+echo "set grid back ls 12">>"$plotfile"
+}
 #  multiplot
 do_header () {
   echo "set lmargin 13" >> "$plotfile"
@@ -203,6 +235,7 @@ do_header () {
   echo "set rmargin 2" >>"$plotfile"
   #echo "set xtics 0,41.000000" >>"$plotfile"
   set_rgb_colors
+  set_grid
 
   if [ $1 -gt 1 ]; then
     if [ -n "$2" ]; then
@@ -347,7 +380,7 @@ echo "$args: $@"
 if [ $# -gt 1 ]; then
   let multi=$#
 fi
-
+delay1=""
 maxx="-99999"
 maxy="-1000"
 miny="1000"
@@ -362,6 +395,7 @@ for f in "$@"; do
     case $i in 
      0) 
       if [ "minmax" = "$MODE" ]; then
+        DELAY="$a"
         MAXT="$b"
         MINY="$c"
         MAXY="$d"
@@ -394,6 +428,9 @@ if [ "minmax" = "$MODE" ]; then
  if float_cond "$miny > $MINY"; then
    miny="$MINY"
  fi
+ if [ -z "$delay1" ]; then
+   delay1="$DELAY"
+ fi
 fi
 echo -n "$f: $MAXT ($maxx) $MINY $MAXY $XTITLE $YTITLE" 
 if [ $fileno -eq 1 ]; then
@@ -407,13 +444,14 @@ if [ $fileno -eq 1 ]; then
   do_header  "$multi"
 fi
 do_ylabel "$YTITLE"
-# add a litte headroom for the Y-axis plot
+# add a little headroom for the Y-axis plot
 ADDER=$(float_eval "($MAXY - $MINY)*0.05")
 MINY=$(float_eval "$MINY - $ADDER")
 MAXY=$(float_eval "$MAXY + $ADDER")
 echo " ... $ADDER $MINY $MAXY"
 do_yrange "$MINY" "$MAXY"
-#calculate the x data offset
+#calculate the x data offset - two sources of offset, differing delay values
+# and 32/34 scope buffer lenghts. delay is from trigger to center of screen
 if float_cond "$MAXT < $gmaxx"; then
   #fixme. We assume if it's less, we are looking at the '32, which only
   # has 8000 points as opposed to the 34 with 32768 points
