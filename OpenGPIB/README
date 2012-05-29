@@ -77,6 +77,29 @@ See get_hp_16555_waveform.c to see how the option works from the table in suppor
 There are 2 functions that work on this table, one displays supported controllers, the 
 other validates the option and returns the device type.
 
+Have now added get_hp_1653xx_scope, which talks to hp16530,16532,and 16534 scope cards.
+The setup with 2 '32 cards in master-slave and 2 '34 cards in master-slave works, and 
+I am able to match the data between the '32 and the '34 cards, which gives me an
+8-channel o-scope.  I am using an external trigger from a tek positive-hi TTL signal
+
+using a simple TTL-ECL converter like so:
+                       GND
+                        |
+                        C
+                        |
+IN---+---||----R100-+-B-PNP
+     |  C104        |   | 
+     R50           R1K--+---OUT  
+     |                 
+     GND
+
+Where R50=50 ohm, R100=100ohm and R1K is 1k ohm
+PNP is MMBT4401, and C104 is .1uF cap.
+BFQ19/BFS17A/BFR93A can also be used. Delay is around 60-70nS
+OUT is tied to the inputs of both master cards.  These connectors are SMB microwave
+connectors, and I managed to find some SMB jumpers on ebay for $5 USD.
+ 
+
 REALLY useful scripts:
 
 ********** setup_16532 ***************
