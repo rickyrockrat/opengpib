@@ -18,8 +18,12 @@ sftp rickyrockrat@frs.sourceforge.net
 goto userweb/htdocs
 
 In short, then Project web page
-/home/groups/o/op/opengpib/htdocs
+/home/project-web/opengpib/htdocs
+#/home/groups/o/op/opengpib/htdocs
 Release files
-/home/frs/project/o/op/opengpib
+#/home/frs/project/o/op/opengpib
+/home/frs/project/opengpib
+
 Developer web page
-/incoming/r/ri/rickyrockrat/userweb/htdocs
+/home/project-web/rickyrockrat.u/htdocs/
+#/incoming/r/ri/rickyrockrat/userweb/htdocs
