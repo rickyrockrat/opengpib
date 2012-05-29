@@ -63,6 +63,8 @@
 WDIR=$(dirname $0)
 float_scale=12
 . "$WDIR/bcommon"
+# These are intended to match the colors on the HP1653x channels. These do
+# match two 16532 cards tied together above two 16534 cards tied together.
 get_rgb (){
 	case $1 in
 	 1) RGB="\"#0000FF\"";;#blu
@@ -77,6 +79,7 @@ get_rgb (){
 	 esac
 	 
 }
+# dumps the colors above into the gnuplot file
 set_rgb_colors () {
 	let i=1
 	while [ $i -lt 9 ]; do
@@ -85,6 +88,7 @@ set_rgb_colors () {
 	  let i=i+1
 	done
 }
+# legacy code. Not used.
 set_old_linestyle () {
 	echo "set style line 1 lt 1 lw 2.000 pointtype 4" >>"$plotfile"
   echo "set style line 2 lt 2 lw 2.000 pointtype 4" >>"$plotfile"
@@ -95,6 +99,7 @@ set_old_linestyle () {
   echo "set style line 7 lt 7 lw 2.000 pointtype 4" >>"$plotfile"
   echo "set style line 8 lt 8 lw 2.000 pointtype 4" >>"$plotfile"
 }
+# Not used
 get_x11_linecolor () {
 	case $plotfile in 
 	  red) return 1;;
