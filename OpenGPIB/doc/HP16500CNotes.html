@@ -1,11 +1,32 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html><head>
-<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>HP 16500C Notes</title>
 
-</head><body>
+
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>HP 16500C Notes</title></head><body>
 <div style="text-align: center;">
 <h1>HP 16500C Notes</h1>
-</div>
+</div><font size="-2"><span style="font-weight: bold;">This file is part of OpenGPIB.</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;For details, see http://opengpib.sourceforge.net</span><br style="font-weight: bold;">
+<br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;Copyright (C) 2008-2009 Doug Springer &lt;gpib a t rickyrockrat d o t net&gt;</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp; </span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; OpenGPIB is free software: you can redistribute it and/or modify</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; it under the terms of the GNU General Public License version 3 </span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; as published by the Free Software Foundation. Note that permission </span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; is not granted to redistribute this program under the terms of any</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; other version of the General Public License.</span><br style="font-weight: bold;">
+<br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; OpenGPIB is distributed in the hope that it will be useful,</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; but WITHOUT ANY WARRANTY; without even the implied warranty of</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.&nbsp; See the</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; GNU General Public License for more details.</span><br style="font-weight: bold;">
+<br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; You should have received a copy of the GNU General Public License</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; along with OpenGPIB.&nbsp; If not, see &lt;http://www.gnu.org/licenses/&gt;.</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; </span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; The License should be in the file called COPYING.</span></font><br>
+<br>
+<br>
 The HP16500C manuals do not describe the configuration data stream.
 These notes describe some of the reverse-engineering done to figure out
 the fields in the configuration data returned from the :SYSTEM:SETUP?<br>command.<br><br>The data stream begins as a block (as described in the programming manual). Here is an example file dump of the <span style="font-weight: bold;">start</span> of the config file. Sections are cut out that are not yet decoded.<br><br><code>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;

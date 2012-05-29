@@ -2,10 +2,32 @@
 <html><head>
 
 
+
+
   
   <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>HP 16500C Hard Drive Notes</title></head><body>
-<h1 style="text-align: center;">HP 16500C Hard Drive Notes</h1>
-
+<h1 style="text-align: center;">HP 16500C Hard Drive Notes</h1><small><small><br style="font-weight: bold;">
+<span style="font-weight: bold;">This file is part of OpenGPIB.</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;For details, see http://opengpib.sourceforge.net</span><br style="font-weight: bold;">
+<br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;Copyright (C) 2008-2009 Doug Springer &lt;gpib a t rickyrockrat d o t net&gt;</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp; </span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; OpenGPIB is free software: you can redistribute it and/or modify</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; it under the terms of the GNU General Public License version 3</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; as published by the Free Software Foundation. Note that permission</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; is not granted to redistribute this program under the terms of any</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; other version of the General Public License.</span><br style="font-weight: bold;">
+<br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; OpenGPIB is distributed in the hope that it will be useful,</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; but WITHOUT ANY WARRANTY; without even the implied warranty of</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.&nbsp; See the</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; GNU General Public License for more details.</span><br style="font-weight: bold;">
+<br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; You should have received a copy of the GNU General Public License</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; along with OpenGPIB.&nbsp; If not, see &lt;http://www.gnu.org/licenses/&gt;.</span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp; </span><br style="font-weight: bold;">
+<span style="font-weight: bold;">&nbsp;&nbsp;&nbsp; The License should be in the file called COPYING.</span></small></small><br>
+<br>
 The HP 16500C has a very&nbsp; interesting HDD.&nbsp; It is MS-Dos
 Fat16, with some twists.<br>
 
@@ -295,6 +317,27 @@ so it's got to be the card.<br>
   </tbody>
 </table>
 <br>
+I just received an email from Alexandre Becoulet on using mtools to
+access the HDD (which, if it works, is MUCH preferrable to kernel
+module hacking described above):<br>
+<br>
+<span style="font-style: italic;">I found a new way to access the FAT16 with non-standard sector</span><br style="font-style: italic;">
+<span style="font-style: italic;">size which does not involve kernel hacking. Here is what I found:</span><br style="font-style: italic;">
+<br style="font-style: italic;">
+<span style="font-style: italic;">The GNU mtools have support for non standard sector size.</span><br style="font-style: italic;">
+<span style="font-style: italic;">The sector size is limited to 8192 bytes however. You have</span><br style="font-style: italic;">
+<span style="font-style: italic;">to change this constant before building the mtools package:</span><br style="font-style: italic;">
+<br style="font-style: italic;">
+<span style="font-style: italic;">./msdos.h:#define
+MAX_SECTOR&nbsp;&nbsp;&nbsp;
+32768&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; /*
+largest sector size */</span><br style="font-style: italic;">
+<br style="font-style: italic;">
+<span style="font-style: italic;">Then you can access the byte swapped image using your custom built mtools:</span><br style="font-style: italic;">
+<br style="font-style: italic;">
+<span style="font-style: italic;">./mdir -i /tmp/hp16500bs.img</span><br style="font-style: italic;">
+<br style="font-style: italic;">
+<span style="font-style: italic;">./mcopy -o -i /tmp/hp16500bs.img /tmp/PVTEST/* ::SYSTEM</span><br>
 
 <br>
 
