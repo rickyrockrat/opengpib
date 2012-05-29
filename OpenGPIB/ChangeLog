@@ -14,3 +14,33 @@ polarity bit, since it *does* invert the data. Still need to revert the data
 back to raw using this info.
 2010-01-24 RickyRockRat V_0_0_9: Added more reverse engineering for the config
 info, which really only effects the hp16500 config parser.
+
+2012-04-26 RickyRockRat V_0_1_1 Added fileio interface (fileio.c/h), added get_hp_plot, bcomon, 
+hp_16655_to_vcd, plot_file, and setup_16532. Renamed get_hp_16530_waveform.c to
+get_hp_1653xx_scope.c. Added is_string_number in common.c/h. 
+
+Added struct hp_cardlist, get hp_info_card, print_card_model, select_hp_card,
+show_known_hp_cards, hp16500_find_card, show_hp_connection_info,
+show_common_usage, handle_common_opts, usage, main, parse_options, 
+set_channel_offset, set_channel_ranged, get_trigger_source, get_xinc_mult,
+oscope_parse_preamble, check_oscope_channel, oscope_get_preamble, 
+get_oscope_data, validate_sampleperiod, and config_show_label to hp16500.c.
+
+Fixed having both analizers on in config_show_label. Most of these functions
+were moved here from the get_hp_1653xx_scope.c and get_hp_16555_waveform.c,
+so that we could use these common functions between different cards.
+
+Added fileio to gpib.c as a machine time, intended to process raw data and
+added the function init_id, which generically sends an id string. 
+
+Added ability to specify the signal type (la2vcd_lib API change) in 
+parse_16500_config.c, tek2gplot.c, and get_hp_1653xx_scope.c. 
+
+Added ability to extract and extrapolate the data from '32 and '34 scope
+cards at the same time. The '32 is 1/2 the data len of the '34, so it 
+(depending on delay, which is not yet implemented) misses the beginning
+and end 1/4 of the trace.  
+
+see README for examples on get/set both settings/data on the 16500C and 
+the '32/'34 scope cards.
+
