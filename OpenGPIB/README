@@ -77,6 +77,40 @@ See get_hp_16555_waveform.c to see how the option works from the table in suppor
 There are 2 functions that work on this table, one displays supported controllers, the 
 other validates the option and returns the device type.
 
-Feel free to email me at rickyrockrat
+REALLY useful scripts:
+
+********** setup_16532 ***************
+
+ex - save setup - automatically appends -cardtype.set to the file name.
+setup_16532 -s 13 -s 14  -g my_settings_file
+-restore setup
+setup_16532 -s 13 -s 14  -p my_settings_file
+- load a config file on the HP16500, then setup the settings (in this case,
+the channel skew file - saved earlier):
+setup_16532 -l 14PSKEW -s 13 -s 14  -p my_settings_file
+
+************* get_hp_plot *************
+- grab the data from both the 14 and 13 card types, put the data in base filenames
+'mybase', set the gnuplot output type to x11, both grab the data and plot it, and 
+- add the title 'mytitle' to the plot:
+
+get_hp_plot -t 14 -t 13  -b "mybase" -k x11 -m all -p "-t mytitle"
+
+This generates (with 2 '32 cards and 2 '34 cards) mybase-13.ch1,ch2,ch3,ch4,
+mybase-14.ch1,ch2,ch3,ch4, and mybase.plot. If you set the type to -k png, it 
+will also generated mybase.png. 
+
+If you change -m all to -m plot, it will only plot the files, not grab them
+from the HP16500 again. This is useful in conjunction with -k x11 to validate 
+the plot before dumping it to png.
+
+the -p "-z optz -y opty" sends the commands to plot-file, which is the one actually
+doing the plotting. if you specify, for example -p "-x 5:7 -t mytitle", you will 
+put 'mytitle' at the top of the graph, and limit the x range to between 5 and 7,
+useful for zooming in and out on the plot.
+
+
+
+Feel free to e mail me at g p i b a t rickyrockrat d o t  n e t.
 
 
