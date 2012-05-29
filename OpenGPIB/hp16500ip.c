@@ -84,7 +84,7 @@ int _hp16500c_open(struct gpib *g, char *ip)
 		c->debug=0;
 	c->ipaddr=strdup(ip);
 	c->port=5025;
-	c->cmd_wait=5000;/**uS  */
+	c->cmd_wait=50000;/**uS  */
 	c->socket.sin_family = AF_INET;
   c->socket.sin_addr.s_addr = inet_addr ( c->ipaddr );
   c->socket.sin_port = htons ( c->port );
@@ -179,7 +179,7 @@ int _hp16500c_read(void *d, void *buf, int len)
 		if(-1 == (r=recv ( c->sockfd, &m[i], len-i,MSG_DONTWAIT )) ){
 			/*fprintf(stderr,"-1"); */
 			++wait;
-			if(wait > 5){
+			if(wait > 10){
 				/*fprintf(stderr,"Err sending\n"); */
 				break;
 			}
