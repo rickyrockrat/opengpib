@@ -188,7 +188,7 @@ int message_avail(struct gpib *g)
 void usage(void)
 {
 	fprintf(stderr,"Version %s: get_hp_16555_waveform <options>\n",TOSTRING(VERSION));
-	show_common_usage();
+	show_common_usage(COM_USE_MODE_LOGIC);
 	/**common options are -a, -d, -n, -m, and -t */
 	fprintf(stderr,"\n"
 	" -c fname put config data to fname\n"

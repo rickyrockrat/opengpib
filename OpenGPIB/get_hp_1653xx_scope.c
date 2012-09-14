@@ -125,7 +125,7 @@ Time= (point# -Xref)*Xinc + Xorigin
 void usage(void)
 {
 	fprintf(stderr,"get_hp_16530_waveform <options>\n");
-	show_common_usage();
+	show_common_usage(COM_USE_MODE_SCOPE);
 	/**common options are -a, -d, -n, -m, and -t */
 	fprintf(stderr,"\n -c n Use channel n for data (ch1). ch1-ch?\n"
 	"    The -c option can be used multiple times. In this case, the fname\n"

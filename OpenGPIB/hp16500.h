@@ -398,6 +398,10 @@ A three-card configuration has the following data arrangement per row:
 Clock Pod 1 < xxxx MLKJ MLKJ MLKJ >
 
 */
+#define COM_USE_MODE_GENERIC 0
+#define COM_USE_MODE_SCOPE   1
+#define COM_USE_MODE_LOGIC   2
+
 /**generic functions  */
 int get_hp_info_card(int id);
 int print_card_model(int id);
@@ -405,7 +409,7 @@ int select_hp_card(int slot, struct gpib *g);
 void show_known_hp_cards(void);
 int hp16500_find_card(int cardtype, int no, struct gpib *g);
 void show_hp_connection_info(void);
-void show_common_usage (void);
+void show_common_usage (int mode);
 int handle_common_opts(int c, char *optarg, struct hp_common_options *o);
 /**scope functions  */
 int get_trigger_source(struct gpib *g);

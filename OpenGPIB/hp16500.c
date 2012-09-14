@@ -242,16 +242,25 @@ void show_hp_connection_info(void)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-void show_common_usage (void)
+void show_common_usage (int mode)
 {
+  char *emsg=NULL;
+  int type;
+  switch(mode){
+    case COM_USE_MODE_SCOPE: 
+      type=CARDTYPE_16534A;  
+      emsg="   Current types are 11=16530, 13=16532, 14=16534\n";
+    break;
+    case COM_USE_MODE_LOGIC: type=CARDTYPE_16554M; break;
+    default: type=0; break;
+  }
 	printf("Common Options\n"
-	" -a addr set GPIB instrument address to addr (ip address automatically sets -d)\n"
+	" -a addr set GPIB instrument address to addr (ip address automatically sets -d, -m)\n"
 	" -d dev set path to device name (use ipaddress for hpip)\n"
 	" -m meth set access method to meth, currently hpip or prologixs\n"
 	" -n num Set card number, use for multiple cards in system. 0 selects first card found.\n"
-	" -t type Set scope type (14)\n"
-	"   Current types are 11=16530, 13=16532, 14=16534\n"
-	"");
+	" -t type Set card type (%d)\n%s"
+	"",type,emsg);
 	show_known_hp_cards();
 }
 
@@ -339,7 +348,7 @@ enum {
 void usage(void)
 {
 	printf("hp16500, the HP16500 Query tool\n");
-	show_common_usage();
+	show_common_usage(COM_USE_MODE_GENERIC);
 	printf(" -c cmd execute command\n");
 	printf(" -q type Set query type to: \n"
 				 "   id - just print instrument ID\n"
