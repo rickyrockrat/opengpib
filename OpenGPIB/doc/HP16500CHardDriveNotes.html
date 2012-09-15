@@ -4,6 +4,7 @@
 
 
 
+
   
   <meta content="text/html; charset=ISO-8859-1" http-equiv="content-type"><title>HP 16500C Hard Drive Notes</title></head><body>
 <h1 style="text-align: center;">HP 16500C Hard Drive Notes</h1><small><small><br style="font-weight: bold;">
@@ -316,6 +317,20 @@ so it's got to be the card.<br>
     </tr>
   </tbody>
 </table>
+Most any of the SimpleTech HDDs should work. I have 64/128/256M that work. They look like this:<br>
+<a href="SimpleTech64MZeroed.img.bs.bz2"><img style="border: 2px solid ; width: 234px; height: 200px;" alt="SimpleTech256M" src="SimpleTech256-sm.jpg"></a><br>
+<br>
+Here is a 64M image that can be used to test any media (Click the image
+above). This is a byte swapped image so that it can be read on a x86
+machine. This has the latest software (V1.09) already on it. You create
+the Hard Drive using this command (after bunzip2 ing it):<br>
+<pre wrap="">dd if=SimpleTech64MZeroed.img.bs of=/dev/sdx conv=swab</pre>
+The /dev/sdx is the device on Linux where your CF card appears. There
+are many adapters out there to adapt from CF to IDE-PATA, and from
+there are USB-IDE adapters. The most useful CF to IDE-PATA is the one
+that just plugs into the end of the IDE cable. You will need a Floppy
+Drive power adapter to go from the standard 4-Pin PC power supply to
+the floppy connector found on most of these CF-IDE adapters.<br>
 <br>
 I just received an email from Alexandre Becoulet on using mtools to
 access the HDD (which, if it works, is MUCH preferrable to kernel
