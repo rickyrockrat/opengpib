@@ -44,3 +44,6 @@ and end 1/4 of the trace.
 see README for examples on get/set both settings/data on the 16500C and 
 the '32/'34 scope cards.
 
+2012-9-15 RickyRockRat V_0_2_1 Changed common option interface so it can
+be customized. Added more documentation in the doc directory.
+
