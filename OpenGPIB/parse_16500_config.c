@@ -41,10 +41,11 @@ void usage(void)
 	" -c filename set name of config file\n"
 	" -d filename set name of data file\n"
 	" -f file set name of output file. Send valid data to file\n"
-	" -l file set name of output file. Send label map to file\n"
+	" -m file set name of output file. Send label map to file\n"
 #ifdef LA2VCD_LIB
-	" -v file set name of output file. Send vcd data to file\n"
+	" -l file set name of output file. Send vcd data to file\n"
 #endif
+  " -v set verbose mode\n"
 	"",TOSTRING(VERSION));
 }
 /***************************************************************************/
@@ -54,13 +55,13 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char *argv[])
 {
-	char *cfname, *dfname, *lfname,*outfname,*vname;
+	char *cfname, *dfname, *mfname,*outfname,*vname;
 	struct section *s;
 	int c,v;
 	v=SHOW_PRINT;
 	s=NULL;
-	outfname=dfname=lfname=cfname=vname=NULL;
-	while( -1 != (c = getopt(argc, argv, "c:d:f:hl:v:")) ) {
+	outfname=dfname=mfname=cfname=vname=NULL;
+	while( -1 != (c = getopt(argc, argv, "c:d:f:hl:m:v")) ) {
 		switch(c){
 			case 'c':
 				cfname=strdup(optarg);
@@ -71,18 +72,21 @@ int main(int argc, char *argv[])
 			case 'f':
 				outfname=strdup(optarg);
 				break;
-			case 'l':
-				lfname=strdup(optarg);
+			case 'm':
+				mfname=strdup(optarg);
 				break;
-			case 'v':
+			case 'l':
 #ifdef LA2VCD_LIB
 				vname=strdup(optarg);
 				v=JUST_LOAD;
 #else
-				fprintf(stderr,"-v not supported. Re-build with LA2VCD_LIB=/path/to/lib\n");
+				fprintf(stderr,"-l not supported. Re-build with LA2VCD_LIB=/path/to/lib\n");
 				return 1;
 #endif
 				break;
+        case 'v':
+          v=SHOW_PRINT;
+          break;
 			default:
 				usage();
 				return 1;
@@ -92,13 +96,13 @@ int main(int argc, char *argv[])
 		usage();
 		goto closem;
 	}	
-	if(NULL != lfname && NULL != cfname ){
+	if(NULL != mfname && NULL != cfname ){
 		
 		if(NULL !=(s=parse_config(cfname,"CONFIG    ",JUST_LOAD) ) ){
 			FILE *cfd=NULL;
 	
-			if(NULL == (cfd=fopen(lfname,"w+"))) {
-				fprintf(stderr,"Unable to open '%s' for writing\n",lfname);
+			if(NULL == (cfd=fopen(mfname,"w+"))) {
+				fprintf(stderr,"Unable to open '%s' for writing\n",mfname);
 				goto closem;
 			}
 			
