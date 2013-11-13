@@ -1,50 +1,107 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html><head><title>OpenGPIB</title></head><body>
+<html><head>
+  <title>OpenGPIB</title>
+
+  
+</head><body>
 <h1>Welcome to <span style="color: rgb(105, 237, 59);">Open</span><span style="color: rgb(255, 153, 0);">GPIB</span></h1>
+
 <p>This is a working project, i.e. the author updates the project
 when some new work take him down a dark, mysterious path requiring some
 new code to implement a new feature.</p>
+
 This is using several prologix controllers (USB), and interfaces with
 the following instruments:<br>
+
 <ul>
-<li>HP 8595E (Spectrum Analyzer)</li>
-<li>HP 16500A/B/C (Logic Analyzer). <a target="_blank" href="HP16500CNotes.html">Reverse-engineering notes</a> and <a href="HP16500CHardDriveNotes.html" target="_blank">HDD notes</a>.</li>
-<li>HP 16531 (6bit dual channel, 400MS/s, 100Mhz bw)</li>
-<li>HP 16555A (64 channel, 110Mhz state/500Mhz timing 1M/pod
+
+  <li>HP 8595E (Spectrum Analyzer)</li>
+  <li>HP 16500A/B/C (Logic Analyzer). <a target="_blank" href="HP16500CNotes.html">Reverse-engineering notes</a> and <a href="HP16500CHardDriveNotes.html" target="_blank">HDD notes</a>.</li>
+  <li>HP 16531 (6bit dual channel, 400MS/s, 100Mhz bw)</li>
+  <li>HP 16532 1GS/s 2 channel digital oscilloscope</li>
+  <li>HP 16534 2 GS/s 2 channel digital oscilloscope<br>
+  </li>
+  <li>HP 16555A (64 channel, 110Mhz state/500Mhz timing 1M/pod
 Analyzer)</li>
-<li>Wayne Kerr PSG2400L (2Ghz signal Generator)</li>
-<li>Tek 2440 (Dual channel, 500MS/s scope)</li>
+  <li>Wayne Kerr PSG2400L (2Ghz signal Generator)</li>
+  <li>Tek 2440 (Dual channel, 500MS/s scope)</li>
 </ul>
+
 Using the Spectrum Analyzer and the Signal generator, a network
-analyzer of sorts can be built. &nbsp;This functionality is
+analyzer of sorts can be built. This functionality is
 provided by the network analyzer code. &nbsp;Gain can be measured
 over frequency. There is a cal mode that measures the loss and
 frequency of the cable (or signal generator). The compensation using
 that cal is not complete yet.<br>
+
 <br>
+
 The 16555 code will extract the data and configuration from the
 analyzer. There is a parser that parses both of these data structures.
 &nbsp;I never found full docs for the config data, so I reverse
 engineered it to find out which label goes with which bit(s).&nbsp;
 <br>
+
 <br>
+
 I also recently added code that will interface with the 16534/16532
 2/1GS/s scope cards. I have two each of these and wrote the code to
-syncronize the data from them and generates plots via GNU plot.<br><br>This parser also generates a file compatible with la2vcd.
-&nbsp;The <a href="http://sourceforge.net/projects/opengpib/files/la2vcd/la2vcd-0.02.tar.gz/download">0.02</a> version of la2vcd contains a couple fatal bugs, so
+syncronize the data between the '34 and the '32 and generates plots via
+GNU plot.<br>
+
+<br>
+
+This parser also generates a file compatible with la2vcd.
+&nbsp;The <a href="http://sourceforge.net/projects/opengpib/files/la2vcd/la2vcd-0.02.tar.gz/download">0.02</a>
+version of la2vcd contains a couple fatal bugs, so
 I've included a fixed version <a href="http://sourceforge.net/projects/opengpib/files/la2vcd/la2vcd-0.02F.tar.gz/download"><span style="text-decoration: underline;">la2vcd-0.02F.tar.gz</span></a>.
-&nbsp;This is the <a href="http://www.brouhaha.com/%7Eeric/software/la2vcd/" target="_blank">la2vcd web page</a>, and the <a href="http://freshmeat.net/projects/la2vcd/" target="_blank">freshmeat</a> page of the same. &nbsp;Here is an <a href="full16ns.la2vcd" target="_blank">example</a> of how to split traces using the la2vcd. <br><br>There is a new version of la2vcd that has the bugs fixed <span style="font-weight: bold;">and</span> has been converted&nbsp;to a library by rickyrockrat. Version 0.02L6 is here: <a href="http://sourceforge.net/projects/opengpib/files/la2vcd/la2vcd-0.02L6.tar.gz/download">la2vcd-0.02L6.tar.gz</a>&nbsp; It is a little clunky, but it does work. The 16555A code now dumps directly to a vcd file.<br>
+&nbsp;This is the <a href="http://www.brouhaha.com/%7Eeric/software/la2vcd/" target="_blank">la2vcd
+web page</a>, and the <a href="http://freshmeat.net/projects/la2vcd/" target="_blank">freshmeat</a> page of the same. &nbsp;Here is an <a href="full16ns.la2vcd" target="_blank">example</a> of how to split
+traces using the la2vcd. <br>
+
 <br>
-Waveform viewers that work well with the vcd format are <a target="_blank" href="http://gtkwave.sourceforge.net/">GTKWave</a> and <a href="http://www.veripool.org/wiki/dinotrace" target="_blank">Dinotrace</a>, but&nbsp;the latter has not been tested.<br>
+
+There is a new version of la2vcd that has the bugs fixed <span style="font-weight: bold;">and</span> has been converted&nbsp;to a
+library by rickyrockrat. Version 0.02L6 is here: <a href="http://sourceforge.net/projects/opengpib/files/la2vcd/la2vcd-0.02L6.tar.gz/download">la2vcd-0.02L6.tar.gz</a>&nbsp;
+It is a little clunky, but it does work. The 16555A code now dumps
+directly to a vcd file.<br>
+
 <br>
+
+Waveform viewers that work well with the vcd format are <a target="_blank" href="http://gtkwave.sourceforge.net/">GTKWave</a> and
+<a href="http://www.veripool.org/wiki/dinotrace" target="_blank">Dinotrace</a>,
+but&nbsp;the latter has not been tested.<br>
+
+<br>
+
 The 16531 and 2440 code pulls waveforms off of the each instrument and
 will generate gnuplot files so the data can be viewed vi gnuplot, or
 generates png images. Here is one screenshot:<br>
+
 <br>
-<a href="8chtrace.html" target="_blank">8 Channels with 2 16534 and 2 16534</a><br>
+
+<a href="8chtrace.html" target="_blank">8 Channels with 2 16534 and 2
+16532</a> (note the 16532 traces at the bottom, 1/2 as much data as those above.)<br>
+
 <br>
-There are also notes and fonts to get the remote X-window control to work on Linux here:<br>
-<a href="http://sourceforge.net/projects/opengpib/files/unix-fonts/unix-fonts.tar.bz2/download">unix-fonts.tar.bz2</a><br>The sourceforge page for this project is <a href="http://sourceforge.net/projects/opengpib/">http://sourceforge.net/projects/opengpib/</a><br><br>Contact: gpib at rickyrockrat.net<br><br><br>
+
+There are also notes and fonts to get the remote X-window control to
+work on Linux here:<br>
+
+<a href="http://sourceforge.net/projects/opengpib/files/unix-fonts/unix-fonts.tar.bz2/download">unix-fonts.tar.bz2</a><br>
+
+The sourceforge page for this project is <a href="http://sourceforge.net/projects/opengpib/">http://sourceforge.net/projects/opengpib/</a><br>
+
+<br>
+
+Contact: gpib at rickyrockrat.net<br>
+
+<br>
+
+<br>
+
 Project web docs for sourceforge are <a target="_blank" href="https://sourceforge.net/apps/trac/sourceforge/wiki/Project%20web">here</a>.<br>
+
 <br>
+
 </body></html>
