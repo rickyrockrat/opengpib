@@ -66,7 +66,7 @@ int hp16500c_init(struct gpib *g)
 /***************************************************************************/
 /** .
 \n\b Arguments:
-\n\b Returns: 1 on failure, 0 on success
+\n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
 int _hp16500c_open(struct gpib *g, char *ip)
 {
@@ -108,6 +108,7 @@ int _hp16500c_open(struct gpib *g, char *ip)
 err:
 	free(c);
 	g->ctl=NULL;
+	return -1;
 }
 
 /***************************************************************************/
