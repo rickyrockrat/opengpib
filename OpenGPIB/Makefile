@@ -68,7 +68,7 @@ help:
 
 build: gpib.lib $(TARGETS)
 
-common.o hp16500.o hp16500ip.o : CFLAGS+=-std=c99 -D_COMMON_
+common.o hp16500.o hp16500ip.o hp1655x.o hp1653x.o: CFLAGS+=-std=c99 -D_COMMON_
 
 common.o: common.c common.h Makefile
 
@@ -102,16 +102,16 @@ get_tek_waveform:	get_tek_waveform.o gpib.lib
 get_hp_1653xx_scope.o get_hp_16555_waveform.o parse_16500_config.o: hp16500.h
 
 
-get_hp_1653xx_scope: get_hp_1653xx_scope.o gpib.lib hp16500.lib $(LA2VCD_LIB)
+get_hp_1653xx_scope: get_hp_1653xx_scope.o gpib.lib hp16500.lib $(LA2VCD_LIB) hp1653x.o
 	gcc -lm -o $@ $^
 	
-get_hp_16555_waveform: get_hp_16555_waveform.o gpib.lib  hp16500.lib $(LA2VCD_LIB)
+get_hp_16555_waveform: get_hp_16555_waveform.o gpib.lib  hp16500.lib $(LA2VCD_LIB) hp1655x.o
 	gcc -lm -o $@ $^
 	
 hp16500.main.o: hp16500.c  hp16500.h	Makefile
 	gcc $(CFLAGS) -DMAIN_QUERY  -c -o $@ hp16500.c
 
-hp16500: hp16500.main.o gpib.lib
+hp16500: hp16500.main.o gpib.lib hp1653x.o
 	gcc -lm -o $@ $^
 	
 test: test.o gpib.lib
@@ -122,7 +122,7 @@ test: test.o gpib.lib
 #parse_16500_config.o: parse_16500_config.c 
 #	gcc -Wall -c  -o $@ $<
 
-parse_16500_config:parse_16500_config.o hp16500.lib gpib.lib $(LA2VCD_LIB)
+parse_16500_config:parse_16500_config.o hp16500.lib gpib.lib $(LA2VCD_LIB) hp1655x.o
 	gcc -lm -o $@ $^
 
 networkanalyzer: networkanalyzer.o gpib.lib

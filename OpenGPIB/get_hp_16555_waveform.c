@@ -31,7 +31,8 @@ Change Log: \n
 #include "common.h"
 #include "gpib.h"
 #include "hp16500.h"
-#include <ctype.h>
+#include "hp1655x.h"
+
 /**for open...  */
 #include <sys/stat.h>
 #include <fcntl.h>
