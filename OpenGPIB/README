@@ -73,6 +73,16 @@ Here are the steps to adding another controller:
 3) Add the entry in the table at the top of gpib.c (supported_dev).
 4) Add the entry to the case in open_gpib.
 
+It is CRITICAL that you check for NULL in the control functions, and allocate the internal struct
+if null, because the system runs control before open to set debug.
+
+This project is layered. The bottom layer is the interface, serial/ip/usb (latter not implemented)
+The next layer is the controller, currently prologix and hp16500C.
+Lastly is the top layer instruments. The structure layout is:
+The control is lower than the device. The control should only be visible to the interface file (serial.c/ip.c)
+The device contains the interface structure, and the highest is the gpib struct. So:
+gpib->dev->ctl
+
 See get_hp_16555_waveform.c to see how the option works from the table in supported_dev.
 There are 2 functions that work on this table, one displays supported controllers, the 
 other validates the option and returns the device type.
