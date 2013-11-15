@@ -195,23 +195,29 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 		case GPIB_CTL_PROLOGIXS:
 			if(register_prologixs(g))
 				goto err1;
+			if(ctype&OPTION_DEBUG)
+				g->control(g,CTL_SET_DEBUG,1);
 			if(g->open(g,dev_path))
 				goto err;
 			break;
 		case GPIB_CTL_HP16500C:
 			if(register_hp16500c(g))
 				goto err1;
+			if(ctype&OPTION_DEBUG)
+				g->control(g,CTL_SET_DEBUG,1);
 			if(g->open(g,dev_path))
 				goto err;
 			break;
     case GPIB_CTL_FILEIO:
 			if(register_fileio(g))
 				goto err1;
+			if(ctype&OPTION_DEBUG)
+				g->control(g,CTL_SET_DEBUG,1);
 			if(g->open(g,dev_path))
 				goto err;
 			break;
 		default:
-			fprintf(stderr,"Unknown controller %d\n",ctype);
+			fprintf(stderr,"Unknown controller %d\n",ctype&CONTROLLER_TYPEMASK);
 			goto err1;
 			break;
 	}
