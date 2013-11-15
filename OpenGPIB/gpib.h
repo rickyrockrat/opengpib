@@ -39,10 +39,12 @@ other controllers.
 
 #include <sys/time.h>
 #include <unistd.h> /**for usleep  */
+#include <stdint.h> /**for types uint32_t  */
 
 /**interface types  */
 enum {
 	GPIB_IF_SERIAL=0,
+	GPIB_IF_IP,
 	GPIB_IF_NONE,
 };
 /**controller types  */
@@ -78,7 +80,7 @@ struct gpib {
 	int (*write)(void *dev, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
 	int (*open)(struct gpib *g, char *path);			/** Returns: 1 on failure, 0 on success */
 	int (*close)(struct gpib *g);									/**closes interface  */
-	int (*control)(struct gpib *g, int cmd, int data); 			/**controller-interface control. Set addr, etc.  */
+	int (*control)(struct gpib *g, int cmd, uint32_t data); 			/**controller-interface control. Set addr, etc.  */
 	char *buf;														/**GPIB buffer  */
 	int buf_len;													/**buffer length  */
 	char *dev_path;																/**physical device path.  */
