@@ -197,23 +197,23 @@ struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 				goto err1;
 			if(ctype&OPTION_DEBUG)
 				g->control(g,CTL_SET_DEBUG,1);
-			if(g->open(g,dev_path))
+			if(-1==g->open(g,dev_path))
 				goto err;
 			break;
 		case GPIB_CTL_HP16500C:
-			if(register_hp16500c(g))
+			if(-1==register_hp16500c(g))
 				goto err1;
 			if(ctype&OPTION_DEBUG)
 				g->control(g,CTL_SET_DEBUG,1);
-			if(g->open(g,dev_path))
+			if(-1==g->open(g,dev_path))
 				goto err;
 			break;
     case GPIB_CTL_FILEIO:
-			if(register_fileio(g))
+			if(-1==register_fileio(g))
 				goto err1;
 			if(ctype&OPTION_DEBUG)
 				g->control(g,CTL_SET_DEBUG,1);
-			if(g->open(g,dev_path))
+			if(-1==g->open(g,dev_path))
 				goto err;
 			break;
 		default:
@@ -292,3 +292,29 @@ int init_id(struct gpib *g, char *idstr)
 	return 0;
 }
 
+/***************************************************************************/
+/** Check a pointer, if it is null, allocate to specified size.
+\n\b Arguments:
+\n\b Returns: 0 on OK, 1 on allocated memory, -1 if out of mem or other error
+****************************************************************************/
+int check_calloc(size_t size, void *x, const char *func, void *s)
+{
+	const char *f;
+	void **p=x;
+	void **set=s;
+	/**sanity checks  */
+	if(NULL != func)	f=func;
+	else f="";
+	if(NULL == p) return -1;
+		
+	if( NULL == *p){
+		if(NULL ==(*p=calloc(1,size)) ){
+			printf("Out of mem on %s alloc\n",f);
+			return -1;
+		}
+		if(NULL != set)
+			*set=*p;
+		return 1;
+	}
+	return 0;
+}

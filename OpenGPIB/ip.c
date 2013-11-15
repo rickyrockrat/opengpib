@@ -63,21 +63,18 @@ struct ip_ctl {
 int _ip_open(struct ip_dev *d, char *ip)
 {
 	struct ip_ctl *c;
+	int i;
 	if(NULL == d){
 		fprintf(stderr,"%s: dev null\n",__func__);
 		return 1;
 	}
 	c=(struct ip_ctl *)d->dev;
+ 	if( (i=check_calloc(sizeof(struct ip_ctl), &c, __func__,NULL)) == -1) return -1;
 	/**We shouldn't ever come here, since we won't have a port or timeout to set...  
 	   Instead, use control to set port and delay.
 	*/
-	if(NULL == c){
+  if(1 == i)
 		fprintf(stderr,"%s Port and delay not set! Opening anyway, but this should fail.\n",__func__);
-		if(NULL ==(c=calloc(1,sizeof(struct ip_ctl))) ){
-			fprintf(stderr,"Out of mem on ip ctl alloc\n");
-			return -1;
-		}
-	}	
 	c->ipaddr=strdup(ip);
 	c->socket.sin_family = AF_INET;
   c->socket.sin_addr.s_addr = inet_addr ( c->ipaddr );
@@ -169,10 +166,11 @@ int _ip_write(struct ip_dev *d, void *buf, int len)
 		m[len++]='\n';
 		m[len]=0;
 	}
-	if(c->debug)
-		fprintf(stderr,"Sending '%s' i=%d, len=%d\n",m,i,len);
+	
 	for (i=0;i<len;){
 		int r;
+		if(c->debug)
+			fprintf(stderr,"Sending '%s' i=%d, len=%d\n",m,i,len);	
 		r= send ( c->sockfd, &m[i], len-i, 0 );
 		if(c->debug)
 			fprintf(stderr,"Sent %d bytes\n",r);
@@ -225,14 +223,8 @@ int _ip_control(struct ip_dev *d, int cmd, uint32_t data)
 	struct ip_ctl *p;
 	p=(struct ip_ctl *)d->dev;
 	/**auto-allocate so we can use the control structure before we open.  */
-	if(NULL == p){
-	  if(NULL ==(p=calloc(1,sizeof(struct ip_ctl))) ){
-			printf("Out of mem on ip ctl alloc\n");
-			return 1;
-		}
-		d->dev=(void *)p;
-		printf("ip_control: allocated mem.\n");
-	}
+	if( check_calloc(sizeof(struct ip_ctl), &p, __func__,(void *)&d->dev) == -1) return -1;
+		
 	switch(cmd){
 		case IP_CMD_SET_CMD_TIMEOUT:
 			p->cmd_timeout=data;

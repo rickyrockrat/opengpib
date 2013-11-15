@@ -105,5 +105,6 @@ int close_gpib (struct gpib *g);
 int gpib_option_to_type(char *op);
 void show_gpib_supported_controllers(void);
 int init_id(struct gpib *g, char *idstr);
+int check_calloc(size_t size, void *p, const char *func, void *set);
 #endif
 

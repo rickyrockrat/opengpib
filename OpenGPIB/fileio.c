@@ -68,12 +68,7 @@ int _fileio_open(struct gpib *g, char *name)
 		return 1;
 	}
 	c=(struct fileio_ctl *)g->ctl;
-	if(NULL == c){
-		if(NULL ==(c=malloc(sizeof(struct fileio_ctl))) ){
-			fprintf(stderr,"Out of mem on fileio ctl alloc\n");
-			return 1;
-		}
-	}	
+	if( check_calloc(sizeof(struct fileio_ctl), &c, __func__,NULL) == -1) return -1;
   c->last_cmd=NULL;
 	if(OPTION_DEBUG&g->type_ctl) 
 		c->debug=1;
@@ -213,13 +208,9 @@ int control_fileio(struct gpib *g, int cmd, uint32_t data)
 		return 0;
 	}
 	c=(struct fileio_ctl *)g->ctl;
-	if(NULL == c){ /**auto-allocate, just in case  */
-		if(NULL ==(c=malloc(sizeof(struct fileio_ctl))) ){
-			fprintf(stderr,"Out of mem on fileio ctl alloc\n");
-			return 1;
-		}
-		g->ctl=(void *)c;
-	}
+	/**sets g->ctl if it allocates new memory  */
+	if( check_calloc(sizeof(struct fileio_ctl), &c, __func__,&g->ctl) == -1) return -1;
+		
 	switch(cmd){
 		case CTL_CLOSE:
 			if(c->debug) fprintf(stderr,"Closing hp INET\n");
