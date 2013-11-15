@@ -30,25 +30,7 @@ Change Log: \n
 */
 #ifndef _HP16500IP_H_
 #define _HP16500IP_H_ 1
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
-struct hp16500c_ctl {
-	char *ipaddr;
-	int port;
-	int debug;
-	struct sockaddr_in socket;
-	int   sockfd;
-	int cmd_wait;
-};
-
-int hp16500c_init(struct gpib *g);
-int _hp16500c_open(struct gpib *g, char *ip);
-int control_hp16500c(struct gpib *g, int cmd, int data);
-int _hp16500c_write(void *d, void *buf, int len);
-int _hp16500c_read(void *d, void *buf, int len);
-int _hp16500c_close(struct gpib *g);
 int register_hp16500c(struct gpib *g);
 
 #endif

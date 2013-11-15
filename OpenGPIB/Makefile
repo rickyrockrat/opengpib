@@ -38,9 +38,9 @@ TARGETS=tek2gplot get_tek_waveform get_hp_1653xx_scope get_hp_16555_waveform \
 calc_area_under_curve networkanalyzer parse_16500_config hp16500
 
 CSRCS = common.c get_hp_1653xx_scope.c get_tek_waveform.c gpib.c networkanalyzer.c \
-prologixs.c serial.c tek2gplot.c calc_area_under_curve.c parse_16500_config.c \
+prologixs.c ip.c serial.c tek2gplot.c calc_area_under_curve.c parse_16500_config.c \
 get_hp_16555_waveform.c fileio.c
-HDRS = common.h gpib.h prologixs.h serial.h hp16500.h fileio.h
+HDRS = common.h gpib.h prologixs.h ip.h serial.h hp16500.h fileio.h
 
 MISC = COPYING README Makefile makepng runcal ChangeLog
 
@@ -66,7 +66,7 @@ help:
 	@echo " la2vcd should be available from the same location"
 	@echo " you obtained this software."
 
-build: test $(TARGETS)
+build: gpib.lib $(TARGETS)
 
 common.o hp16500.o hp16500ip.o : CFLAGS+=-std=c99 -D_COMMON_
 
@@ -82,16 +82,18 @@ calc_area_under_curve: calc_area_under_curve.o common.o
 
 serial.o: serial.h serial.c	Makefile
 
+ip.o: ip.h ip.c	Makefile
+
 gpib.o: gpib.c gpib.h	Makefile
 
-gpib.lib: gpib.o prologixs.o serial.o common.o hp16500ip.o fileio.o
+gpib.lib: gpib.o prologixs.o ip.o serial.o common.o hp16500ip.o fileio.o
 	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
 	
 hp16500.o: hp16500.c  hp16500.h	Makefile
 
 hp16500ip.o: hp16500ip.c  hp16500ip.h	Makefile
 
-hp16500.lib: hp16500.o
+hp16500.lib: hp16500.o 
 	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
 
 get_tek_waveform:	get_tek_waveform.o gpib.lib

@@ -30,13 +30,16 @@ Logic analyzer.
 Change Log: \n
 */
 #include "common.h"
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
 #include "gpib.h"
+#include "ip.h"
 #include "hp16500ip.h"
 
+struct hp16500c_ctl {
+	int addr; /**internal address, used to set address when != gpib.addr  */
+	int debug;
+	int cmd_wait;
+	struct ip_dev ip; /**ip interface control  */
+};
 
 /***************************************************************************/
 /** .
@@ -45,8 +48,7 @@ Change Log: \n
 ****************************************************************************/
 int hp16500c_init(struct gpib *g)
 {
-	struct hp16500c_ctl *c;
-	c=(struct hp16500c_ctl *)g->ctl;
+	
 	if(g->type_ctl&OPTION_DEBUG)fprintf(stderr,"Init HP 16500C INET controller\n");
 	if(0 == write_get_data(g,"*IDN?"))
 		return -1;
@@ -70,46 +72,42 @@ int _hp16500c_open(struct gpib *g, char *ip)
 {
 	struct hp16500c_ctl *c;
 	if(NULL == g){
-		fprintf(stderr,"%s: dev null\n",__func__);
+		printf("%s: dev null\n",__func__);
 		return 1;
 	}
-	
-	if(NULL ==(c=malloc(sizeof(struct hp16500c_ctl))) ){
-		fprintf(stderr,"Out of mem on hp16500c ctl alloc\n");
-		return 1;
-	}
+	c=(struct hp16500c_ctl *)g->ctl;
+	if(NULL == c){
+		if(NULL ==(c=calloc(1,sizeof(struct hp16500c_ctl))) ){
+			printf("Out of mem on hp16500c ctl alloc\n");
+			return 1;
+		}
+	}	
+	if(ip_register(&c->ip)) /**load our ip function list  */
+		goto err;
 	if(OPTION_DEBUG&g->type_ctl) 
-		c->debug=1;
+		c->ip.debug=1;
 	else
-		c->debug=0;
-	c->ipaddr=strdup(ip);
-	c->port=5025;
-	c->cmd_wait=50000;/**uS  */
-	c->socket.sin_family = AF_INET;
-  c->socket.sin_addr.s_addr = inet_addr ( c->ipaddr );
-  c->socket.sin_port = htons ( c->port );
-	  /* Create an endpoint for communication */
-  if(-1 ==(c->sockfd = socket( AF_INET, SOCK_STREAM, 0 )) ){
-		fprintf(stderr,"Unable to create socket for '%s', port %d\n",c->ipaddr,c->port);
-		return 1;
-	}
-	fprintf(stderr,"Socket created for '%s'\n",c->ipaddr);
-  /* Initiate a connection on the created socket */
-  if( 0 !=connect( c->sockfd, (struct sockaddr *)&c->socket, sizeof (struct sockaddr_in ) )){
-		fprintf(stderr,"Unable to connect to '%s', port %d\n",c->ipaddr,c->port);
-		return 1;
-	}
-	fprintf(stderr,"Connected to '%s'\n",c->ipaddr);
+		c->ip.debug=0;
+	/**set the port - IMPORTANT! Be sure to do this before opening. */
+	c->ip.control(&c->ip,IP_CMD_SET_PORT,5025);
+	/**set net timeout - Set this too, or you will timeout when opening */
+	c->ip.control(&c->ip,IP_CMD_SET_CMD_TIMEOUT,50000); /**uS  */
+	c->ip.control(&c->ip,IP_CMD_SET_DEBUG,c->debug); /**pass down debug option to interface level  */
+	
+	/**open ip address on port set above  */
+	if(-1 == c->ip.open(&c->ip,ip))
+		goto err;
+	
 	g->ctl=c;
 	if(-1 == hp16500c_init(g)){
 		fprintf(stderr,"Controller init failed\n");
-		free (g->ctl);
-		g->ctl=NULL;
-		/*fprintf(stderr,"_po rtn\n"); */
-		return 1;
+		goto err;
 	}
 	
 	return 0;
+err:
+	free(c);
+	g->ctl=NULL;
 }
 
 /***************************************************************************/
@@ -124,6 +122,10 @@ int _hp16500c_write(void *d, void *buf, int len)
 	char *m;
 	
 	c=(struct hp16500c_ctl *)d;
+	if(NULL == c){
+		fprintf(stderr,"%s ctl struct NULL\n",__func__);
+		return -1;
+	}
 	m=(char *)buf;
 	
 	if('\n' != m[len-1]){ /**Make sure we have terminator...  */
@@ -138,19 +140,10 @@ int _hp16500c_write(void *d, void *buf, int len)
 	}
 	if(c->debug)
 		fprintf(stderr,"Sending '%s'\n",m);
-	for (i=0;i<len;){
-		int r;
-		r= send ( c->sockfd, &m[i], len-i, 0 );
-		if(c->debug)
-			fprintf(stderr,"Sent %d bytes\n",r);
-		if(-1 == r){
-			fprintf(stderr,"Err Sending at byte %d\n",i);
-			i=-1;
-			goto end;
-		}
-		i+=r;
-	}
-	
+	if((i=c->ip.write(&c->ip,m,len)) <0) {/* error writing */
+		i=-1;
+		goto end;
+  }
 	/*fprintf(stderr,"wrote %d bytes\n%s\n",rtn,g->buf); */
 	if(i != len)
 		fprintf(stderr,"Write mis-match %d != %d\n",i,len);
@@ -169,29 +162,12 @@ end:
 int _hp16500c_read(void *d, void *buf, int len)
 {
 	struct hp16500c_ctl *c;
-	int i,wait;
+	int i;
 	char *m;
 	m=(char *)buf;
 	c=(struct hp16500c_ctl *)d;
 	/*fprintf(stderr,"Looking for %d bytes\n",len); */
-	for (i=wait=0; i<len;){
-		int r;
-		if(-1 == (r=recv ( c->sockfd, &m[i], len-i,MSG_DONTWAIT )) ){
-			/*fprintf(stderr,"-1"); */
-			++wait;
-			if(wait > 10){
-				/*fprintf(stderr,"Err sending\n"); */
-				break;
-			}
-			usleep(c->cmd_wait);
-		}else{
-			i+=r;
-			wait=0;
-		}
-		m[i]=0;	
-		/** if(0 && -1 != r)
-			fprintf(stderr,"Got %d bytes '%s'\n",r,&m[i-r]);*/
-	}
+	i=c->ip.read(&c->ip,buf,len);
 	if(i){
 		--i;
 		while(i>=0 && (m[i]=='\r' || m[i]=='\n'))
@@ -206,7 +182,7 @@ int _hp16500c_read(void *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int control_hp16500c(struct gpib *g, int cmd, int data)
+int control_hp16500c(struct gpib *g, int cmd, uint32_t data)
 {
 	struct hp16500c_ctl *c; 
 	int i;
@@ -218,8 +194,11 @@ int control_hp16500c(struct gpib *g, int cmd, int data)
 	}
 	c=(struct hp16500c_ctl *)g->ctl;
 	if(NULL == c){
-		fprintf(stderr,"hp16500c_clt null\n");
-		return 1;
+		if(NULL ==(c=calloc(1,sizeof(struct hp16500c_ctl))) ){
+			printf("Out of mem on hp16500c ctl alloc\n");
+			return 1;
+		}
+		g->ctl=(void *)c;
 	}
 	switch(cmd){
 		case CTL_CLOSE:
@@ -270,10 +249,9 @@ int _hp16500c_close(struct gpib *g)
 	if(NULL == g->ctl)
 		return 0;
 	c=(struct hp16500c_ctl *)g->ctl;
-	if(0!= (i=shutdown(c->sockfd,SHUT_RDWR)) ){
+	if(0!= (i=c->ip.close(&c->ip)) ){
 		fprintf(stderr,"Error closing interface\n");
 	}
-	close(c->sockfd);
 	free (g->ctl);
 	g->ctl=NULL;
 	return i;
@@ -296,3 +274,4 @@ int register_hp16500c(struct gpib *g)
 	g->close=	_hp16500c_close;
 	return 0;
 }
+
