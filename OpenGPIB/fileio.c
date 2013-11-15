@@ -57,7 +57,7 @@ off_t readlen(struct fileio_ctl *c, int len)
 /***************************************************************************/
 /** .
 \n\b Arguments:
-\n\b Returns: 1 on failure, 0 on success
+\n\b Returns: -1  on failure, 0 on success
 ****************************************************************************/
 int _fileio_open(struct gpib *g, char *name)
 {
@@ -67,11 +67,13 @@ int _fileio_open(struct gpib *g, char *name)
 		fprintf(stderr,"%s: dev null\n",__func__);
 		return 1;
 	}
-	
-	if(NULL ==(c=malloc(sizeof(struct fileio_ctl))) ){
-		fprintf(stderr,"Out of mem on fileio ctl alloc\n");
-		return 1;
-	}
+	c=(struct fileio_ctl *)g->ctl;
+	if(NULL == c){
+		if(NULL ==(c=malloc(sizeof(struct fileio_ctl))) ){
+			fprintf(stderr,"Out of mem on fileio ctl alloc\n");
+			return 1;
+		}
+	}	
   c->last_cmd=NULL;
 	if(OPTION_DEBUG&g->type_ctl) 
 		c->debug=1;
@@ -81,23 +83,25 @@ int _fileio_open(struct gpib *g, char *name)
 	  /* Open the file for reading */
   if(NULL ==(c->f = fopen( c->name,"r")) ){
 		fprintf(stderr,"Unable to open '%s'\n",c->name);
-		return 1;
+		goto err;
 	}
   if(-1 == stat(name,&finfo)){
     fprintf(stderr,"Unable to Stat '%s'\n",c->name);
     fclose(c->f);
     free(c->name);
-    free(c);
-    g->ctl=NULL;
-    return -1;
+		goto err;
   }
   c->filelen=finfo.st_size;
   c->pos=0;
   c->readto=0;
 	fprintf(stderr,"Opened '%s', %ld bytes\n",c->name,c->filelen);
 	g->ctl=c;
-	
 	return 0;
+	
+err:
+	free(c);
+	g->ctl=NULL;
+	return -1;
 }
 
 /***************************************************************************/
@@ -200,7 +204,7 @@ end:
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int control_fileio(struct gpib *g, int cmd, int data)
+int control_fileio(struct gpib *g, int cmd, uint32_t data)
 {
 	struct fileio_ctl *c; 
 
@@ -209,9 +213,12 @@ int control_fileio(struct gpib *g, int cmd, int data)
 		return 0;
 	}
 	c=(struct fileio_ctl *)g->ctl;
-	if(NULL == c){
-		fprintf(stderr,"fileio_clt null\n");
-		return 1;
+	if(NULL == c){ /**auto-allocate, just in case  */
+		if(NULL ==(c=malloc(sizeof(struct fileio_ctl))) ){
+			fprintf(stderr,"Out of mem on fileio ctl alloc\n");
+			return 1;
+		}
+		g->ctl=(void *)c;
 	}
 	switch(cmd){
 		case CTL_CLOSE:
