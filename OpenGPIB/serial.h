@@ -38,7 +38,7 @@ struct serial_dev {
 	int (*write)(struct serial_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
 	int (*open)(struct serial_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
 	int (*close)(struct serial_dev *d);									/**closes interface  */
-	int (*control)(struct serial_dev *d, int cmd,int data); 			/**controller-interface control. Set addr, etc.  */
+	int (*control)(struct serial_dev *d, int cmd,uint32_t data); 			/**controller-interface control. Set addr, etc.  */
 	void *dev;            												/**interface-specific structure  */
 	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
 	int debug;
