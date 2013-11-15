@@ -434,7 +434,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	static int od=0, first=1,labelno=1;
 	static int offset, x, y, rmargin=RMARGIN;
 	static char *fname;
-	int ilinecolor;
+	int ilinecolor=0;
 
 	if( WR_SETFILENAME == plotno){
 		sprintf(buf,"%s.plot",dfile);
