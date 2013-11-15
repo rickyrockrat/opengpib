@@ -244,7 +244,7 @@ void show_hp_connection_info(void)
 ****************************************************************************/
 void show_common_usage (int mode)
 {
-  char *emsg=NULL;
+  char *emsg="";
   int type;
   switch(mode){
     case COM_USE_MODE_SCOPE: 
@@ -353,6 +353,7 @@ void usage(void)
 	printf(" -q type Set query type to: \n"
 				 "   id - just print instrument ID\n"
 	       "   cards - show cards in instrument\n"
+	       " -v turn debug on.\n"
 	       "\n"
 	"");
 }
@@ -372,7 +373,7 @@ int main(int argc, char * argv[])
 	i=-2;
 	query=QTEST;
 	cmd=NULL;
-	while( -1 != (c = getopt(argc, argv, "c:q:h"HP_COMMON_GETOPS)) ) {
+	while( -1 != (c = getopt(argc, argv, "c:q:hv"HP_COMMON_GETOPS)) ) {
 		i=1;
 		switch(c){
 			case 'a':
@@ -399,6 +400,9 @@ int main(int argc, char * argv[])
 					fprintf(stderr,"Unknown query '%s'\n",optarg);
 					return 1;
 				}
+				break;
+			case 'v':
+				copt.dtype|=OPTION_DEBUG;
 				break;
 			default:
 				usage();
