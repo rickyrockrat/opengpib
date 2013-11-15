@@ -47,11 +47,6 @@ struct fileio_ctl {
   off_t pos;        /**current place in file  */
 };
 
-int _fileio_open(struct gpib *g, char *name);
-int control_fileio(struct gpib *g, int cmd, int data);
-int _fileio_write(void *d, void *buf, int len);
-int _fileio_read(void *d, void *buf, int len);
-int _fileio_close(struct gpib *g);
 int register_fileio(struct gpib *g);
 
 #endif
