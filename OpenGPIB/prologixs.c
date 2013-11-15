@@ -120,7 +120,7 @@ int prologixs_init(struct gpib *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int control_prologixs(struct gpib *g, int cmd, int data)
+int control_prologixs(struct gpib *g, int cmd, uint32_t data)
 {
 	int i;
 	struct prologixs_ctl *c; 
@@ -130,14 +130,8 @@ int control_prologixs(struct gpib *g, int cmd, int data)
 		return 0;
 	}
 	c=(struct prologixs_ctl *)g->ctl;
-	/**auto-allocate, if needed  */
-	if(NULL == c){
-		if(NULL ==(c=malloc(sizeof(struct prologixs_ctl))) ){
-			printf("Out of mem on prologix ctl alloc\n");
-			return 1;
-		}
-		g->ctl=(void *)c;
-	}
+	if( check_calloc(sizeof(struct prologixs_ctl), &c, __func__,&g->ctl) == -1) return -1;
+		
 	switch(cmd){
 		case CTL_CLOSE:
 			if(c->serial.debug) printf("Closing gpib\n");
@@ -272,12 +266,7 @@ int _prologixs_open(struct gpib *g, char *path)
 		return 1;
 	}
 	c=(struct prologixs_ctl *)g->ctl;
-	if( NULL == c){
-		if(NULL ==(c=malloc(sizeof(struct prologixs_ctl))) ){
-			printf("Out of mem on prologix ctl alloc\n");
-			return 1;
-		}
-	}
+	if( check_calloc(sizeof(struct prologixs_ctl), &c, __func__,NULL) == -1) return -1;
 	
 	if(serial_register(&c->serial)) /**load our function list  */
 		goto err;
@@ -286,7 +275,7 @@ int _prologixs_open(struct gpib *g, char *path)
 		c->serial.debug=1;
 	else
 		c->serial.debug=0;
-	if(c->serial.open(&c->serial,path))
+	if(-1==c->serial.open(&c->serial,path))
 		goto err;
 	
 	c->serial.control(&c->serial,SERIAL_CMD_SET_CHAR_TIMEOUT,50000);
