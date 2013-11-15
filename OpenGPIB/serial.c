@@ -447,7 +447,7 @@ int _serial_close(struct serial_dev *d)
 /***************************************************************************/
 /** .
 \n\b Arguments:
-\n\b Returns: 1 on failure, 0 on success
+\n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
 int _serial_open(struct serial_dev *d, char *path)
 {
@@ -457,12 +457,8 @@ int _serial_open(struct serial_dev *d, char *path)
 		return -1;
 	}
 	p=(struct serial_port *)d->dev;
-	if(NULL == p){
-		if(NULL == (p=calloc(1,sizeof(struct serial_port))) ){
-			printf("%s: out of memory\n",__func__);
-			return -1;
-		}
-	}	
+	if(check_calloc(sizeof(struct serial_port), &p,__func__,NULL) ) return -1;
+		
 	p->debug=d->debug;
 	if(-1 == open_serial_port(path,115200,0,0,0,p)) {
 		printf("Can't open %s. Fatal\n",path);
@@ -484,12 +480,7 @@ int _serial_control(struct serial_dev *d, int cmd, uint32_t data)
 {
 	struct serial_port *p;
 	p=(struct serial_port *)d->dev;
-	if(NULL == p){
-		if(NULL == (p=calloc(1,sizeof(struct serial_port))) ){
-			fprintf(stderr,"%s: out of memory\n",__func__);
-			return -1;
-		}
-	}
+	if(check_calloc(sizeof(struct serial_port), &p,__func__,d->dev) ) return -1;
 	switch(cmd){
 		case SERIAL_CMD_SET_CHAR_TIMEOUT:
 			p->timeout=data;
@@ -511,7 +502,7 @@ int _serial_control(struct serial_dev *d, int cmd, uint32_t data)
 /***************************************************************************/
 /** allocate and fill in our function structure.
 \n\b Arguments:
-\n\b Returns:
+\n\b Returns: 0 on success, -1 on failure
 ****************************************************************************/
 int serial_register(struct serial_dev *d)
 {
