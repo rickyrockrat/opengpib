@@ -341,15 +341,8 @@ void restore_serial_port(struct serial_port *p)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct serial_port *open_serial_port(char *name, int baud, int data, int stop, int parity, int debug)
+int open_serial_port(char *name, int baud, int data, int stop, int parity, struct serial_port *p)
 {
-	struct serial_port *p;
-	if(NULL == (p=malloc(sizeof(struct serial_port))) ){
-		printf("%s: out of memory\n",__func__);
-		return NULL;
-	}
-	bzero(p,sizeof(struct serial_port));
-	p->debug=debug;
 	p->handle=-1;
 	p->baud=baud;
 	p->stop=stop;
@@ -362,11 +355,10 @@ struct serial_port *open_serial_port(char *name, int baud, int data, int stop, i
 		goto error;
 	}	
 	p->timeout=50000;
-	return p;
+	return 0;
 error:
 	restore_serial_port(p);
-	free(p);
-	return NULL;
+	return -1;
 }
 
 /***************************************************************************/
@@ -459,15 +451,25 @@ int _serial_close(struct serial_dev *d)
 ****************************************************************************/
 int _serial_open(struct serial_dev *d, char *path)
 {
+	struct serial_port *p;
 	if(NULL == d){
 		printf("serial open: dev null\n");
-		return 1;
+		return -1;
 	}
-	if(NULL == (d->dev=open_serial_port(path,115200,0,0,0,d->debug))){
+	p=(struct serial_port *)d->dev;
+	if(NULL == p){
+		if(NULL == (p=calloc(1,sizeof(struct serial_port))) ){
+			printf("%s: out of memory\n",__func__);
+			return -1;
+		}
+	}	
+	p->debug=d->debug;
+	if(-1 == open_serial_port(path,115200,0,0,0,p)) {
 		printf("Can't open %s. Fatal\n",path);
-		return 1;
+		free(p);
+		return -1;
 	}
-	
+	d->dev=(void *)p;
 	if(d->debug) printf("Serial port opened.\n");
 
 	return 0; 
@@ -478,13 +480,15 @@ int _serial_open(struct serial_dev *d, char *path)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _serial_control(struct serial_dev *d, int cmd, int data)
+int _serial_control(struct serial_dev *d, int cmd, uint32_t data)
 {
 	struct serial_port *p;
 	p=(struct serial_port *)d->dev;
 	if(NULL == p){
-		printf("serial_port is null\n");
-		return 1;
+		if(NULL == (p=calloc(1,sizeof(struct serial_port))) ){
+			fprintf(stderr,"%s: out of memory\n",__func__);
+			return -1;
+		}
 	}
 	switch(cmd){
 		case SERIAL_CMD_SET_CHAR_TIMEOUT:
@@ -495,6 +499,12 @@ int _serial_control(struct serial_dev *d, int cmd, int data)
 				p->debug=1;
 			else
 				p->debug=0;
+		  break;
+		default:
+			fprintf(stderr,"%s unknown cmd %d\n",__func__,cmd);
+			return -1;
+			break;
+
 	}
 	return 0;
 }
