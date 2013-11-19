@@ -414,6 +414,21 @@ int get_linecolor( char *rgb)
 	}
 	return 2;
 }
+   /***************************************************************************/
+/** .
+\n\b Arguments:
+if plotno is 1 or above, we do a multi-plot.  If 0, we do a single plot.
+if plotno is -1, we close the file
+\n\b Returns:
+****************************************************************************/
+int write_file ( int fd, char *buf, int len, char *fname)
+{
+	int i;
+	if ( (i=write(fd,buf,len)) != len)
+			fprintf(stderr,"Failed to write all bytes (%d of %d) to %s\n",i,len,fname);
+	return i;
+}
+
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -468,7 +483,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		else
 			s=dfile;
 		c=sprintf(buf,"set label %d \"%s\" at %s %f, %s %f\n",labelno++,title,s,ext->x,s, ext->y);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		return 0;
 	}
 	if(WR_RMARGIN == plotno){
@@ -477,7 +492,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	}
 	if(WR_DATA == plotno){	/**write data  */
 		c=sprintf(buf,"%E %E\n",ext->time_mult*ext->x,ext->y);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		return 0;
 	}
 	if(WR_TRIGGER == plotno){/**write trigger  */
@@ -485,7 +500,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		o=lseek(od,0,SEEK_CUR);
 		lseek(od,offset,SEEK_SET);
 		c=sprintf(buf,"%E,%E front\n",ext->xtrig,ext->ytrig);			
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		offset=lseek(od,0,SEEK_CUR);
 		lseek(od,o,SEEK_SET);
 		return 0;
@@ -495,33 +510,33 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		o=lseek(od,0,SEEK_CUR);
 		lseek(od,offset,SEEK_SET);
 		c=sprintf(buf,"set label %d '%s' at %E,%E front",labelno++,ext->src,ext->x,ext->y);			
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		offset=lseek(od,0,SEEK_CUR);
 		lseek(od,o,SEEK_SET);
 		c=sprintf(buf,",\\\n'-' title \"\" ls %d with lines\n",ilinecolor);
-		write(od,buf,c);			
+		write_file(od,buf,c,fname);			
 		++ilinecolor;
 		return 0;
 	}
 
 	if(plotno <WR_MULTI_PLOT ){
 		c=sprintf(buf,"set xlabel \"%s\"\n",ext->time_units);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set lmargin %d\nset bmargin %d\nset rmargin %d\n",LMARGIN,BMARGIN,rmargin);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set label %d \"%s\" at graph -0.15, graph .5\n",labelno++,ext->vert_units);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set yrange[%d:%d]\n",-ext->yrange_minus,ext->yrange_plus);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set xrange[0:%d]\n",ext->xrange);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set xtics 0,%f\n",ext->time_div);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set title %s\n",title);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		for (data=1; data<9;++data){
 			c=sprintf(buf,"set style line %d lt %d lw 2.000 pointtype 4\n",data,data);
-			write(od,buf,c);	
+			write_file(od,buf,c,fname);	
 		}
 		
 		switch(ext->terminal){
@@ -539,7 +554,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	                     "xffffff x000000 x404040 \\\n"
 	                     "xff0000 %s x66cdaa xcdb5cd \\\n"
 	                     "xadd8e6 x0000ff xdda0dd x9500d3\n",x, y,ext->line_color );
-				write(od,buf,c);
+				write_file(od,buf,c,fname);
 				break;
 			/**  
 			gnuplot*background:  white
@@ -557,11 +572,11 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 				*/
 			case TERM_X:
 				c=sprintf(buf,"set terminal x11 title \"%s\" persist\n",xtitle);
-				write(od,buf,c);
+				write_file(od,buf,c,fname);
 				break;
 			case TERM_DUMB:
 				c=sprintf(buf,"set terminal dumb\n");
-				write(od,buf,c);
+				write_file(od,buf,c,fname);
 				break;
 		}
 		if(TERM_X == ext->terminal ){
@@ -569,30 +584,30 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		}
 		else ilinecolor=2;
 		c=sprintf(buf,"set label %d 'T' at ",labelno++);
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		offset=lseek(od,0,SEEK_CUR);
 		/*printf("offset at %d\n",offset); */
 		/**save space for rest of line.. and possible cursor title */
 		c=sprintf(buf,"																					                  ");
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		c=sprintf(buf,"																					                 ");
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		c=sprintf(buf,"																					                 \n");
-		write(od,buf,c);
+		write_file(od,buf,c,fname);
 		
 		if(ext->smoothing){
 			c=sprintf(buf,"set samples %d\n",ext->smoothing);
-			write(od,buf,c);		
+			write_file(od,buf,c,fname);		
 		}		
 	}	
 	
 	if(ext->smoothing){
 		c=sprintf(buf,"%s'%s' title \"%s\" ls %d smooth csplines with lines%s",plotno>0?first?"\nplot ":",\\\n":"\nplot ",dfile,ext->src,ilinecolor,plotno>0?"":"\n");
-		write(od,buf,c);			
+		write_file(od,buf,c,fname);			
 	}
 	else{
 		c=sprintf(buf,"%s'%s' title \"%s\" ls %d with lines%s",plotno>0?first?"\nplot ":",\\\n":"\nplot ",dfile,ext->src,ilinecolor,plotno>0?"":"\n");
-		write(od,buf,c);			
+		write_file(od,buf,c,fname);			
 	}
 	++ilinecolor;
 	first=0;
@@ -813,7 +828,10 @@ int read_cursor_file(char *name, struct cursors *c)
 		printf("Unable to open %s\n",name);
 		return 1;
 	}
-	read(id,buf,BUF_LEN-1);
+	if( 1>read(id,buf,BUF_LEN-1)) {
+		fprintf(stderr,"Error reading or 0 bytes read from %s\n",name);
+		return 1;
+	}
 	c->func=og_get_string("CURSOR",buf);
 	c->max=og_get_value("MAX",buf);
 	c->min=og_get_value("MIN",buf);
@@ -1055,7 +1073,7 @@ int handle_functions(struct plot_data *p)
 						update_yrange(p,diff);
 						save_data_point(&f->trace,p->trace[f->main_idx[0]].data_pt.data[c].x,diff);
 						i=sprintf(buf,"%E %E\n",p->trace[f->main_idx[0]].data_pt.data[c].x,diff);
-						write(od,buf,i);
+						write_file(od,buf,i,f->trace.oname);
 					}
 					break;
 				
@@ -1217,7 +1235,7 @@ int write_datafiles(struct plot_data *p)
 			else {
 				/*printf("%E %E (%s)\n",x,y,buf); */
 				i=sprintf(buf,"%E %E\n",x,y);
-				write(od,buf,i);	
+				write_file(od,buf,i,p->trace[c].oname);	
 			}
 		}
 		if(p->flags & FLAGS_GNUPLOT){ /**write trigger  */

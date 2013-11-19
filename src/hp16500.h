@@ -30,12 +30,8 @@ Change Log: \n
 
 #ifndef _HP16500_H_
 #define _HP16500_H_ 1
-#include "open-gpib.h"
-#ifdef LA2VCD_LIB
-#include "la2vcd.h"
-#else
-  #warning "LA2VCD_LIB Not Defined! You loose vcd functionality"
-#endif
+#include <open-gpib.h>
+
 #define SLOTNO_16500C    0 /**0 to talk to system (i.e. controller)  */
 /** Id Number Card*/
 #define CARDTYPE_16500C  0         /** HP 16500C system  */

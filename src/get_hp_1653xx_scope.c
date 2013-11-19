@@ -28,12 +28,10 @@ Change Log: \n
 		The License should be in the file called COPYING.
 */
 
-#include "open-gpib.h"
+#include <open-gpib.h>
 #include "hp16500.h"
 #include "hp1653x.h"
-#ifdef LA2VCD_LIB
-#include "la2vcd.h"
-#endif
+
 /**for open...  */
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -135,7 +133,7 @@ void usage(void)
   " -p hno Prefix file header to hno. 0=none,just x y. 1= title for x y, 2 = full header(2)\n"
 	" -r set raw mode (don't convert data to volts)\n"
   " -u set unprocess mode, dump preamble at top and raw data after. -r,-g have no effect.\n"
-#ifdef LA2VCD_LIB
+#ifdef HAVE_LIBLA2VCD2
 	" -v put vcd data to fname.vcd. Creates .chx also\n"
 #endif	
 	
@@ -161,7 +159,7 @@ int main(int argc, char * argv[])
   double miny, maxy, time, time_inc,toff;
 	char *ofname, *channel[MAX_CHANNELS], *lbuf;
 	int i, c, rtn, ch_idx, raw,xy,process,hdr;
-#ifdef LA2VCD_LIB	 
+#ifdef HAVE_LIBLA2VCD2	 
   int vcd=0;
   struct la2vcd *l;
 #endif
@@ -222,7 +220,7 @@ int main(int argc, char * argv[])
       case 'u':
         process=0;
         break;
-#ifdef LA2VCD_LIB	  			
+#ifdef HAVE_LIBLA2VCD2	  			
       case 'v':
 				++vcd;
 				break;
@@ -283,7 +281,7 @@ int main(int argc, char * argv[])
 		}
 	}else{
     lbuf=NULL;
-#ifdef LA2VCD_LIB	
+#ifdef HAVE_LIBLA2VCD2	
     fprintf(stderr,"Can't output .vcd to stdout\n");
     vcd=0;
   }
@@ -331,7 +329,7 @@ int main(int argc, char * argv[])
   		fprintf(stderr,"Preable failed on %s\n",channel[c]);
   		goto closem;
   	}
-#ifdef LA2VCD_LIB	
+#ifdef HAVE_LIBLA2VCD2	
     if(vcd && NULL !=l)/**marvelous hack...  */
       l->time_delta=h.xinc;
 #endif
@@ -395,7 +393,7 @@ int main(int argc, char * argv[])
   							fprintf(ofd,"%e,",volts);	
   					}
           
-#ifdef LA2VCD_LIB
+#ifdef HAVE_LIBLA2VCD2
           
             if(vcd ){
   				    vcd_read_sample_real(l,volts); 
@@ -436,7 +434,7 @@ int main(int argc, char * argv[])
   /*fprintf(stderr,"Done!\n"); */
   fflush(NULL);
 closem:
-#ifdef LA2VCD_LIB
+#ifdef HAVE_LIBLA2VCD2
   if(vcd)
     close_la2vcd(l);  
 #endif

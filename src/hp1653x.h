@@ -29,6 +29,7 @@
 */
 #ifndef _HP1653X_H_
 #define _HP1653X_H_ 1
+#include <hp16500.h>
 struct hp_scope_preamble {
 	double xinc;  /**time value between consecutive data points. Time between samples in FULL mode, the only mode we run in.  */
 	double xorg;  /**Time of first data point in memory with respect to the trigger.  */

@@ -196,7 +196,7 @@ void usage(void)
 	" -p set packed mode to packed for config only (unpacked)\n"
 	" -r sample if !0, set sample period to sample ns and send run before getting data\n"
 	" -s fname put signal(data) to fname\n"
-#ifdef LA2VCD_LIB
+#ifdef HAVE_LIBLA2VCD2
 	" -v basename put vcd data to basename.vcd. Creates .dat and .cfg\n"
 #endif	
 	"");
@@ -337,7 +337,7 @@ int main(int argc, char * argv[])
 				sname=strdup(optarg);
 				break;
 			case 'v':
-#ifdef LA2VCD_LIB 
+#ifdef HAVE_LIBLA2VCD2 
 				if(NULL != sname || NULL != cname){
 					fprintf(stderr,"-v and -c/-tare mutually exclusive.\n");
 					usage();
@@ -354,7 +354,7 @@ int main(int argc, char * argv[])
 				sname=&vname[i];
 				sprintf(sname,"%s.dat",optarg);
 #else
-				fprintf(stderr,"-v not supported. Re-build with LA2VCD_LIB=/path/to/lib\n");
+				fprintf(stderr,"-v not supported. Re-build with HAVE_LIBLA2VCD2=/path/to/lib\n");
 				return 1;
 #endif
 				break;
@@ -478,7 +478,7 @@ closem:
 	if(NULL != tfd)
 		fclose(tfd);
 	close_gpib(g);
-#ifdef LA2VCD_LIB	
+#ifdef HAVE_LIBLA2VCD2	
 /*	if(total != sz+10) */
 /*		goto endvcd; */
 	if(NULL !=vname){ /**generate a vcd file from the config and data  */

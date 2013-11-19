@@ -43,7 +43,7 @@ void usage(void)
 	" -d filename set name of data file\n"
 	" -f file set name of output file. Send valid data to file\n"
 	" -m file set name of output file. Send label map to file\n"
-#ifdef LA2VCD_LIB
+#ifdef HAVE_LIBLA2VCD2
 	" -l file set name of output file. Send vcd data to file\n"
 #endif
   " -v set verbose mode\n"
@@ -77,11 +77,11 @@ int main(int argc, char *argv[])
 				mfname=strdup(optarg);
 				break;
 			case 'l':
-#ifdef LA2VCD_LIB
+#ifdef HAVE_LIBLA2VCD2
 				vname=strdup(optarg);
 				v=JUST_LOAD;
 #else
-				fprintf(stderr,"-l not supported. Re-build with LA2VCD_LIB=/path/to/lib\n");
+				fprintf(stderr,"-l not supported. Re-build with HAVE_LIBLA2VCD2=/path/to/lib\n");
 				return 1;
 #endif
 				break;
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
 					show_la2vcd(p,s,SHOW_PRINT);
 					fprintf(stderr,"-td %ld ns\n",p->a1.sampleperiod/1000);
 				}
-#ifdef LA2VCD_LIB										
+#ifdef HAVE_LIBLA2VCD2										
 				else{
 					struct la2vcd *l;
 					struct signal_data *d,*x;

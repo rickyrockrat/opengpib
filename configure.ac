@@ -19,6 +19,9 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 PKG_PROG_PKG_CONFIG([0.20])
 
+# allow per-target cflags
+AM_PROG_CC_C_O
+
 # use the C compiler for the following checks
 AC_LANG([C])
 
@@ -55,8 +58,8 @@ AC_SUBST([LIBOPEN_GPIB_LIBS])
 
 # now external libraries
 pkg_modules="libla2vcd2 >= 0.0.0"
-PKG_CHECK_MODULES([LA2VCD2], [$pkg_modules],[have_libla2vcd2=yes],[have_libla2vcd2=no])
-AM_CONDITIONAL(HAVE_LA2VCD2, test x$enable_libla2vcd2 = xyes)
+PKG_CHECK_MODULES([LIBLA2VCD2], [$pkg_modules],[have_libla2vcd2=yes],[have_libla2vcd2=no])
+AM_CONDITIONAL(HAVE_LIBLA2VCD2, test x$enable_libla2vcd2 = xyes)
 
 if test "x$have_libla2vcd2" = "xyes" ; then
   AC_DEFINE(HAVE_LIBLA2VCD2, 1, [ Have libla2vcd2])

@@ -167,7 +167,7 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 struct gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 {
 	struct gpib *g;
-	fprintf(stderr,"OpenGPIB Version %s\n",TOSTRING(VERSION));  
+	fprintf(stderr,"OpenGPIB Version %s\n",PACKAGE_VERSION);  
 	if(NULL == dev_path){
 		fprintf(stderr,"Device name is NULL. Must specify device.\n");
 		return NULL;

@@ -47,6 +47,15 @@ other controllers.
 	#endif 
 #endif 
 
+#ifdef HAVE_CONFIG_H
+	#include <config.h>
+	#ifdef HAVE_LIBLA2VCD2
+		#include <libla2vcd2.h>
+	#endif
+#else
+	#define PACKAGE_VERSION 0.12-unknown
+#endif
+
 /*#include <sys/time.h>*/
 #include <unistd.h> /**for usleep  */
 #include <stdint.h> /**for types uint32_t  */
