@@ -29,7 +29,6 @@ CF MHz;TS;MKPK HI;MKA?
     
 		The License should be in the file called COPYING.
 */
-#include "common.h"
 #include "open-gpib.h"
 #include <math.h>
 

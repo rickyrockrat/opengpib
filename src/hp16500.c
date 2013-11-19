@@ -28,10 +28,8 @@
 Change Log: \n
 
 */
-#include "common.h"
 #include "hp16500.h"
 #include "open-gpib.h"
-#include <ctype.h>
 
 struct hp_cards{
 	int type;
@@ -197,7 +195,7 @@ int hp16500_find_card(int cardtype, int no, struct gpib *g)
   		if(isdigit(g->buf[s]))
   			break;
   	for (ccount=i=0;i<5;++i){
-  		slots[i]=(int)get_value_col(i,&g->buf[s]);
+  		slots[i]=(int)og_get_value_col(i,&g->buf[s]);
   		fprintf(stderr,"Slot %c = %d - ",'A'+i,slots[i]);
   		print_card_model(slots[i]);
   		fprintf(stderr,"\n");

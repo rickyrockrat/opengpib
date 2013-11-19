@@ -27,7 +27,6 @@
 		The License should be in the file called COPYING.
 
 */
-#include "common.h"
 #include "hp16500.h"
 #include "open-gpib.h"
 #include "hp1655x.h"

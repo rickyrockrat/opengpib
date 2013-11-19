@@ -30,17 +30,11 @@ Change Log: \n
 #define _GNU_SOURCE
 /*#define _ISOC99_SOURCE  */
 /*#define _XOPEN_SOURCE=600   */
-#include <sys/types.h>
-#include <unistd.h>
-#include <string.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-
-
-#include <stdio.h>
 #include <math.h>
 #include <inttypes.h>
-#include "common.h"
+#include <open-gpib.h>
 
 #define CURSOR_XPERCENT 17
 #define RMARGIN 19
@@ -820,12 +814,12 @@ int read_cursor_file(char *name, struct cursors *c)
 		return 1;
 	}
 	read(id,buf,BUF_LEN-1);
-	c->func=get_string("CURSOR",buf);
-	c->max=get_value("MAX",buf);
-	c->min=get_value("MIN",buf);
-	c->diff=get_value("DIFF",buf);
-	c->target=get_string("TARGET",buf);
-	c->trigger=get_string("TRIGGER", buf);
+	c->func=og_get_string("CURSOR",buf);
+	c->max=og_get_value("MAX",buf);
+	c->min=og_get_value("MIN",buf);
+	c->diff=og_get_value("DIFF",buf);
+	c->target=og_get_string("TARGET",buf);
+	c->trigger=og_get_string("TRIGGER", buf);
 	close (id);
 	return 0;
 }
@@ -875,15 +869,15 @@ int load_data(struct plot_data *p)
 			goto closeid;
 		}
 		p->trace[c].info.terminal=p->terminal;
-		p->trace[c].yoff=get_value("YOFF", preamble);
+		p->trace[c].yoff=og_get_value("YOFF", preamble);
 		/**PT.OFF  */
-		p->trace[c].ymult=get_value("YMULT",preamble);
-		p->trace[c].xincr=get_value("XINCR", preamble);
-		p->trace[c].points=get_value("NR.PT", preamble);
-		p->trace[c].fmt=get_string("BN.FMT",preamble);
-		p->trace[c].enc=get_string("ENCDG",preamble);
-		p->trace[c].trigger=get_value("PT.OFF",preamble);
-		p->trace[c].title=get_string("WFID",preamble);
+		p->trace[c].ymult=og_get_value("YMULT",preamble);
+		p->trace[c].xincr=og_get_value("XINCR", preamble);
+		p->trace[c].points=og_get_value("NR.PT", preamble);
+		p->trace[c].fmt=og_get_string("BN.FMT",preamble);
+		p->trace[c].enc=og_get_string("ENCDG",preamble);
+		p->trace[c].trigger=og_get_value("PT.OFF",preamble);
+		p->trace[c].title=og_get_string("WFID",preamble);
 		strip_quotes(p->trace[c].title);
 
 		if(!strcmp("RI",p->trace[c].fmt))

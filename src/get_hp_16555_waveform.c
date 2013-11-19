@@ -28,7 +28,6 @@ Change Log: \n
 		The License should be in the file called COPYING.
 */
 #define HP16500_COM_SYMBOLS
-#include "common.h"
 #include "open-gpib.h"
 #include "hp16500.h"
 #include "hp1655x.h"

@@ -37,9 +37,51 @@ other controllers.
 #ifndef _GPIB_H_
 #define _GPIB_H_ 1
 
-#include <sys/time.h>
+#ifdef _GLOBAL_ALLOC_
+	#if __STDC_VERSION__ >= 199901L
+		#define _XOPEN_SOURCE 600
+		#warning "XOPENSRC 600"#__STDC_VERSION__
+	#else
+		#warning "XOPENSRC 501"#__STDC_VERSION__
+		#define _XOPEN_SOURCE 501
+	#endif 
+#endif 
+
+/*#include <sys/time.h>*/
 #include <unistd.h> /**for usleep  */
 #include <stdint.h> /**for types uint32_t  */
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h> /**getopt  */
+#include <time.h> /**timespec  */
+#include <ctype.h>
+#include <sys/types.h>
+
+#define MAX_CHANNELS 8
+
+#ifdef _GLOBAL_TEK_2440_
+/**We use the below for figuring out which channel the target is on.  */
+#define CURSORS      6 /**offset into CH_LIST where cursors keyword is */
+char *CH_LIST[MAX_CHANNELS]=\
+{
+	"ch1",
+	"ch2",
+	"ref1",
+	"ref2",
+	"ref3",
+	"ref4",
+	"cursors", /**make sure all REAL channels go before this.  */
+};
+#endif
+
+struct c_opts {
+	FILE *fd;
+	int col;
+	int dlm;
+	float div;
+	float mul;
+};
 
 /**interface types  */
 enum {
@@ -106,5 +148,15 @@ int gpib_option_to_type(char *op);
 void show_gpib_supported_controllers(void);
 int init_id(struct gpib *g, char *idstr);
 int check_calloc(size_t size, void *p, const char *func, void *set);
+
+int is_string_number(char *s);
+int og_next_col(struct c_opts *o);
+int og_get_col(struct c_opts *o, float *f);
+double format_eng_units(double val, int *m);
+double og_get_value( char *f, char *buf);
+double og_get_value_col( int col, char *buf);
+char * og_get_string( char *f, char *buf);
+char * og_get_string_col( int col, char *buf); /**make sure resulting char * is has free() called on it  */
+void _usleep(int usec);
 #endif
 

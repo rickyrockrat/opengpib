@@ -28,11 +28,9 @@ Change Log: \n
 		The License should be in the file called COPYING.
 */
 
-#include "common.h"
 #include "open-gpib.h"
 #include "hp16500.h"
 #include "hp1653x.h"
-#include <ctype.h>
 #ifdef LA2VCD_LIB
 #include "la2vcd.h"
 #endif

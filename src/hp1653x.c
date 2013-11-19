@@ -27,7 +27,6 @@
 		The License should be in the file called COPYING.
 
 */
-#include "common.h"
 #include "hp16500.h"
 #include "open-gpib.h"
 #include "hp1653x.h"
@@ -81,7 +80,7 @@ we also want to use ms,us, etc, so do it by powers of 1000.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-double get_xinc_mult(double v, int *x)
+double og_get_xinc_mult(double v, int *x)
 {
   double i;
   int z;
@@ -102,19 +101,19 @@ double get_xinc_mult(double v, int *x)
 ****************************************************************************/
 int oscope_parse_preamble(struct gpib *g, struct hp_scope_preamble *h)
 {
-	h->fmt=get_value_col(0,g->buf);
-	h->type=get_value_col(1,g->buf);
-	h->points=get_value_col(2,g->buf);
-  h->count=get_value_col(3,g->buf);
-	h->xinc=get_value_col(4,g->buf);
-	h->xorg=get_value_col(5,g->buf); /**first data point (in seconds) w/respect to trigger, i.e.  */
+	h->fmt=og_get_value_col(0,g->buf);
+	h->type=og_get_value_col(1,g->buf);
+	h->points=og_get_value_col(2,g->buf);
+  h->count=og_get_value_col(3,g->buf);
+	h->xinc=og_get_value_col(4,g->buf);
+	h->xorg=og_get_value_col(5,g->buf); /**first data point (in seconds) w/respect to trigger, i.e.  */
                                    /**trigger point is this value * -1, and data point number=
                                        xorg/xinc. */
-	h->xref=get_value_col(6,g->buf);
-	h->yinc=get_value_col(7,g->buf);
-	h->yorg=get_value_col(8,g->buf);
-	h->yref=get_value_col(9,g->buf);
-  h->xincmult=get_xinc_mult(h->xinc,&h->xinc_thou);
+	h->xref=og_get_value_col(6,g->buf);
+	h->yinc=og_get_value_col(7,g->buf);
+	h->yorg=og_get_value_col(8,g->buf);
+	h->yref=og_get_value_col(9,g->buf);
+  h->xincmult=og_get_xinc_mult(h->xinc,&h->xinc_thou);
   switch(h->xinc_thou){
     case 0: snprintf(h->xunits,3,"S"); break;
     case 1: snprintf(h->xunits,3,"mS"); break;

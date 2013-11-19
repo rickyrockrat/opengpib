@@ -30,7 +30,6 @@ Change Log: \n
 
 #ifndef _HP16500_H_
 #define _HP16500_H_ 1
-#include "common.h"
 #include "open-gpib.h"
 #ifdef LA2VCD_LIB
 #include "la2vcd.h"

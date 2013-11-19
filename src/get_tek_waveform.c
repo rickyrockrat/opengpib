@@ -30,10 +30,7 @@ Change Log: \n
 */
  
 
-#include "common.h"
 #include "open-gpib.h"
-
-#include <ctype.h>
 
 #define FUNC_VOLT 1
 #define FUNC_TIME 2
@@ -160,23 +157,23 @@ int read_cursors(struct gpib *g)
 	write_string(g,"CURSOR?");
 	read_string(g);
 	
-	function=get_string("FUNCTION",g->buf);
+	function=og_get_string("FUNCTION",g->buf);
 	if( !strcmp(function,"TIME"))
 		f=FUNC_TIME;
 	else if (!strcmp(function,"ONE/TIME") )
 		f=FUNC_FREQ;
 	else if(!strcmp(function,"VOLTS") ){
 		f=FUNC_VOLT;
-		min=get_value("YPOS:ONE",g->buf);
-		max=get_value("YPOS:TWO",g->buf);	
-		target=get_string("TARGET",g->buf); /**reference to  */
+		min=og_get_value("YPOS:ONE",g->buf);
+		max=og_get_value("YPOS:TWO",g->buf);	
+		target=og_get_string("TARGET",g->buf); /**reference to  */
 		
 		/**get channel for cursor ref  */
 	  i=sprintf(lbuf,"%s?\r",target);
 		write_string(g,lbuf);
 		read_string(g);
 		/**get the volts/div  */
-		volts=get_value(function,g->buf);
+		volts=og_get_value(function,g->buf);
 		min *=volts;
 		max *=volts;		
 	}else{
@@ -185,12 +182,12 @@ int read_cursors(struct gpib *g)
 		return 0;
 	}
 	if(FUNC_TIME ==f || FUNC_FREQ == f){
-		min=get_value("TPOS:ONE",g->buf);
-		max=get_value("TPOS:TWO",g->buf);
+		min=og_get_value("TPOS:ONE",g->buf);
+		max=og_get_value("TPOS:TWO",g->buf);
 		i=sprintf(lbuf,"WFM?\r");
 		write_string(g,lbuf);
 		read_string(g);
-		xinc=get_value("XINCR",g->buf);
+		xinc=og_get_value("XINCR",g->buf);
 		min*=xinc;
 		max*=xinc;
 	}
@@ -208,7 +205,7 @@ int read_cursors(struct gpib *g)
 		i=sprintf(lbuf,"ATRIGGER?\r");
 		write_string(g,lbuf);
 		read_string(g);
-		trigsrc=get_string("SOURCE",g->buf);
+		trigsrc=og_get_string("SOURCE",g->buf);
 	
 	if(FUNC_VOLT ==f)
 		printf("volts");

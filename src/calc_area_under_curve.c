@@ -28,11 +28,7 @@ Change Log: \n
 		The License should be in the file called COPYING.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include "common.h"
+#include "open-gpib.h"
 
 
 /***************************************************************************/
@@ -69,7 +65,7 @@ int calc_area_under_curve(struct c_opts *o)
 	off=99999;
 	sum=0;
 	count=0;
-	while( 0 == get_col(o,&c)){
+	while( 0 == og_get_col(o,&c)){
 		++count;
 		if(count>1){
 			ave=(last+c)/2;
