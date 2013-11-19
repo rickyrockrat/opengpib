@@ -31,7 +31,7 @@ Change Log: \n
 
 
 #include "gpib.h"
-#include "ip.h"
+#include "open-gpib-ip.h"
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h> /* for select.... */

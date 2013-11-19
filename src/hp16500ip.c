@@ -31,7 +31,7 @@ Change Log: \n
 */
 #include "common.h"
 #include "gpib.h"
-#include "ip.h"
+#include "open-gpib-ip.h"
 #include "hp16500ip.h"
 
 struct hp16500c_ctl {
