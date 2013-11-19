@@ -32,7 +32,7 @@ Change Log: \n
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "gpib.h"
+#include "open-gpib.h"
 #include "fileio.h"
 
 

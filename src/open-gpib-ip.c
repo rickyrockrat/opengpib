@@ -30,7 +30,7 @@ Change Log: \n
 */
 
 
-#include "gpib.h"
+#include "open-gpib.h"
 #include "open-gpib-ip.h"
 #include <sys/stat.h>
 #include <fcntl.h>

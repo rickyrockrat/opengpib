@@ -33,7 +33,7 @@ Change Log: \n
 included by <termios.h> */
 
 
-#include "gpib.h"
+#include "open-gpib.h"
 #include "serial.h"
 #include <termios.h>
 #include <sys/types.h>

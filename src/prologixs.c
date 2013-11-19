@@ -28,7 +28,7 @@ Change Log: \n
 		The License should be in the file called COPYING.
 */
 
-#include "gpib.h"
+#include "open-gpib.h"
 #include "prologixs.h"
 #include "serial.h"
 #include <stdio.h>

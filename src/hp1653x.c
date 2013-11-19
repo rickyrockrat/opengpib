@@ -29,7 +29,7 @@
 */
 #include "common.h"
 #include "hp16500.h"
-#include "gpib.h"
+#include "open-gpib.h"
 #include "hp1653x.h"
 /**#######################################################################
                      oscilliscope functionality

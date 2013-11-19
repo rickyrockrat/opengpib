@@ -31,7 +31,7 @@ Change Log: \n
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "gpib.h"
+#include "open-gpib.h"
 #include "serial.h"
 #include "prologixs.h"
 #include "hp16500ip.h"

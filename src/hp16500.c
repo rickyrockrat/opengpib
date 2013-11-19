@@ -30,7 +30,7 @@ Change Log: \n
 */
 #include "common.h"
 #include "hp16500.h"
-#include "gpib.h"
+#include "open-gpib.h"
 #include <ctype.h>
 
 struct hp_cards{

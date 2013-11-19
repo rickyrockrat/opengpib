@@ -29,12 +29,12 @@
 */
 #include "common.h"
 #include "hp16500.h"
-#include "gpib.h"
+#include "open-gpib.h"
 #include "hp1655x.h"
 
 #define SIZEOF_ACTIVE_ARRAY 13
 struct valid_bits {
-	uint8 pod[2*SIZEOF_ACTIVE_ARRAY];
+	uint8_t pod[2*SIZEOF_ACTIVE_ARRAY];
 	char active[SIZEOF_ACTIVE_ARRAY];
 	int bytes;
 	int bits;
@@ -49,7 +49,7 @@ struct valid_bits {
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int validate_sampleperiod(uint32 p)
+int validate_sampleperiod(uint32_t p)
 {
 	if( p<8){
 		if( 2 != p && 4 != p)
@@ -85,9 +85,9 @@ long int get_datsize(char *hdr)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-uint32 swap32(uint32 in)
+uint32_t swap32(uint32_t in)
 {
-	uint32 out;
+	uint32_t out;
 	out=in<<24;
 	out|=(in&0x0000FF00)<<8;
 	out|=in>>24;
@@ -100,9 +100,9 @@ uint32 swap32(uint32 in)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-uint64 swap64(uint64 in)
+uint64_t swap64(uint64_t in)
 {
-	uint64 out;
+	uint64_t out;
 	out=in<<56;
 	out|=in>>56;
 	
@@ -120,9 +120,9 @@ uint64 swap64(uint64 in)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-uint16 swap16(uint16 in)
+uint16_t swap16(uint16_t in)
 {
-	uint16 out;
+	uint16_t out;
 	out=in<<8;
 	out|=in>>8;
 	/*fprintf(stderr,"in %d out %d\n",in,out); */
@@ -136,7 +136,7 @@ structure.
 ****************************************************************************/
 struct section *find_section(char *name, struct hp_block_hdr *blk )
 {
-	uint32 total;
+	uint32_t total;
   struct section *sec;
 	if( NULL == (sec=malloc(sizeof(struct section))))	{
 		fprintf(stderr,"Unable to alloc for section\n");
@@ -171,7 +171,7 @@ struct section *find_section(char *name, struct hp_block_hdr *blk )
 ****************************************************************************/
 void show_sections(struct hp_block_hdr *blk )
 {
-	uint32 total, sz;
+	uint32_t total, sz;
 	struct section_hdr hdr;
 	for (total=0,sz=1; total<blk->bs.blocklen && sz>0;){
 		memcpy(&hdr,(char *)(blk->data+total),sizeof(struct section_hdr));
@@ -473,11 +473,11 @@ state  bit fields to look for that match this state
 mask -  bits to look at, 1 means look for it
 \n\b Returns:
 ****************************************************************************/
-void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask, int mode,struct data_preamble *pre)
+void search_state(int pod, uint16_t clk, uint16_t clkmask, uint16_t state, uint16_t mask, int mode,struct data_preamble *pre)
 {
 	struct one_card_data *d;
 	char *s,*b;
-	uint32 count;
+	uint32_t count;
 	long int  ps;
 	int inc,c,p;
 	int cmatch, pmatch, lc, lp;
@@ -504,7 +504,7 @@ void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask
 	inc = ONE_CARD_ROWSIZE;
 	count=0;
 	while(s<pre->data + pre->data_sz){
-		uint16 val,_clk,x;
+		uint16_t val,_clk,x;
 		
 		d=(struct one_card_data *)s;
 		val=d->pdata[p+1]|d->pdata[p]<<8;
@@ -564,10 +564,10 @@ void search_state(int pod, uint16 clk, uint16 clkmask, uint16 state, uint16 mask
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int number_of_pods_assigned(uint32 pods)
+int number_of_pods_assigned(uint32_t pods)
 {
 	int p;
-	uint32 i;
+	uint32_t i;
 	for (p=0,i=1;i;i<<=1)
 		if(i&pods)
 			++p;
@@ -584,9 +584,9 @@ rows is the array that tells how many valid rows this pod has.
 Note that bit 2 = pod 1 in map, but rows[3]=pod 1.
 \n\b Returns:
 ****************************************************************************/
-uint32 valid_rows(int pod_no, uint32 pods, uint32 *rows)
+uint32_t valid_rows(int pod_no, uint32_t pods, uint32_t *rows)
 {
-	uint32 i;
+	uint32_t i;
 	if(pod_no <1 || pod_no>12){
 		fprintf(stderr,"valid_rows: invalid pod %d\n",pod_no);
 		return 0;
@@ -658,13 +658,13 @@ reguardless of the what the data_xxx vars say.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-uint32 put_data_to_file(struct data_preamble *p, char *fname)
+uint32_t put_data_to_file(struct data_preamble *p, char *fname)
 {
 	long int ps;
 	int c;
 	char buf[500];
 	FILE *out;
-	uint32 count;
+	uint32_t count;
 	count=0;
 	
 	ps=0;
@@ -733,7 +733,7 @@ void print_data(struct data_preamble *p)
 	char *dstart;
 	long int ps;
 	int inc,c;
-	uint32 count;
+	uint32_t count;
 	count=0;
 	c=0;
 	ps=0;
@@ -859,8 +859,8 @@ active[0] is clk, pod 4 is [1]
 struct signal_data *show_vcd_label(char *a, struct labels *l)
 {
 	int i,bits, bs, be,p,bytes, bsset,beset;
-	uint8 pod[26];
-	uint16 x;
+	uint8_t pod[26];
+	uint16_t x;
 	static struct signal_data *d=NULL;
 	if(NULL ==a && NULL ==l) /**just return pointer to data struct  */
 		return d;

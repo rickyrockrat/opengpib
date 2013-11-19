@@ -30,7 +30,7 @@ Logic analyzer.
 Change Log: \n
 */
 #include "common.h"
-#include "gpib.h"
+#include "open-gpib.h"
 #include "open-gpib-ip.h"
 #include "hp16500ip.h"
 

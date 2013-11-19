@@ -31,7 +31,7 @@ Change Log: \n
  
 
 #include "common.h"
-#include "gpib.h"
+#include "open-gpib.h"
 
 #include <ctype.h>
 

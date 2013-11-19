@@ -29,7 +29,7 @@ Change Log: \n
 */
 #define HP16500_COM_SYMBOLS
 #include "common.h"
-#include "gpib.h"
+#include "open-gpib.h"
 #include "hp16500.h"
 #include "hp1655x.h"
 
@@ -215,7 +215,7 @@ long int write_data_to_file(struct gpib *g, FILE *fd)
 	
 	long int  sz,total;
 	int nodata;
-	uint32 i, off=0;
+	uint32_t i, off=0;
 	/*wait_for_data(g); */
 	usleep(1000000); 
 	sz=total=0;
@@ -576,7 +576,7 @@ endvcd:
 		sz=total=0;
 		
 		while(1){
-			uint32 off=0;
+			uint32_t off=0;
 			i=read_raw(g);
 			if(i && 0 == total){
 				if(g->buf[0]!='#'){
