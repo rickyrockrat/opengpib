@@ -14,8 +14,9 @@ a lot of testing using a Windows box, and I have very little patience
 with Windows these days.  Besides, I had to get some work done (i.e.
 data out of my test equipment).
 
-The web page is http://opengpib.sourceforge.net. 
-
+The web page is http://opengpib.sourceforge.net. Other useful links are:
+http://la2vcd2.sourceforge.net (another tool I'm developing, a fork of la2vcd).
+http://gtkwave.sourceforge.net
 
 All the tools should accept -h for a usage page.
 
@@ -58,8 +59,8 @@ pk-pk
 see makepng for an invocation that will generate a png. Leave terminal type off for
 and Xwindow.
 
-This has only been tested on a 64-bit Linux operating system, and only 2 controllers are
-supported thus far.  It's prettty easy to write new controller interfaces.
+This has only been tested on a 64-bit Linux operating system (though it should work on 32 just fine), 
+and only 2 controllers are supported thus far.  It's prettty easy to write new controller interfaces.
 
 Look at hp16500ip.c/h or prologixs.c/h (device implemntation) and gpib.c/h.
 
