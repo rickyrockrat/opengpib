@@ -1,0 +1,8 @@
+LSRCS =  open-gpib.c fileio.c prologixs.c open-gpib-ip.c serial.c
+LHDRS = open-gpib.h prologixs.h open-gpib-ip.h serial.h fileio.h 
+all: open-gpib.lib
+
+%.o: %.c %.h
+
+open-gpib.lib: open-gpib.o prologixs.o open-gpib-ip.o serial.o hp16500ip.o fileio.o
+	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;

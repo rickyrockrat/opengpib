@@ -1,0 +1,13 @@
+#########  pc.in               ########  
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: open-gpib
+Description: Convert raw data to VCD
+Version: @PACKAGE_VERSION@
+Requires: 
+Libs: -L${libdir} -lopen-gpib
+Cflags: -I${includedir}/open-gpib
+

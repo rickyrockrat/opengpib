@@ -451,7 +451,7 @@ void show_pre(struct data_preamble *p)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-char *get_trace_start(struct data_preamble *l)
+char *hp1655x_get_trace_start(struct data_preamble *l)
 {
 	char *s;
 	struct data_preamble *lp;
@@ -499,7 +499,7 @@ void search_state(int pod, uint16_t clk, uint16_t clkmask, uint16_t state, uint1
 	p=((pod-1)*2);
 	p=6-p;
 	p+=2; /**move the offset past clk  */
-	b=s=get_trace_start(pre);
+	b=s=hp1655x_get_trace_start(pre);
 	inc = ONE_CARD_ROWSIZE;
 	count=0;
 	while(s<pre->data + pre->data_sz){
@@ -620,7 +620,7 @@ int get_next_datarow(struct data_preamble *p, char *buf)
 	}
 		
 	if(0 == state){
-		dstart=get_trace_start(p);
+		dstart=hp1655x_get_trace_start(p);
 		state=1;
 		off=dstart-p->data;
 	}
@@ -689,7 +689,7 @@ uint32_t put_data_to_file(struct data_preamble *p, char *fname)
 		++count;
 	}
 #if 0
-	dstart=get_trace_start(sec);
+	dstart=hp1655x_get_trace_start(sec);
 /*	dstart = (void *)((char *)(&lp->rtc.sec) - (char *)sec->data);  */
 	c=0;
 	inc = ONE_CARD_ROWSIZE;
@@ -738,7 +738,7 @@ void print_data(struct data_preamble *p)
 	ps=0;
 	inc = ONE_CARD_ROWSIZE;
 	fprintf(stderr,"Valid rows= %d\n",p->data_master[3]);
-	dstart=get_trace_start(p);
+	dstart=hp1655x_get_trace_start(p);
 /*	dstart = (void *)((char *)(&lp->rtc.sec) - (char *)sec->data);  */
 	
 	while (dstart < p->data + p->data_sz){
