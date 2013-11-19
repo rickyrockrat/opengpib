@@ -68,9 +68,9 @@ help:
 
 build: open-gpib.lib $(TARGETS)
 
-common.o hp16500.o hp16500ip.o hp1655x.o hp1653x.o: CFLAGS+=-std=c99 -D_COMMON_
+common.o hp16500.o hp16500ip.o hp1655x.o hp1653x.o: CFLAGS+=-std=c99 -D_GLOBAL_ALLOC_
 
-common.o: common.c common.h Makefile
+common.o: common.c common.h 
 
 tek2gplot.o: get_tek_waveform.o tek2gplot.c open-gpib.lib
 
@@ -80,41 +80,41 @@ tek2gplot: common.o tek2gplot.o
 calc_area_under_curve: calc_area_under_curve.o common.o
 	gcc -lm  -o $@ $^
 
-serial.o: serial.h serial.c	Makefile
+serial.o: serial.h serial.c	
 
-open-gpib-ip.o: open-gpib-ip.h open-gpib-ip.c	Makefile
+open-gpib-ip.o: open-gpib-ip.h open-gpib-ip.c	
 
-open-gpib.o: open-gpib.c open-gpib.h	Makefile
+open-gpib.o: open-gpib.c open-gpib.h	
 
 open-gpib.lib: open-gpib.o prologixs.o open-gpib-ip.o serial.o common.o hp16500ip.o fileio.o
 	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
 	
-hp16500.o: hp16500.c  hp16500.h	Makefile
+hp16500.o: hp16500.c  hp16500.h	
 
-hp16500ip.o: hp16500ip.c  hp16500ip.h	Makefile
+hp16500ip.o: hp16500ip.c  hp16500ip.h	
 
 hp16500.lib: hp16500.o 
 	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
 
-get_tek_waveform:	get_tek_waveform.o gpib.lib
+get_tek_waveform:	get_tek_waveform.o open-gpib.lib
 	gcc -lm -o $@ $^
 	
 get_hp_1653xx_scope.o get_hp_16555_waveform.o parse_16500_config.o: hp16500.h
 
 
-get_hp_1653xx_scope: get_hp_1653xx_scope.o gpib.lib hp16500.lib $(LA2VCD_LIB) hp1653x.o
+get_hp_1653xx_scope: get_hp_1653xx_scope.o open-gpib.lib hp16500.lib $(LA2VCD_LIB) hp1653x.o
 	gcc -lm -o $@ $^
 	
-get_hp_16555_waveform: get_hp_16555_waveform.o gpib.lib  hp16500.lib $(LA2VCD_LIB) hp1655x.o
+get_hp_16555_waveform: get_hp_16555_waveform.o open-gpib.lib  hp16500.lib $(LA2VCD_LIB) hp1655x.o
 	gcc -lm -o $@ $^
 	
-hp16500.main.o: hp16500.c  hp16500.h	Makefile
+hp16500.main.o: hp16500.c  hp16500.h
 	gcc $(CFLAGS) -DMAIN_QUERY  -c -o $@ hp16500.c
 
-hp16500: hp16500.main.o gpib.lib hp1653x.o
+hp16500: hp16500.main.o open-gpib.lib hp1653x.o
 	gcc -lm -o $@ $^
 	
-test: test.o gpib.lib
+test: test.o open-gpib.lib
 	gcc -lm -o $@ $^
 
 %.o: Makefile
@@ -122,10 +122,10 @@ test: test.o gpib.lib
 #parse_16500_config.o: parse_16500_config.c 
 #	gcc -Wall -c  -o $@ $<
 
-parse_16500_config:parse_16500_config.o hp16500.lib gpib.lib $(LA2VCD_LIB) hp1655x.o
+parse_16500_config:parse_16500_config.o hp16500.lib open-gpib.lib $(LA2VCD_LIB) hp1655x.o
 	gcc -lm -o $@ $^
 
-networkanalyzer: networkanalyzer.o gpib.lib
+networkanalyzer: networkanalyzer.o open-gpib.lib
 	gcc -lm -o $@ $^
 
 .PHONY: clean
