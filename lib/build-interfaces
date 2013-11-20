@@ -1,0 +1,20 @@
+OFILE="interfaces.h"
+echo "#ifndef _INTERFACE_H_"> "$OFILE"
+echo "#define _INTERFACE_H_ 1">> "$OFILE"
+echo "#ifdef _ALLOC_REGISTER_" >> "$OFILE"
+echo "struct open_gpib_register open_gpib_interfaces []={" >> "$OFILE"
+
+for f in $@; do
+	line=$(grep _INTERFACE_DEF_ $f|sed 's!.*(!!;s!).*!!'|tr -d ' ')
+	if [ -n "$line" ]; then
+		name=$(echo "$line"|sed 's!\(.*\),.*,.*!\1!')
+		type=$(echo "$line"|sed 's!.*,\(.*\),.*!\1!')
+		func=$(echo "$line"|sed 's!.*,.*,\(.*\)!\1!')
+ 		echo "{.name=$name,.type=$type,.func=$func}," >> "$OFILE"
+	fi
+done
+echo "{.name=NULL,.type=0, .func=NULL}," >> "$OFILE"
+echo "};" >> "$OFILE"
+echo "#endif" >> "$OFILE"
+echo "#endif" >> "$OFILE"
+echo "" >> "$OFILE"
