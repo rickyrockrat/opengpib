@@ -39,11 +39,7 @@ included by <termios.h> */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h> /* for select.... */
-#include <stdio.h>         
 #include <errno.h> /* for errno */
-#include <stdlib.h> /*for malloc, free */
-#include <string.h> /* for memset, strcpy,sprintf.... */
 
 #define FLAGS_SET 1
 #define TERMIO_SET 2

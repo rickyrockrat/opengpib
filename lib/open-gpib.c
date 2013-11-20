@@ -58,12 +58,44 @@ static struct supported_dev s_dev[]={\
 ****************************************************************************/
 int open_gpib_list_interfaces(void)
 {
-	struct open_gpib_register *ogr;
 	int i;
-	for (i=0,ogr=open_gpib_interfaces;NULL != ogr[i].name; ++i){
-		fprintf(stderr,"%s, %d, %p\n",ogr->name, ogr->type, ogr->func);
+	for (i=0;NULL != IF_LIST[i].name; ++i){
+		fprintf(stderr,"%s, %d, %p\n",IF_LIST[i].name, IF_LIST[i].type, IF_LIST[i].func);
 	}
 	
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments: 
+name is the name of the interface, like ip/usb/serial.
+type is either controller or transport
+                
+\n\b Returns:	function found or null;
+****************************************************************************/
+open_gpib_register open_gpib_find_interface(char *name, int type)
+{
+	int i;
+	if( NULL == name)
+		return;
+	switch (type){
+		case OPEN_GPIB_REG_TYPE_CONTROLLER:
+		case OPEN_GPIB_REG_TYPE_TRANSPORT:
+			break;
+		default:
+			fprintf(stderr,"Unknown type %d\n",type);
+			return NULL;
+	}
+	for (i=0;NULL != IF_LIST[i].name; ++i){
+		if(!strcmp(name,IF_LIST[i].name) &&	type == IF_LIST[i].type) {
+			fprintf(stderr,"Found '%s', type %d, @%p\n",IF_LIST[i].name, IF_LIST[i].type, IF_LIST[i].func);
+			return IF_LIST[i].func;		
+		}
+			
+		
+	}
+	fprintf(stderr,"Canot find interface '%s', type %d\n", IF_LIST[i].name,IF_LIST[i].type);
+	return NULL;
 }
 /***************************************************************************/
 /** .
@@ -312,6 +344,8 @@ int init_id(struct gpib *g, char *idstr)
 /***************************************************************************/
 /** Check a pointer, if it is null, allocate to specified size.
 \n\b Arguments:
+size is size in bytes to allocate
+x is a pointer to a pointer, and *x will be allocated.
 \n\b Returns: 0 on OK, 1 on allocated memory, -1 if out of mem or other error
 ****************************************************************************/
 int check_calloc(size_t size, void *x, const char *func, void *s)
@@ -326,9 +360,10 @@ int check_calloc(size_t size, void *x, const char *func, void *s)
 		
 	if( NULL == *p){
 		if(NULL ==(*p=calloc(1,size)) ){
-			printf("Out of mem on %s alloc\n",f);
+			fprintf(stderr,"Out of mem on %s alloc\n",f);
 			return -1;
-		}
+		}	
+	/*	else fprintf(stderr,"Allocated %d: %p->%p, set %p->%p\n",size,*p,p,*set,set); */
 		if(NULL != set)
 			*set=*p;
 		return 1;

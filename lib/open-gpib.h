@@ -1,5 +1,5 @@
 /** \file ******************************************************************
-\n\b File:        gpib.h
+\n\b File:        open-gpib.h
 \n\b Author:      Doug Springer
 \n\b Company:     DNK Designs Inc.
 \n\b Date:        10/06/2008  1:44 am
@@ -57,13 +57,13 @@ other controllers.
 #endif
 
 /*#include <sys/time.h>*/
-#include <unistd.h> /**for usleep  */
 #include <stdint.h> /**for types uint32_t  */
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h> /**getopt, select  */
+#include <unistd.h> /**getopt, select, usleep  */
 #include <time.h> /**timespec  */
+#include <errno.h> /* for errno */
 #include <ctype.h>
 #include <sys/types.h>
 
@@ -129,14 +129,19 @@ enum {
 	#define STRINGIFY(x) #x
 	#define TOSTRING(x) STRINGIFY(x)
 #endif
+typedef int (*open_gpib_register)(void *dev); 	/**Returns: -1 on failure, 0 on success */
 
 /**structure to use for controller and transport registration  */
-struct open_gpib_register {
-	char *name;
+struct open_gpib_interfaces {
+	const char *name;
 	int type;
-	int (*func)(void *d); 	/**Returns: -1 on failure, 0 otherwise */
+	open_gpib_register func; 	/**Returns: -1 on failure, 0 otherwise */
 };
+/**Auto-built interfaces.h (see build-interfaces)  */
+#define IF_LIST open_gpib_interface_list
 
+#define OPEN_GPIB_REG_TYPE_CONTROLLER 1
+#define OPEN_GPIB_REG_TYPE_TRANSPORT  2
 #define _INTERFACE_DEF_(name,type,register_func)
 
 
@@ -153,14 +158,14 @@ struct transport_dev {
 };
 /**structure to talk to the host controller  */
 struct gpib {
-	int addr; 																		/**instrument address. Check against inst addr  */
-	void *ctl;																		/**controller-specific structure, if any  */
-	int type_ctl;					 												/**controller type, options at top.  */
 	int (*read)(void *dev, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
 	int (*write)(void *dev, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
 	int (*open)(struct gpib *g, char *path);			/** Returns: 1 on failure, 0 on success */
 	int (*close)(struct gpib *g);									/**closes interface  */
-	int (*control)(struct gpib *g, int cmd, uint32_t data); 			/**controller-interface control. Set addr, etc.  */
+	int (*control)(struct gpib *g, int cmd, uint32_t data); 			/**controller-interface control. Set addr, etc.  */	
+	void *ctl;																		/**controller-specific structure, if any  */	
+	int addr; 																		/**instrument address. Check against inst addr  */
+	int type_ctl;					 												/**controller type, options at top.  */
 	char *buf;														/**GPIB buffer  */
 	int buf_len;													/**buffer length  */
 	char *dev_path;																/**physical device path.  */
@@ -176,8 +181,47 @@ struct ginstrument {
 	int addr;																							  /**instrument address.  */
 	int (*init)(struct ginstrument *inst);									/**function to call to initialize instrument.  */
 };
+/** Set up our interface functions.  */
+static int read_if(struct transport_dev *d, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
+static int write_if(struct transport_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
+static int open_if(struct transport_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
+static int close_if(struct transport_dev *d);									/**closes interface  */
+static int control_if(struct transport_dev *d, int cmd,uint32_t data); 			/**controller-interface control. Set addr, etc.  */
+
+/** 	
+	void **x=p;	\
+if( check_calloc(sizeof(struct transport_dev), p, __func__,NULL) == -1) return -1;\
+		fprintf(stderr,"register_func passed %p read= %p\n",d,&d->read);\
+	fprintf(stderr,"ctl=%p\n",d->control); \
+	*/
+
+#define GPIB_TRANSPORT_FUNCTION(x) \
+int register_##x(void *p) {\
+	struct transport_dev *d=(struct transport_dev *)p; \
+	d->read=read_if; \
+	d->write=write_if; \
+	d->open=open_if; \
+	d->close=close_if; \
+	d->control=control_if; \
+	d->dev=NULL; \
+	return 0; \
+}
+
+#define GPIB_CONTROLLER_FUNCTION (x) \
+int register_##x ( void *p) {\
+	struct gpib *d=(struct gpib *)p; \
+	d->read=read_if; \
+	d->write=write_if; \
+	d->open=open_if; \
+	d->close=close_if; \
+	d->control=control_if; \
+	d->dev=NULL; \
+	return 0; \
+}
+
 
 int open_gpib_list_interfaces(void);
+open_gpib_register open_gpib_find_interface(char *name, int type);
 int read_raw(struct gpib *g);
 int read_string(struct gpib *g);
 int write_string(struct gpib *g, char *msg);

@@ -71,6 +71,7 @@ int hp16500c_init(struct gpib *g)
 int ctl_hp16500c_open(struct gpib *g, char *ip)
 {
 	struct hp16500c_ctl *c;
+	open_gpib_register ip_reg;
 	if(NULL == g){
 		printf("%s: dev null\n",__func__);
 		return 1;
@@ -82,12 +83,21 @@ int ctl_hp16500c_open(struct gpib *g, char *ip)
 			return 1;
 		}
 	}	
-	if(ip_register(&c->dev)) /**load our ip function list  */
+	open_gpib_list_interfaces();
+	if(NULL == (ip_reg=open_gpib_find_interface("inet", OPEN_GPIB_REG_TYPE_TRANSPORT))){
+		fprintf(stderr,"Unable to find transport 'inet'\n");
+		return 1;
+	}
+/*	printf("Calling ip_reg, var=%p,control=%p\n",&c->dev, &c->dev.control);  */
+/*	c->dev.read=NULL; */
+	if(ip_reg(&c->dev)) /**load our ip function list  */
 		goto err;
+/*	printf("Back\n"); */
 	if(OPTION_DEBUG&g->type_ctl) 
 		c->dev.debug=1;
 	else
 		c->dev.debug=0;
+/*	printf("ctl=%p\n",c->dev.control); */
 	/**set the port - IMPORTANT! Be sure to do this before opening. */
 	c->dev.control(&c->dev,IP_CMD_SET_PORT,5025);
 	/**set net timeout - Set this too, or you will timeout when opening */
@@ -275,4 +285,4 @@ int register_hp16500c(struct gpib *g)
 	g->close=	ctl_hp16500c_close;
 	return 0;
 }
-_INTERFACE_DEF_("name", 1, register_hp16500c);
+_INTERFACE_DEF_("name", 1,register_hp16500c);

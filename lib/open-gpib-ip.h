@@ -5,7 +5,7 @@
 \n\b Date:        11/14/2013  2:18 pm
 \n\b Description: Interface description file. It should just contain  minimal
 functions of read, write, open, close, and control, and any defs specific to
-this interface. It must also contain the ip_register function that fills
+this interface. It must also contain the register_xxx function that fills
 in the above function pointers.
 */ /************************************************************************
 Change Log: \n

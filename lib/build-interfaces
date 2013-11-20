@@ -2,16 +2,25 @@ OFILE="interfaces.h"
 echo "#ifndef _INTERFACE_H_"> "$OFILE"
 echo "#define _INTERFACE_H_ 1">> "$OFILE"
 echo "#ifdef _ALLOC_REGISTER_" >> "$OFILE"
-echo "struct open_gpib_register open_gpib_interfaces []={" >> "$OFILE"
-
 for f in $@; do
-	line=$(grep _INTERFACE_DEF_ $f|sed 's!.*(!!;s!).*!!'|tr -d ' ')
-	if [ -n "$line" ]; then
-		name=$(echo "$line"|sed 's!\(.*\),.*,.*!\1!')
-		type=$(echo "$line"|sed 's!.*,\(.*\),.*!\1!')
-		func=$(echo "$line"|sed 's!.*,.*,\(.*\)!\1!')
- 		echo "{.name=$name,.type=$type,.func=$func}," >> "$OFILE"
+	line=$(grep "GPIB_TRANSPORT_FUNCTION\|GPIB_CONTROLLER_FUNCTION" $f)
+        if [ -n "$line" ]; then
+		T=$(echo "$line"|grep -c GPIB_TRANSPORT_FUNCTION)
+		sname=$(echo "$line"|sed 's!.*(!!;s!).*!!'|tr -d ' ')
+		func="register_$sname"
+		if [ "0" = "$T" ]; then
+			type="OPEN_GPIB_REG_TYPE_CONTROLLER"
+		else
+			type="OPEN_GPIB_REG_TYPE_TRANSPORT"
+		fi
+		ENTRY="{.name=\"$sname\",.type=$type,.func=$func}, $ENTRY"
+		echo "extern int $func(void *dev);" >> "$OFILE"
 	fi
+done
+echo "struct open_gpib_interfaces open_gpib_interface_list []={" >> "$OFILE"
+
+for e in $ENTRY; do
+	echo "$e" >> "$OFILE"
 done
 echo "{.name=NULL,.type=0, .func=NULL}," >> "$OFILE"
 echo "};" >> "$OFILE"

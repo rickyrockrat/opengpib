@@ -116,6 +116,7 @@ int main(int argc, char * argv[])
 		fprintf(stderr,"Can't open/init controller at %s. Fatal\n",copt.dev);
 		return 1;
 	}
+	open_gpib_list_interfaces();
 	switch(query){
 		case QID:
 			if(0!=init_id(g,"*IDN?")){

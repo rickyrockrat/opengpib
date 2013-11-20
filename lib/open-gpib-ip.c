@@ -33,10 +33,7 @@ Change Log: \n
 #include "open-gpib-ip.h"
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h> /* for select.... */
-#include <errno.h> /* for errno */
-#include <stdlib.h> /*for malloc, free */
-#include <string.h> /* for memset, strcpy,sprintf.... */
+
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -52,13 +49,12 @@ struct ip_ctl {
 };
 
 
-
 /***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
-int _ip_open(struct transport_dev *d, char *ip)
+static int open_if(struct transport_dev *d, char *ip)
 {
 	struct ip_ctl *c;
 	int i;
@@ -104,7 +100,7 @@ err:
 \n\b Arguments:
 \n\b Returns: number of bytes read 
 ****************************************************************************/
-int _ip_read(struct transport_dev *d, void *buf, int len)
+static int read_if(struct transport_dev *d, void *buf, int len)
 {
 	struct ip_ctl *c; 				 
 	int i,wait;
@@ -145,7 +141,7 @@ int _ip_read(struct transport_dev *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-int _ip_write(struct transport_dev *d, void *buf, int len)
+static int write_if(struct transport_dev *d, void *buf, int len)
 {
 	struct ip_ctl *c;
 	int i;
@@ -196,7 +192,7 @@ end:
 \n\b Arguments:
 \n\b Returns: -1 on error or 0 all OK
 ****************************************************************************/
-int _ip_close(struct transport_dev *d)
+static int close_if(struct transport_dev *d)
 {
 	int i;
 	struct ip_ctl *c;
@@ -216,11 +212,12 @@ int _ip_close(struct transport_dev *d)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _ip_control(struct transport_dev *d, int cmd, uint32_t data)
+static int control_if(struct transport_dev *d, int cmd, uint32_t data)
 {
 	struct ip_ctl *p;
 	p=(struct ip_ctl *)d->dev;
 	/**auto-allocate so we can use the control structure before we open.  */
+/*	fprintf(stderr,"p=%p &p=%p, &dev=%p\n",p,&p,&d->dev); */
 	if( check_calloc(sizeof(struct ip_ctl), &p, __func__,(void *)&d->dev) == -1) return -1;
 		
 	switch(cmd){
@@ -242,12 +239,13 @@ int _ip_control(struct transport_dev *d, int cmd, uint32_t data)
 	}
 	return 0;
 }
+GPIB_TRANSPORT_FUNCTION(inet)
 /***************************************************************************/
 /** 
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int ip_register(struct transport_dev *d)
+/** int ip_register(struct transport_dev *d)
 {
 	
 	d->read=		_ip_read;
@@ -258,4 +256,4 @@ int ip_register(struct transport_dev *d)
 	
 	d->dev=NULL;
 	return 0;
-}
+}		*/
