@@ -305,7 +305,10 @@ struct hp_block_hdr *read_block(char *cfname)
 		goto closem;
 	}
 	/**read in header  */
-	fread(blk,1,10,cfd);
+	if(fread(blk,1,10,cfd)<10){
+		fprintf(stderr,"Unable to read header in '%s'\n",cfname);
+		goto closem;
+	}
 	sscanf(blk->bs.blocklen_data,"%d",&blk->bs.blocklen);
 	fprintf(stderr,"Blocksize is %d\n",blk->bs.blocklen);
 	/**allocate room for data  */
@@ -314,7 +317,8 @@ struct hp_block_hdr *read_block(char *cfname)
 		goto closem;
 	}
 	/**read data in  */
-	fread(blk->data,1,blk->bs.blocklen,cfd);
+  if(fread(blk->data,1,blk->bs.blocklen,cfd)<blk->bs.blocklen)
+  	fprintf(stderr,"Short read of '%s'\n",cfname);
 closem:
 	if(NULL != cfd)
 		fclose(cfd);

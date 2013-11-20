@@ -62,7 +62,7 @@ other controllers.
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h> /**getopt  */
+#include <unistd.h> /**getopt, select  */
 #include <time.h> /**timespec  */
 #include <ctype.h>
 #include <sys/types.h>
@@ -115,13 +115,42 @@ enum {
 	CTL_SEND_CLR,
 	CTL_NONE,
 };
+/**control commands   */
+enum {
+	CMD_SET_DEBUG=0,
+	CMD_SET_CMD_TIMEOUT,
+	CMD_LAST,
+};
 
 #define CONTROLLER_TYPEMASK 0xFF
 #define OPTION_DEBUG 0x100
+
 #ifndef TOSTRING
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
+	#define STRINGIFY(x) #x
+	#define TOSTRING(x) STRINGIFY(x)
 #endif
+
+/**structure to use for controller and transport registration  */
+struct open_gpib_register {
+	char *name;
+	int type;
+	int (*func)(void *d); 	/**Returns: -1 on failure, 0 otherwise */
+};
+
+#define _INTERFACE_DEF_(name,type,register_func)
+
+
+/**structure to talk to transport mechanisms (serial, usb, inet, pci, etc.  */
+struct transport_dev {
+	int (*read)(struct transport_dev *d, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
+	int (*write)(struct transport_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
+	int (*open)(struct transport_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
+	int (*close)(struct transport_dev *d);									/**closes interface  */
+	int (*control)(struct transport_dev *d, int cmd,uint32_t data); 			/**controller-interface control. Set addr, etc.  */
+	void *dev;            												/**transport-specific structure  */
+	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
+	int debug;
+};
 /**structure to talk to the host controller  */
 struct gpib {
 	int addr; 																		/**instrument address. Check against inst addr  */
@@ -136,7 +165,9 @@ struct gpib {
 	int buf_len;													/**buffer length  */
 	char *dev_path;																/**physical device path.  */
 	void *inst;                                   /**instrument-specific structure, if any  */
+	struct transport_dev *tdev;                   /**transport structure, if any.  */
 };
+
 
 /**structure to talk to the instrument  */
 struct ginstrument {
@@ -146,6 +177,7 @@ struct ginstrument {
 	int (*init)(struct ginstrument *inst);									/**function to call to initialize instrument.  */
 };
 
+int open_gpib_list_interfaces(void);
 int read_raw(struct gpib *g);
 int read_string(struct gpib *g);
 int write_string(struct gpib *g, char *msg);

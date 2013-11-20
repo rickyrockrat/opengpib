@@ -36,6 +36,8 @@ Change Log: \n
 #include "prologixs.h"
 #include "hp16500ip.h"
 #include "fileio.h"
+#include "interfaces.h" 
+
 struct supported_dev {
 	int type;
 	char *option;
@@ -48,6 +50,21 @@ static struct supported_dev s_dev[]={\
 	{-1,NULL,NULL},
 };
 
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int open_gpib_list_interfaces(void)
+{
+	struct open_gpib_register *ogr;
+	int i;
+	for (i=0,ogr=open_gpib_interfaces;NULL != ogr[i].name; ++i){
+		fprintf(stderr,"%s, %d, %p\n",ogr->name, ogr->type, ogr->func);
+	}
+	
+}
 /***************************************************************************/
 /** .
 \n\b Arguments:

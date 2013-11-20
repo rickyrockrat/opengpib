@@ -31,26 +31,15 @@ Change Log: \n
 		The License should be in the file called COPYING.
 
 */
-#ifndef _IP_H_
-#define _IP_H_ 1
+#ifndef OPEN_GPIB_IP_H_
+#define OPEN_GPIB_IP_H_ 1
 
-struct ip_dev {
-	int (*read)(struct ip_dev *d, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
-	int (*write)(struct ip_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
-	int (*open)(struct ip_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
-	int (*close)(struct ip_dev *d);									/**closes interface  */
-	int (*control)(struct ip_dev *d, int cmd,uint32_t data); 			/**controller-interface control. Set addr, etc.  */
-	void *dev;            												/**interface-specific structure  */
-	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
-	int debug;
-};
 
+#include <open-gpib.h>
+/**only add commands here we don't already have  */
 enum {
-	IP_CMD_SET_CMD_TIMEOUT=0,
-	IP_CMD_SET_DEBUG,
-	IP_CMD_SET_PORT,		
+	IP_CMD_SET_PORT=CMD_LAST,
 	IP_CMD_NONE,
 };
-int ip_register(struct ip_dev *d);
 #endif
 

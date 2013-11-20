@@ -29,15 +29,16 @@ Logic analyzer.
 
 Change Log: \n
 */
-#include "open-gpib.h"
 #include "open-gpib-ip.h"
 #include "hp16500ip.h"
+ 
+
 
 struct hp16500c_ctl {
 	int addr; /**internal address, used to set address when != gpib.addr  */
 	int debug;
 	int cmd_wait;
-	struct ip_dev ip; /**ip interface control  */
+	struct transport_dev dev; /**ip interface control  */
 };
 
 /***************************************************************************/
@@ -67,7 +68,7 @@ int hp16500c_init(struct gpib *g)
 \n\b Arguments:
 \n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
-int _hp16500c_open(struct gpib *g, char *ip)
+int ctl_hp16500c_open(struct gpib *g, char *ip)
 {
 	struct hp16500c_ctl *c;
 	if(NULL == g){
@@ -81,20 +82,20 @@ int _hp16500c_open(struct gpib *g, char *ip)
 			return 1;
 		}
 	}	
-	if(ip_register(&c->ip)) /**load our ip function list  */
+	if(ip_register(&c->dev)) /**load our ip function list  */
 		goto err;
 	if(OPTION_DEBUG&g->type_ctl) 
-		c->ip.debug=1;
+		c->dev.debug=1;
 	else
-		c->ip.debug=0;
+		c->dev.debug=0;
 	/**set the port - IMPORTANT! Be sure to do this before opening. */
-	c->ip.control(&c->ip,IP_CMD_SET_PORT,5025);
+	c->dev.control(&c->dev,IP_CMD_SET_PORT,5025);
 	/**set net timeout - Set this too, or you will timeout when opening */
-	c->ip.control(&c->ip,IP_CMD_SET_CMD_TIMEOUT,50000); /**uS  */
-	c->ip.control(&c->ip,IP_CMD_SET_DEBUG,c->debug); /**pass down debug option to interface level  */
+	c->dev.control(&c->dev,CMD_SET_CMD_TIMEOUT,50000); /**uS  */
+	c->dev.control(&c->dev,CMD_SET_DEBUG,c->debug); /**pass down debug option to interface level  */
 	
 	/**open ip address on port set above  */
-	if(-1 == c->ip.open(&c->ip,ip))
+	if(-1 == c->dev.open(&c->dev,ip))
 		goto err;
 	
 	g->ctl=c;
@@ -115,7 +116,7 @@ err:
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-int _hp16500c_write(void *d, void *buf, int len)
+int ctl_hp16500c_write(void *d, void *buf, int len)
 {
 	struct hp16500c_ctl *c;
 	int i;
@@ -140,7 +141,7 @@ int _hp16500c_write(void *d, void *buf, int len)
 	}
 	if(c->debug)
 		fprintf(stderr,"Sending '%s'\n",m);
-	if((i=c->ip.write(&c->ip,m,len)) <0) {/* error writing */
+	if((i=c->dev.write(&c->dev,m,len)) <0) {/* error writing */
 		i=-1;
 		goto end;
   }
@@ -159,7 +160,7 @@ end:
 \n\b Arguments:
 \n\b Returns: -1 on failure, number of byte read otherwise
 ****************************************************************************/
-int _hp16500c_read(void *d, void *buf, int len)
+int ctl_hp16500c_read(void *d, void *buf, int len)
 {
 	struct hp16500c_ctl *c;
 	int i;
@@ -167,7 +168,7 @@ int _hp16500c_read(void *d, void *buf, int len)
 	m=(char *)buf;
 	c=(struct hp16500c_ctl *)d;
 	/*fprintf(stderr,"Looking for %d bytes\n",len); */
-	i=c->ip.read(&c->ip,buf,len);
+	i=c->dev.read(&c->dev,buf,len);
 	if(i){
 		--i;
 		while(i>=0 && (m[i]=='\r' || m[i]=='\n'))
@@ -182,7 +183,7 @@ int _hp16500c_read(void *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int control_hp16500c(struct gpib *g, int cmd, uint32_t data)
+int ctl_hp16500c_ctrl(struct gpib *g, int cmd, uint32_t data)
 {
 	struct hp16500c_ctl *c; 
 	int i;
@@ -228,7 +229,7 @@ int control_hp16500c(struct gpib *g, int cmd, uint32_t data)
 			break;
 		case CTL_SEND_CLR:
 			i=sprintf(buf,"*CLS\n");
-			_hp16500c_write(c,buf,i);
+			ctl_hp16500c_write(c,buf,i);
 			break;
 		default:
 			fprintf(stderr,"Unsupported cmd '%d'\n",cmd);
@@ -242,14 +243,14 @@ int control_hp16500c(struct gpib *g, int cmd, uint32_t data)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _hp16500c_close(struct gpib *g)
+int ctl_hp16500c_close(struct gpib *g)
 {
 	int i;
 	struct hp16500c_ctl *c;
 	if(NULL == g->ctl)
 		return 0;
 	c=(struct hp16500c_ctl *)g->ctl;
-	if(0!= (i=c->ip.close(&c->ip)) ){
+	if(0!= (i=c->dev.close(&c->dev)) ){
 		fprintf(stderr,"Error closing interface\n");
 	}
 	free (g->ctl);
@@ -267,11 +268,11 @@ int _hp16500c_close(struct gpib *g)
 ****************************************************************************/
 int register_hp16500c(struct gpib *g)
 {
-	g->control=control_hp16500c;
-	g->read=	_hp16500c_read;
-	g->write=	_hp16500c_write;
-	g->open=	_hp16500c_open;
-	g->close=	_hp16500c_close;
+	g->control=ctl_hp16500c_ctrl;
+	g->read=	ctl_hp16500c_read;
+	g->write=	ctl_hp16500c_write;
+	g->open=	ctl_hp16500c_open;
+	g->close=	ctl_hp16500c_close;
 	return 0;
 }
-
+_INTERFACE_DEF_("name", 1, register_hp16500c);

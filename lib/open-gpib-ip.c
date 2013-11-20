@@ -30,12 +30,10 @@ Change Log: \n
 */
 
 
-#include "open-gpib.h"
 #include "open-gpib-ip.h"
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h> /* for select.... */
-#include <stdio.h>         
 #include <errno.h> /* for errno */
 #include <stdlib.h> /*for malloc, free */
 #include <string.h> /* for memset, strcpy,sprintf.... */
@@ -60,7 +58,7 @@ struct ip_ctl {
 \n\b Arguments:
 \n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
-int _ip_open(struct ip_dev *d, char *ip)
+int _ip_open(struct transport_dev *d, char *ip)
 {
 	struct ip_ctl *c;
 	int i;
@@ -106,7 +104,7 @@ err:
 \n\b Arguments:
 \n\b Returns: number of bytes read 
 ****************************************************************************/
-int _ip_read(struct ip_dev *d, void *buf, int len)
+int _ip_read(struct transport_dev *d, void *buf, int len)
 {
 	struct ip_ctl *c; 				 
 	int i,wait;
@@ -147,7 +145,7 @@ int _ip_read(struct ip_dev *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-int _ip_write(struct ip_dev *d, void *buf, int len)
+int _ip_write(struct transport_dev *d, void *buf, int len)
 {
 	struct ip_ctl *c;
 	int i;
@@ -198,7 +196,7 @@ end:
 \n\b Arguments:
 \n\b Returns: -1 on error or 0 all OK
 ****************************************************************************/
-int _ip_close(struct ip_dev *d)
+int _ip_close(struct transport_dev *d)
 {
 	int i;
 	struct ip_ctl *c;
@@ -218,7 +216,7 @@ int _ip_close(struct ip_dev *d)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _ip_control(struct ip_dev *d, int cmd, uint32_t data)
+int _ip_control(struct transport_dev *d, int cmd, uint32_t data)
 {
 	struct ip_ctl *p;
 	p=(struct ip_ctl *)d->dev;
@@ -226,11 +224,11 @@ int _ip_control(struct ip_dev *d, int cmd, uint32_t data)
 	if( check_calloc(sizeof(struct ip_ctl), &p, __func__,(void *)&d->dev) == -1) return -1;
 		
 	switch(cmd){
-		case IP_CMD_SET_CMD_TIMEOUT:
+		case CMD_SET_CMD_TIMEOUT:
 			p->cmd_timeout=data;
 			printf("ip cmdtimeout=%ld\n",(long)data);
 			break;
-		case IP_CMD_SET_DEBUG:
+		case CMD_SET_DEBUG:
 			if(data)
 				p->debug=1;
 			else
@@ -245,17 +243,19 @@ int _ip_control(struct ip_dev *d, int cmd, uint32_t data)
 	return 0;
 }
 /***************************************************************************/
-/** allocate and fill in our function structure.
+/** 
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int ip_register(struct ip_dev *d)
+int ip_register(struct transport_dev *d)
 {
+	
 	d->read=		_ip_read;
 	d->write=		_ip_write;
 	d->open=		_ip_open;
 	d->close=		_ip_close;
 	d->control= _ip_control;
+	
 	d->dev=NULL;
 	return 0;
 }
