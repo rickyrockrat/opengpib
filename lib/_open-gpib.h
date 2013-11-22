@@ -263,7 +263,7 @@ int read_string( struct open_gpib_mstr *g);
 int write_string( struct open_gpib_mstr *g, char *msg);
 int write_get_data ( struct open_gpib_mstr *g, char *cmd);
 int write_wait_for_data( struct open_gpib_mstr *g, char *cmd, int sec);
- struct open_gpib_mstr *open_gpib(int ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
+ struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
 int close_gpib ( struct open_gpib_mstr *g);
 int gpib_option_to_type(char *op);
 void show_gpib_supported_controllers(void);

@@ -213,7 +213,7 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct open_gpib_mstr *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
+struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path, int buf_size)
 {
 	struct open_gpib_mstr *open_gpibp;
 	open_gpib_register reg_func; 
@@ -247,7 +247,7 @@ struct open_gpib_mstr *open_gpib(int ctype, int addr, char *dev_path, int buf_si
 				goto err;
 			if(NULL == (open_gpibp->ctl=reg_func()) )
 				goto err; 
-			fprintf(stderr,"ctype=0x%x\n",ctype);
+			fprintf(stderr,"ctype=0x%x, extr 0x%x\n",ctype,OPTION_EXTRACT_DEBUG(ctype));
 			open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,OPTION_EXTRACT_DEBUG(ctype));
 			if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
 				goto err;

@@ -157,8 +157,9 @@ static int control_prologixs( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 			}
 			break;
 		case CTL_SET_DEBUG:
-			fprintf(stderr,"%s: Setting debug to %d\n",__func__,ctl->dev->debug);
-			ctl->dev->debug=data;
+			ctl->debug=data;
+			fprintf(stderr,"%s: Setting debug to %d\n",__func__,ctl->debug);
+			
 			break;
 	}
 	return 0;
@@ -277,7 +278,8 @@ static int open_prologixs(struct open_gpib_dev *ctl, char *path)
 	}	
 	if(NULL == (ctl->dev=reg_func())) /**load our function list  */
 		goto err;
-	
+	/**pass our debug option down  */
+	ctl->dev->funcs.og_control(ctl->dev,CMD_SET_DEBUG,ctl->debug);
 	if(-1==ctl->dev->funcs.og_open(ctl->dev,path))
 		goto err;
 	
