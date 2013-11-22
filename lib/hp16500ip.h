@@ -31,7 +31,7 @@ Change Log: \n
 #ifndef _HP16500IP_H_
 #define _HP16500IP_H_ 1
 
-int register_hp16500c( struct open_gpib *g);
+int register_hp16500c( struct open_gpib_mstr *g);
 
 #endif
 

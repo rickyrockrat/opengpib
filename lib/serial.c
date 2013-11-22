@@ -381,7 +381,7 @@ int close_serial_port( struct serial_port *p)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number of byte read otherwise
 ****************************************************************************/
-static int read_if(struct open_gpib_dev *d, void *buf, int len)
+static int read_serial(struct open_gpib_dev *d, void *buf, int len)
 {
 	struct serial_port *p; 				 
 	int i,count;
@@ -420,7 +420,7 @@ static int read_if(struct open_gpib_dev *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-static int write_if(struct open_gpib_dev *d, void *buf, int len)
+static int write_serial(struct open_gpib_dev *d, void *buf, int len)
 {
 	int i;
 	struct serial_port *p;
@@ -435,7 +435,7 @@ static int write_if(struct open_gpib_dev *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int close_if(struct open_gpib_dev  *d)
+static int close_serial(struct open_gpib_dev  *d)
 {
 	return close_serial_port((struct serial_port *)d->dev);
 }
@@ -444,7 +444,7 @@ static int close_if(struct open_gpib_dev  *d)
 \n\b Arguments:
 \n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
-static int open_if(struct open_gpib_dev  *d, char *path)
+static int open_serial(struct open_gpib_dev  *d, char *path)
 {
 	struct serial_port *p;
 	if(NULL == d){
@@ -471,7 +471,7 @@ static int open_if(struct open_gpib_dev  *d, char *path)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int control_if(struct open_gpib_dev  *d, int cmd, uint32_t data)
+static int control_serial(struct open_gpib_dev  *d, int cmd, uint32_t data)
 {
 	struct serial_port *p;
 	p=(struct serial_port *)d;
@@ -515,7 +515,7 @@ static int control_if(struct open_gpib_dev  *d, int cmd, uint32_t data)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static void *calloc_internal(void)
+static void *calloc_internal_serial(void)
 {
 	void *p=NULL;
 	if(-1 == check_calloc(sizeof(struct serial_port), &p,__func__,NULL) ) 
@@ -527,7 +527,7 @@ static void *calloc_internal(void)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int init_if(struct open_gpib *d)
+static int init_serial(struct open_gpib_mstr *d)
 {
 	
 }

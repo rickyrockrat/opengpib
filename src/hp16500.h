@@ -138,9 +138,9 @@ struct hp_common_options {
 /**generic functions  */
 int get_hp_info_card(int id);
 int print_card_model(int id);
-int select_hp_card(int slot, struct open_gpib *g);
+int select_hp_card(int slot, struct open_gpib_mstr *g);
 void show_known_hp_cards(void);
-int hp16500_find_card(int cardtype, int no, struct open_gpib *g);
+int hp16500_find_card(int cardtype, int no, struct open_gpib_mstr *g);
 void show_hp_connection_info(void);
 void show_common_usage (int mode);
 int handle_common_opts(int c, char *optarg, struct hp_common_options *o);

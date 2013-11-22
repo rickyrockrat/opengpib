@@ -59,12 +59,12 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct open_gpib *g;
+	struct open_gpib_mstr *g;
 	struct hp_common_options copt;
-	int i, c, query,rtn,slot;
+	int i, c, query,rtn,slot,debug;
 	char *cmd;
 	handle_common_opts(0,NULL,&copt);
-	rtn=0;
+	rtn=debug=0;
 	i=-2;
 	query=QTEST;
 	cmd=NULL;
@@ -97,7 +97,7 @@ int main(int argc, char * argv[])
 				}
 				break;
 			case 'v':
-				copt.dtype|=OPTION_DEBUG;
+				++debug;
 				break;
 			default:
 				usage();
@@ -108,6 +108,7 @@ int main(int argc, char * argv[])
 		usage();
 		return 1;
 	}
+	copt.dtype|=OPTION_SET_DEBUG(debug);
 	if(NULL ==copt.dev){
 		fprintf(stderr,"Must specify device, or -a with ipaddress\n");
 		return -1;

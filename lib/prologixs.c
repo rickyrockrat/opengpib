@@ -44,7 +44,7 @@ struct prologixs_ctl {
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int verify( struct open_gpib *g, char *msg)
+int verify( struct open_gpib_mstr *g, char *msg)
 {
 	sprintf(g->buf,"%s\r",msg);
 	write_string(g,g->buf);
@@ -66,12 +66,12 @@ int prologixs_set_addr()
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int init_if( struct open_gpib *g)
+static int init_prologixs( struct open_gpib_mstr *g)
 {
 	int i;
 	struct prologixs_ctl *c;
-	c=(struct prologixs_ctl *)g->ctl;
-	if(g->type_ctl&OPTION_DEBUG)printf("Init Prologix controller\n");
+	c=(struct prologixs_ctl *)g->ctl->internal;
+	if(g->type_ctl&OPTION_DEBUG)printf("Init Prologix controller, dbg=%d\n",g->ctl->debug);
 	write_string(g,"++clr");
 	read_string(g);
 	/*make sure auto reply is on*/
@@ -92,9 +92,10 @@ static int init_if( struct open_gpib *g)
 		goto err;
 	}
 	if(g->type_ctl&OPTION_DEBUG) printf("Talking to Controller '%s'\n",g->buf);
+	if(g->ctl->debug >= DBG_TRACE)	fprintf(stderr,"write mode\n");
 	/*Then set to Controller mode */
 	write_string(g,"++mode 1");
-	
+	if(g->ctl->debug >= DBG_TRACE)	fprintf(stderr,"write addr\n");
 	/*Set the address to talk to */
 	sprintf(g->buf,"++addr %d",g->addr);
 	c->addr=g->addr;
@@ -109,7 +110,7 @@ static int init_if( struct open_gpib *g)
 		verify(g,"++eos");
 		verify(g,"++auto");	
 	}
-	
+	if(g->ctl->debug >= DBG_TRACE)	fprintf(stderr,"%s: return\n",__func__);
 	return 0;
 err:
 	fprintf(stderr,"Controller init failed\n");
@@ -121,45 +122,43 @@ err:
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int control_if( struct open_gpib_dev *ctl, int cmd, uint32_t data)
+static int control_prologixs( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 {
 	int i;
 	struct prologixs_ctl *c; 
 	char cmdbuf[100];
 	if(NULL == ctl){
-		printf("prologixs: gpib null\n");
+		fprintf(stderr,"prologixs: gpib null\n");
 		return 0;
 	}
-	c=(struct prologixs_ctl *)ctl->dev;
-	if( -1== check_calloc(sizeof(struct prologixs_ctl), &c, __func__,&ctl->dev) == -1) return -1;
+	c=(struct prologixs_ctl *)ctl->internal;
+	if( -1== check_calloc(sizeof(struct prologixs_ctl), &c, __func__,&ctl->internal) == -1) return -1;
 		
 	switch(cmd){
 		case CTL_CLOSE:
-			if(c->serial->debug) printf("Closing gpib\n");
+			if(ctl->debug) fprintf(stderr,"Closing gpib\n");
 			
 			break;
 		case CTL_SET_TIMEOUT:
-			return c->serial->funcs.og_control(c->serial,SERIAL_CMD_SET_CHAR_TIMEOUT,data);
+			return ctl->dev->funcs.og_control(ctl->dev,SERIAL_CMD_SET_CHAR_TIMEOUT,data);
 			break;
 		case CTL_SET_ADDR: /**send command, check result, then set gpib addr.  */
 			i=sprintf(cmdbuf,"++addr %d\n",data);
-			if(c->serial->funcs.og_write(c->serial,cmdbuf,i) == i){
+			if(ctl->dev->funcs.og_write(ctl->dev,cmdbuf,i) == i){
 				c->addr=data;
 				return 1;
 			}
 			break;
 		case CTL_SEND_CLR:
 			i=sprintf(cmdbuf,"++clr\n");
-			if(c->serial->funcs.og_write(c->serial,cmdbuf,i) == i){
-				printf("Sent Device Clear\n");
+			if(ctl->dev->funcs.og_write(ctl->dev,cmdbuf,i) == i){
+				fprintf(stderr,"Sent Device Clear\n");
 				return 1;
 			}
 			break;
 		case CTL_SET_DEBUG:
-			if(data)
-				c->serial->debug=1;
-			else
-				c->serial->debug=0;
+			fprintf(stderr,"%s: Setting debug to %d\n",__func__,ctl->dev->debug);
+			ctl->dev->debug=data;
 			break;
 	}
 	return 0;
@@ -172,14 +171,10 @@ static int control_if( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-static int write_if(struct open_gpib_dev *d, void *buf, int len)
+static int write_prologixs(struct open_gpib_dev *ctl, void *buf, int len)
 {
-	struct prologixs_ctl *c;
 	int rtn;
-	char *m;
-	
-	c=(struct prologixs_ctl *)d;
-	m=(char *)buf;
+	char *m=(char *)buf;
 	
 	if('\r' != m[len-1]){ /**Make sure we have terminator...  */
 		if(NULL == (m=malloc(len+2)) ){
@@ -192,7 +187,7 @@ static int write_if(struct open_gpib_dev *d, void *buf, int len)
 		m[len]=0;
 	}
 	/*printf("Swrite.."); */
-	if((rtn=c->serial->funcs.og_write(c->serial,m,len)) <0) {/* error writing */
+	if((rtn=ctl->dev->funcs.og_write(ctl->dev,m,len)) <0) {/* error writing */
 		rtn=-1;
 		goto end;
   }
@@ -211,23 +206,23 @@ end:
 \n\b Arguments:
 \n\b Returns: -1 on failure, number of byte read otherwise
 ****************************************************************************/
-static int read_if(struct open_gpib_dev *d, void *buf, int len)
+static int read_prologixs(struct open_gpib_dev *ctl, void *buf, int len)
 {
 	struct prologixs_ctl *c;
 	int i;
 	char *m;
-	if(NULL == d || NULL == buf){
+	if(NULL == ctl || NULL == buf){
 		fprintf(stderr,"%s: Null buffer or dev\n",__func__);
 		return -1;
 	}
 	m=(char *)buf;
-	c=(struct prologixs_ctl *)d;
+	c=(struct prologixs_ctl *)ctl->internal;
 	if(0 == c->autor){
 		char cmd[20];
 		i=sprintf(cmd,"++read\r");
-		write_if(d,cmd,i);
+		write_prologixs(ctl,cmd,i);
 	}
-	i=c->serial->funcs.og_read(c->serial,buf,len);
+	i=ctl->dev->funcs.og_read(ctl->dev,buf,len);
 	
 	if(i){
 		--i;
@@ -243,18 +238,20 @@ static int read_if(struct open_gpib_dev *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int close_if( struct open_gpib_dev *ctl)
+static int close_prologixs( struct open_gpib_dev *ctl)
 {
 	int i;
 	struct prologixs_ctl *c;
 	if(NULL == ctl->dev)
 		return 0;
-	c=(struct prologixs_ctl *)ctl->dev;
-	if((i=c->serial->funcs.og_close(c->serial)) ){
+	c=(struct prologixs_ctl *)ctl->internal;
+	if((i=ctl->dev->funcs.og_close(ctl->dev)) ){
 		printf("Error closing interface\n");
 	}
+	if(NULL != ctl->internal)
+		free(ctl->internal);
 	free (ctl->dev);
-	ctl->dev=NULL;
+	ctl->dev = ctl->internal=NULL;
 	return i;
 }
 
@@ -263,7 +260,7 @@ static int close_if( struct open_gpib_dev *ctl)
 \n\b Arguments:
 \n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
-static int open_if(struct open_gpib_dev *ctl, char *path)
+static int open_prologixs(struct open_gpib_dev *ctl, char *path)
 {
 	struct prologixs_ctl *c;
 	open_gpib_register reg_func;
@@ -271,24 +268,24 @@ static int open_if(struct open_gpib_dev *ctl, char *path)
 		printf("%s: dev null\n",__func__);
 		return 1;
 	}
-	c=(struct prologixs_ctl *)ctl->dev;
-	if(-1 == check_calloc(sizeof(struct prologixs_ctl), &c, __func__,&ctl->dev) == -1) 
+	c=(struct prologixs_ctl *)ctl->internal;
+	if(-1 == check_calloc(sizeof(struct prologixs_ctl), &c, __func__,&ctl->internal) == -1) 
 		return -1;
 		
 	if(NULL == (reg_func=open_gpib_find_interface("serial", OPEN_GPIB_REG_TYPE_TRANSPORT))){
 		goto err;
 	}	
-	if(NULL == (c->serial=reg_func())) /**load our function list  */
+	if(NULL == (ctl->dev=reg_func())) /**load our function list  */
 		goto err;
 	
-	if(-1==c->serial->funcs.og_open(c->serial,path))
+	if(-1==ctl->dev->funcs.og_open(ctl->dev,path))
 		goto err;
 	
-	c->serial->funcs.og_control(c->serial,SERIAL_CMD_SET_CHAR_TIMEOUT,50000);
+	ctl->dev->funcs.og_control(ctl->dev,SERIAL_CMD_SET_CHAR_TIMEOUT,50000);
 	c->autor=1;
 	return 0;
 err:
-	free(c);
+	free(ctl->dev);
 	ctl->dev=NULL;
 	return -1;
 }
@@ -298,7 +295,7 @@ err:
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static void *calloc_internal(void)
+static void *calloc_internal_prologixs(void)
 {
 	void *p=NULL;
 	if(-1 == check_calloc(sizeof(struct prologixs_ctl), &p,__func__,NULL) ) 

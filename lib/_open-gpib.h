@@ -125,7 +125,12 @@ enum {
 */
 
 #define CONTROLLER_TYPEMASK 0xFF
-#define OPTION_DEBUG 0x100
+#define OPTION_DEBUG 0xF00
+/**  */
+#define OPTION_EXTRACT_DEBUG(x) ((x&OPTION_DEBUG)>>8)
+#define OPTION_SET_DEBUG(x) ((x<<8)&OPTION_DEBUG)
+/**debug levels after the above operation  */
+#define DBG_TRACE 4
 
 #ifndef TOSTRING
 	#define STRINGIFY(x) #x
@@ -139,7 +144,7 @@ enum {
 #define OPEN_GPIB_REG_TYPE_TRANSPORT  2
 /**forward reference these two  */
 struct open_gpib_dev;
-struct open_gpib;
+struct open_gpib_mstr;
 /** #define _INTERFACE_DEF_(name,type,register_func)*/
 struct open_gpib_functions {
 	int (*og_read)(struct open_gpib_dev *dev, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
@@ -147,21 +152,22 @@ struct open_gpib_functions {
 	int (*og_open)(struct open_gpib_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
 	int (*og_close)(struct open_gpib_dev *d);									/**closes interface  */
 	int (*og_control)(struct open_gpib_dev *d, int cmd, uint32_t data); 			/**controller-interface control. Set addr, etc.  */	
-	int (*og_init)(struct open_gpib *d); 									/**Initialize the controller  */		
+	int (*og_init)(struct open_gpib_mstr *d); 									/**Initialize the controller  */		
 };
 
 /**structure to talk to transport mechanisms (serial, usb, inet, pci, etc.) and 
    controllers  */
 struct open_gpib_dev {  
+	struct open_gpib_dev *dev;
 	struct open_gpib_functions funcs;
-	void *dev;            												/**transport-specific structure  */
+	void *internal;            												/**transport-specific structure  */
 	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
 	int debug;
 	char *if_name;
 	uint32_t wait;
 };
 /**structure to talk to the host controller  */
-struct open_gpib {
+struct open_gpib_mstr {
 	struct open_gpib_dev *ctl;										/**controller-specific structure, if any  */	
 	int addr; 																		/**instrument address. Check against inst addr  */
 	int type_ctl;					 												/**controller type, options at top.  */
@@ -174,7 +180,7 @@ struct open_gpib {
 
 /**structure to talk to the instrument  */
 struct ginstrument {
-	struct open_gpib *open_gpibp;
+	struct open_gpib_mstr *open_gpibp;
 	int type;
 	int addr;																							  /**instrument address.  */
 	int (*init)(struct ginstrument *inst);									/**function to call to initialize instrument.  */
@@ -183,7 +189,7 @@ struct ginstrument {
 /**this function is created with the  GPIB_TRANSPORT_FUNCTION and 
    GPIB_CONTROLLER_FUNCTION macro. It allocates the memory for 
    itself and it's internal structure. Most internal structures
-   have a struct open_gpib pointing to the next level.
+   have a struct open_gpib_mstr pointing to the next level.
    
 */
 typedef struct open_gpib_dev *(*open_gpib_register)(void ); 	/**Returns: -1 on failure, 0 on success */
@@ -199,7 +205,7 @@ static int read_if(struct open_gpib_dev *d, void *buf, int len); 	/**Returns: -1
 static int write_if(struct open_gpib_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
 static int open_if(struct open_gpib_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
 static int close_if(struct open_gpib_dev *d);									/**closes interface  */
-static int init_if( struct open_gpib *d);									/**initializes interface - usually for the controller setup.  */
+static int init_if( struct open_gpib_mstr *d);									/**initializes interface - usually for the controller setup.  */
 static int control_if(struct open_gpib_dev *d, int cmd,uint32_t data); 			/**controller-interface control. Set addr, etc.  */
 static void *calloc_internal(void); /**allocate internal structures.  */
 
@@ -219,14 +225,15 @@ if( -1 == check_calloc(sizeof(struct transport_dev), p, __func__,NULL) == -1) re
 struct open_gpib_dev *register_##x(void) {\
 	struct open_gpib_dev *d=NULL;\
 	if(-1 == check_calloc(sizeof(struct open_gpib_dev), &d,__func__,NULL) ) return NULL;\
-	d->funcs.og_read=read_if;\
-	d->funcs.og_write=write_if;\
-	d->funcs.og_open=open_if;\
-	d->funcs.og_close=close_if;\
-	d->funcs.og_control=control_if;\
-	d->funcs.og_init=init_if;\
-	d->dev=calloc_internal(); \
+	d->funcs.og_read=read_##x;\
+	d->funcs.og_write=write_##x;\
+	d->funcs.og_open=open_##x;\
+	d->funcs.og_close=close_##x;\
+	d->funcs.og_control=control_##x;\
+	d->funcs.og_init=init_##x;\
+	d->dev=calloc_internal_##x();\
 	d->if_name=strdup(#x);\
+	d->wait=1;\
 	printf("rtn from %s\n",__func__);\
 	return d; \
 }
@@ -234,7 +241,7 @@ struct open_gpib_dev *register_##x(void) {\
 #define GPIB_CONTROLLER_FUNCTION GPIB_TRANSPORT_FUNCTION
 /** #define GPIB_CONTROLLER_FUNCTION (x) \
 int register_##x ( void *p) {\
-	 struct open_gpib *d=( struct open_gpib *)p;\
+	 struct open_gpib_mstr *d=( struct open_gpib_mstr *)p;\
 	d->funcs.og_read=read_ctl;\
 	d->funcs.og_write=write_ctl;\
 	d->funcs.og_open=open_ctl;\
@@ -251,16 +258,16 @@ int register_##x ( void *p) {\
 
 int open_gpib_list_interfaces(void);
 open_gpib_register open_gpib_find_interface(char *name, int type);
-int read_raw( struct open_gpib *g);
-int read_string( struct open_gpib *g);
-int write_string( struct open_gpib *g, char *msg);
-int write_get_data ( struct open_gpib *g, char *cmd);
-int write_wait_for_data( struct open_gpib *g, char *cmd, int sec);
- struct open_gpib *open_gpib(int ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
-int close_gpib ( struct open_gpib *g);
+int read_raw( struct open_gpib_mstr *g);
+int read_string( struct open_gpib_mstr *g);
+int write_string( struct open_gpib_mstr *g, char *msg);
+int write_get_data ( struct open_gpib_mstr *g, char *cmd);
+int write_wait_for_data( struct open_gpib_mstr *g, char *cmd, int sec);
+ struct open_gpib_mstr *open_gpib(int ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
+int close_gpib ( struct open_gpib_mstr *g);
 int gpib_option_to_type(char *op);
 void show_gpib_supported_controllers(void);
-int init_id( struct open_gpib *g, char *idstr);
+int init_id( struct open_gpib_mstr *g, char *idstr);
 int check_calloc(size_t size, void *p, const char *func, void *set);
 
 int is_string_number(char *s);

@@ -42,7 +42,6 @@ Change Log: \n
 struct ip_ctl {
 	char *ipaddr;
 	int port;
-	int debug;
 	struct sockaddr_in socket;
 	int   sockfd;
 	int cmd_timeout;
@@ -54,43 +53,43 @@ struct ip_ctl {
 \n\b Arguments:
 \n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
-static int open_if(struct open_gpib_dev *d, char *ip)
+static int open_inet(struct open_gpib_dev *d, char *ip)
 {
-	struct ip_ctl *c;
+	struct ip_ctl *in;
 	int i;
 	if(NULL == d){
 		fprintf(stderr,"%s: dev null\n",__func__);
 		return 1;
 	}
-	c=(struct ip_ctl *)d->dev;
- 	if( (i=check_calloc(sizeof(struct ip_ctl), &c, __func__,NULL)) == -1) return -1;
+	in=(struct ip_ctl *)d->internal;
+ 	if( (i=check_calloc(sizeof(struct ip_ctl), &in, __func__,NULL)) == -1) return -1;
 	/**We shouldn't ever come here, since we won't have a port or timeout to set...  
 	   Instead, use control to set port and delay.
 	*/
   if(1 == i)
 		fprintf(stderr,"%s Port and delay not set! Opening anyway, but this should fail.\n",__func__);
-	c->ipaddr=strdup(ip);
-	c->socket.sin_family = AF_INET;
-  c->socket.sin_addr.s_addr = inet_addr ( c->ipaddr );
-  c->socket.sin_port = htons ( c->port );
+	in->ipaddr=strdup(ip);
+	in->socket.sin_family = AF_INET;
+  in->socket.sin_addr.s_addr = inet_addr ( in->ipaddr );
+  in->socket.sin_port = htons ( in->port );
 	  /* Create an endpoint for communication */
-  if(-1 ==(c->sockfd = socket( AF_INET, SOCK_STREAM, 0 )) ){
-		fprintf(stderr,"Unable to create socket for '%s', port %d\n",c->ipaddr,c->port);
+  if(-1 ==(in->sockfd = socket( AF_INET, SOCK_STREAM, 0 )) ){
+		fprintf(stderr,"Unable to create socket for '%s', port %d\n",in->ipaddr,in->port);
 		goto err;
 	}
-	fprintf(stderr,"Socket %d created for '%s'\n",c->sockfd, c->ipaddr);
+	fprintf(stderr,"Socket %d created for '%s'\n",in->sockfd, in->ipaddr);
   /* Initiate a connection on the created socket */
-  if( 0 !=connect( c->sockfd, (struct sockaddr *)&c->socket, sizeof (struct sockaddr_in ) )){
-		fprintf(stderr,"Unable to connect to '%s', port %d\n",c->ipaddr,c->port);
+  if( 0 !=connect( in->sockfd, (struct sockaddr *)&in->socket, sizeof (struct sockaddr_in ) )){
+		fprintf(stderr,"Unable to connect to '%s', port %d\n",in->ipaddr,in->port);
 		goto err;
 	}
-	fprintf(stderr,"Connected to '%s'\n",c->ipaddr);
-	d->dev=(void *)c;
+	fprintf(stderr,"Connected to '%s'\n",in->ipaddr);
+	d->internal=(void *)in;
 	
 	return 0;
 err:
-	free (c);
-	d->dev=NULL;
+	free (in);
+	d->internal=NULL;
 	return -1;
 }
 
@@ -100,25 +99,25 @@ err:
 \n\b Arguments:
 \n\b Returns: number of bytes read 
 ****************************************************************************/
-static int read_if(struct open_gpib_dev *d, void *buf, int len)
+static int read_inet(struct open_gpib_dev *d, void *buf, int len)
 {
-	struct ip_ctl *c; 				 
+	struct ip_ctl *in; 				 
 	int i,wait;
 	char *m;
 	m=(char *)buf;
-	c=(struct ip_ctl *)d->dev;
+	in=(struct ip_ctl *)d->internal;
 	fprintf(stderr,"%s read\n",d->if_name);
 	/*fprintf(stderr,"Looking for %d bytes\n",len); */
 	for (i=wait=0; i<len;){
 		int r;
-		if(-1 == (r=recv ( c->sockfd, &m[i], len-i,MSG_DONTWAIT )) ){
+		if(-1 == (r=recv ( in->sockfd, &m[i], len-i,MSG_DONTWAIT )) ){
 			/*fprintf(stderr,"-1"); */
 			++wait;
 			if(wait > 10){
 				/*fprintf(stderr,"Err sending\n"); */
 				break;
 			}
-			usleep(c->cmd_timeout);
+			usleep(d->wait);
 		}else{
 			i+=r;
 			wait=0;
@@ -142,13 +141,13 @@ static int read_if(struct open_gpib_dev *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-static int write_if(struct open_gpib_dev *d, void *buf, int len)
+static int write_inet(struct open_gpib_dev *d, void *buf, int len)
 {
-	struct ip_ctl *c;
+	struct ip_ctl *in;
 	int i;
 	char *m;
-	printf("write_if %s\n",d->if_name);
-	c=(struct ip_ctl *)d->dev;
+	printf("%s: %s\n",__func__,d->if_name);
+	in=(struct ip_ctl *)d->internal;
 	m=(char *)buf;
 	
 	if('\n' != m[len-1]){ /**Make sure we have terminator...  */
@@ -164,10 +163,10 @@ static int write_if(struct open_gpib_dev *d, void *buf, int len)
 	
 	for (i=0;i<len;){
 		int r;
-		if(c->debug)
+		if(d->debug)
 			fprintf(stderr,"Sending '%s' i=%d, len=%d\n",m,i,len);	
-		r= send ( c->sockfd, &m[i], len-i, 0 );
-		if(c->debug)
+		r= send ( in->sockfd, &m[i], len-i, 0 );
+		if(d->debug)
 			fprintf(stderr,"Sent %d bytes\n",r);
 		if(-1 == r){
 			fprintf(stderr,"Err Sending at byte %d\n",i);
@@ -193,18 +192,18 @@ end:
 \n\b Arguments:
 \n\b Returns: -1 on error or 0 all OK
 ****************************************************************************/
-static int close_if(struct open_gpib_dev *d)
+static int close_inet(struct open_gpib_dev *d)
 {
 	int i;
-	struct ip_ctl *c;
-	c=(struct ip_ctl *)d->dev;
-	if(0!= (i=shutdown(c->sockfd,SHUT_RDWR)) ){
+	struct ip_ctl *in;
+	in=(struct ip_ctl *)d->internal;
+	if(0!= (i=shutdown(in->sockfd,SHUT_RDWR)) ){
 		fprintf(stderr,"Error closing interface\n");
 		return -1;
 	}
-	close(c->sockfd);
-	free (d->dev);
-	d->dev=NULL;
+	close(in->sockfd);
+	free (d->internal);
+	d->internal=NULL;
 	return 0;
 }
 
@@ -213,25 +212,22 @@ static int close_if(struct open_gpib_dev *d)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int control_if(struct open_gpib_dev *d, int cmd, uint32_t data)
+static int control_inet(struct open_gpib_dev *d, int cmd, uint32_t data)
 {
 	struct ip_ctl *p;
-	p=(struct ip_ctl *)d->dev;
+	p=(struct ip_ctl *)d->internal;
 	/**auto-allocate so we can use the control structure before we open.  */
-/*	fprintf(stderr,"p=%p &p=%p, &dev=%p\n",p,&p,&d->dev); */
-	if(-1==check_calloc(sizeof(struct ip_ctl), &p, __func__,(void *)&d->dev) == -1) return -1;
+/*	fprintf(stderr,"p=%p &p=%p, &dev=%p\n",p,&p,&d->internal); */
+	if(-1==check_calloc(sizeof(struct ip_ctl), &p, __func__,(void *)&d->internal) == -1) return -1;
 		
 	switch(cmd){
 		case CMD_SET_CMD_TIMEOUT:
-			p->cmd_timeout=data;
+			d->wait=data;
 			printf("ip cmdtimeout=%ld\n",(long)data);
 			break;
 		case CMD_SET_DEBUG:
-			if(data)
-				p->debug=1;
-			else
-				p->debug=0;
-			printf("ip dbg=%d\n",p->debug);
+			d->debug=data;
+			printf("ip dbg=%d\n",d->debug);
 			break;
 		case IP_CMD_SET_PORT:
 			p->port=data;
@@ -245,7 +241,7 @@ static int control_if(struct open_gpib_dev *d, int cmd, uint32_t data)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static void *calloc_internal(void)
+static void *calloc_internal_inet(void)
 {
 	void *p=NULL;
 	printf("inet:calloc_internal\n");
@@ -259,7 +255,7 @@ static void *calloc_internal(void)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int init_if( struct open_gpib *d)
+static int init_inet( struct open_gpib_mstr *d)
 {
 	
 }

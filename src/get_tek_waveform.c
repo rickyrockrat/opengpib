@@ -59,7 +59,7 @@ int check_channel(char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int set_channel(struct open_gpib *g,char *ch)
+int set_channel(struct open_gpib_mstr *g,char *ch)
 {
 	int i;
 	char *c;
@@ -76,7 +76,7 @@ int set_channel(struct open_gpib *g,char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init_instrument(struct open_gpib *g)	 
+int init_instrument(struct open_gpib_mstr *g)	 
 {
 	int i;
 	printf("Initializing Instrument\n");
@@ -102,7 +102,7 @@ int init_instrument(struct open_gpib *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_data(struct open_gpib *g)
+int get_data(struct open_gpib_mstr *g)
 {
 	int i;
 	write_string(g,"WAV?");
@@ -147,7 +147,7 @@ Todo:
 \n\b Returns:
 ****************************************************************************/
 
-int read_cursors(struct open_gpib *g)
+int read_cursors(struct open_gpib_mstr *g)
 {
 	char *target,lbuf[100], *function, *trigsrc;
 	float min,max,volts, diff,xinc;
@@ -242,7 +242,7 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct open_gpib *g;
+	struct open_gpib_mstr *g;
 	char *name, *ofname, *channel[MAX_CHANNELS], *lbuf;
 	FILE *ofd;
 	int i, c,inst_addr, rtn, ch_idx;

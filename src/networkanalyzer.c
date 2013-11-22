@@ -70,7 +70,7 @@ struct freq_off {
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct open_gpib *g)	 
+struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct open_gpib_mstr *g)	 
 {
 	struct ginstrument *gi;
 	
@@ -109,7 +109,7 @@ struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct open_gp
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct ginstrument *init_HP8595E(char *path, int type, int addr, struct open_gpib *g)	 
+struct ginstrument *init_HP8595E(char *path, int type, int addr, struct open_gpib_mstr *g)	 
 {
 	struct ginstrument *gi;
 	if(NULL ==(gi=malloc(sizeof(struct ginstrument)))){

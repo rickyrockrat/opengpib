@@ -103,7 +103,7 @@ open_gpib_register open_gpib_find_interface(char *name, int type)
 len is max_len for msg.
 \n\b Returns: number of chars read.
 ****************************************************************************/
-int read_raw( struct open_gpib *open_gpibp)
+int read_raw( struct open_gpib_mstr *open_gpibp)
 {
 	int i,j;
 	i=0;
@@ -122,7 +122,7 @@ int read_raw( struct open_gpib *open_gpibp)
 len is max_len for msg.
 \n\b Returns: number of chars read.
 ****************************************************************************/
-int read_string( struct open_gpib *open_gpibp)
+int read_string( struct open_gpib_mstr *open_gpibp)
 {
 	int i,j;
 	i=0;
@@ -139,7 +139,7 @@ int read_string( struct open_gpib *open_gpibp)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int write_string( struct open_gpib *open_gpibp, char *msg)
+int write_string( struct open_gpib_mstr *open_gpibp, char *msg)
 {
 	int i;
 	if(NULL == msg){
@@ -156,7 +156,7 @@ int write_string( struct open_gpib *open_gpibp, char *msg)
 \n\b Arguments:
 \n\b Returns: 0 on fail or number of chars read on success.
 ****************************************************************************/
-int write_get_data ( struct open_gpib *open_gpibp, char *cmd)
+int write_get_data ( struct open_gpib_mstr *open_gpibp, char *cmd)
 {
 	int i;
 	/*fprintf(stderr,"Write... "); */
@@ -175,7 +175,7 @@ int write_get_data ( struct open_gpib *open_gpibp, char *cmd)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int write_wait_for_data( struct open_gpib *open_gpibp, char *cmd, int sec)
+int write_wait_for_data( struct open_gpib_mstr *open_gpibp, char *cmd, int sec)
 {
 	int i,rtn;
 	rtn =0;
@@ -213,20 +213,20 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct open_gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
+struct open_gpib_mstr *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 {
-	struct open_gpib *open_gpibp;
+	struct open_gpib_mstr *open_gpibp;
 	open_gpib_register reg_func; 
 	fprintf(stderr,"OpenGPIB Version %s\n",PACKAGE_VERSION);  
 	if(NULL == dev_path){
 		fprintf(stderr,"Device name is NULL. Must specify device.\n");
 		return NULL;
 	}
-	if(NULL == (open_gpibp=malloc(sizeof( struct open_gpib)) ) ){
+	if(NULL == (open_gpibp=malloc(sizeof( struct open_gpib_mstr)) ) ){
 		fprintf(stderr,"Out of mem on gpib alloc\n");
 		return NULL;
 	}
-	memset(open_gpibp,0,sizeof( struct open_gpib));
+	memset(open_gpibp,0,sizeof( struct open_gpib_mstr));
 	open_gpibp->addr=addr;
 	if(0>= buf_size)
 		buf_size=8096;
@@ -247,8 +247,8 @@ struct open_gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 				goto err;
 			if(NULL == (open_gpibp->ctl=reg_func()) )
 				goto err; 
-			if(ctype&OPTION_DEBUG)
-				open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,1);
+			fprintf(stderr,"ctype=0x%x\n",ctype);
+			open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,OPTION_EXTRACT_DEBUG(ctype));
 			if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
 				goto err;
 			if(-1==open_gpibp->ctl->funcs.og_init(open_gpibp)){
@@ -261,8 +261,7 @@ struct open_gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 			if(-1==register_hp16500c(open_gpibp))
 				goto err1;
 			printf("opt\n");
-			if(ctype&OPTION_DEBUG)
-				open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,1);
+			open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,OPTION_EXTRACT_DEBUG(ctype));
 			printf("open\n");
 			if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
 				goto err;
@@ -275,8 +274,7 @@ struct open_gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
     case GPIB_CTL_FILEIO:
 			if(-1==register_fileio(open_gpibp))
 				goto err1;
-			if(ctype&OPTION_DEBUG)
-				open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,1);
+			open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,OPTION_EXTRACT_DEBUG(ctype));
 			if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
 				goto err;
 			break;
@@ -301,7 +299,7 @@ err1:
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int close_gpib ( struct open_gpib *open_gpibp)
+int close_gpib ( struct open_gpib_mstr *open_gpibp)
 {
 	if(NULL != open_gpibp->ctl->funcs.og_control)
 		open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_CLOSE,0);
@@ -351,7 +349,7 @@ void show_gpib_supported_controllers(void)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init_id( struct open_gpib *open_gpibp, char *idstr)
+int init_id( struct open_gpib_mstr *open_gpibp, char *idstr)
 {
 	open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_TIMEOUT,500);
 	while(read_string(open_gpibp));

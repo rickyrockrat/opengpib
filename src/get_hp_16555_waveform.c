@@ -120,7 +120,7 @@ number of valid rows.
 \n\b Arguments:
 \n\b Returns: slot number of card.
 ****************************************************************************/
-int init_instrument(struct hp_common_options *o,struct open_gpib *g)	 
+int init_instrument(struct hp_common_options *o,struct open_gpib_mstr *g)	 
 {
 	int slot;
 	if(-1 == (slot=hp16500_find_card(o->cardtype,o->cardno,g)) )
@@ -142,7 +142,7 @@ int init_instrument(struct hp_common_options *o,struct open_gpib *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int wait_for_data(struct open_gpib *g)
+int wait_for_data(struct open_gpib_mstr *g)
 {
 	int i;
 	/**make sure it is enabled  */
@@ -166,7 +166,7 @@ int wait_for_data(struct open_gpib *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int message_avail(struct open_gpib *g)
+int message_avail(struct open_gpib_mstr *g)
 {
 	int i;
 	/**make sure it is enabled  */
@@ -209,7 +209,7 @@ void usage(void)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-long int write_data_to_file(struct open_gpib *g, FILE *fd)
+long int write_data_to_file(struct open_gpib_mstr *g, FILE *fd)
 {
 	
 	long int  sz,total;
@@ -275,7 +275,7 @@ long int write_data_to_file(struct open_gpib *g, FILE *fd)
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct open_gpib *g;
+	struct open_gpib_mstr *g;
 	struct hp_common_options copt;
 	
 	FILE *ofd,*cfd,*tfd,*vfd;

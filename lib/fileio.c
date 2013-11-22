@@ -195,7 +195,7 @@ end:
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int control_fileio( struct open_gpib *g, int cmd, uint32_t data)
+int control_fileio( struct open_gpib_mstr *g, int cmd, uint32_t data)
 {
 	struct fileio_ctl *c; 
 
@@ -216,10 +216,7 @@ int control_fileio( struct open_gpib *g, int cmd, uint32_t data)
 		case CTL_SET_ADDR: /**send command, check result, then set gpib addr.  */
 			break;
 		case CTL_SET_DEBUG:
-			if(data)
-				c->debug=1;
-			else
-				c->debug=0;
+			c->debug=data;
 			break;
 		case CTL_SEND_CLR:
 			break;
@@ -235,7 +232,7 @@ int control_fileio( struct open_gpib *g, int cmd, uint32_t data)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _fileio_close( struct open_gpib *g)
+int _fileio_close( struct open_gpib_mstr *g)
 {
 	struct fileio_ctl *c;
 	if(NULL == g->ctl)
@@ -261,7 +258,7 @@ int _fileio_init(struct open_gpib_dev *x)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int register_fileio( struct open_gpib *g)
+int register_fileio( struct open_gpib_mstr *g)
 {
 	if(NULL == g)
 		return -1;
