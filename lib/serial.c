@@ -452,7 +452,7 @@ static int open_if(struct open_gpib_dev  *d, char *path)
 		return -1;
 	}
 	p=(struct serial_port *)d->dev;
-	if(check_calloc(sizeof(struct serial_port), &p,__func__,NULL) ) return -1;
+	if(-1 == check_calloc(sizeof(struct serial_port), &p,__func__,NULL) ) return -1;
 		
 	p->debug=d->debug;
 	if(-1 == open_serial_port(path,115200,0,0,0,p)) {
@@ -517,7 +517,7 @@ static int control_if(struct open_gpib_dev  *d, int cmd, uint32_t data)
 ****************************************************************************/
 static void *calloc_internal(void)
 {
-	void *p;
+	void *p=NULL;
 	if(-1 == check_calloc(sizeof(struct serial_port), &p,__func__,NULL) ) 
 		return NULL;
 	return p;

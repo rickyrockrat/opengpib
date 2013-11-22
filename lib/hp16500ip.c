@@ -45,7 +45,7 @@ struct hp16500c_ctl {
 ****************************************************************************/
 int hp16500c_init( struct open_gpib *g)
 {
-	
+	fprintf(stderr,"h156c-init %d\n",g->type_ctl);
 	if(g->type_ctl&OPTION_DEBUG)fprintf(stderr,"Init HP 16500C INET controller\n");
 	if(0 == write_get_data(g,"*IDN?"))
 		return -1;
@@ -71,18 +71,22 @@ int ctl_hp16500c_open( struct open_gpib_dev *ctl, char *ip)
 	open_gpib_register ip_reg;
 	if(NULL == ctl){
 		printf("%s: ctl null\n",__func__);
-		return 1;
+		return -1;
 	}
-	c=(struct hp16500c_ctl *)ctl->dev;
-	if(check_calloc(sizeof(struct hp16500c_ctl), &c,__func__,&ctl->dev) ) return -1;
+	/** c=(struct hp16500c_ctl *)ctl->dev;
+	if(-1 ==check_calloc(sizeof(struct hp16500c_ctl), &c,__func__,&ctl->dev) ) return -1;*/
 	open_gpib_list_interfaces();
 	if(NULL == (ip_reg=open_gpib_find_interface("inet", OPEN_GPIB_REG_TYPE_TRANSPORT))){
-		return 1;
+		return -1;
 	}
+	c=(struct hp16500c_ctl *)ctl->dev;
+	if(-1 ==check_calloc(sizeof(struct hp16500c_ctl), &c,__func__,&ctl->dev) ) return -1;
 /*	printf("Calling ip_reg, var=%p,control=%p\n",&c->dev, &c->dev.control);  */
 /*	c->dev.read=NULL; */
+	printf("ip_rg\n");
 	if(NULL == (c->dev=ip_reg())) /**load our ip function list  */
 		goto err;
+	printf("control\n");
 /*	printf("Back\n"); */
 /*	printf("ctl=%p\n",c->dev.control); */
 	/**set the port - IMPORTANT! Be sure to do this before opening. */
@@ -90,15 +94,14 @@ int ctl_hp16500c_open( struct open_gpib_dev *ctl, char *ip)
 	/**set net timeout - Set this too, or you will timeout when opening */
 	c->dev->funcs.og_control(c->dev,CMD_SET_CMD_TIMEOUT,50000); /**uS  */
 	c->dev->funcs.og_control(c->dev,CMD_SET_DEBUG,c->debug); /**pass down debug option to interface level  */
-	
+	printf("open '%s'\n",ip);
 	/**open ip address on port set above  */
 	if(-1 == c->dev->funcs.og_open(c->dev,ip))
 		goto err;
-	
-	
-	
+	printf("Exit hcipopen\n");
 	return 0;
 err:
+	
 	if(NULL != c->dev)
 		free(c->dev);
 	free(c);
@@ -117,7 +120,7 @@ int ctl_hp16500c_write(struct open_gpib_dev *d, void *buf, int len)
 	int i;
 	char *m;
 	
-	c=(struct hp16500c_ctl *)d;
+	c=(struct hp16500c_ctl *)d->dev;
 	if(NULL == c){
 		fprintf(stderr,"%s ctl struct NULL\n",__func__);
 		return -1;
@@ -161,8 +164,9 @@ int ctl_hp16500c_read(struct open_gpib_dev *d, void *buf, int len)
 	int i;
 	char *m;
 	m=(char *)buf;
-	c=(struct hp16500c_ctl *)d;
+	c=(struct hp16500c_ctl *)d->dev;
 	/*fprintf(stderr,"Looking for %d bytes\n",len); */
+	fprintf(stderr,"calling %s read\n",c->dev->if_name);
 	i=c->dev->funcs.og_read(c->dev,buf,len);
 	if(i){
 		--i;
@@ -189,11 +193,11 @@ int ctl_hp16500c_ctrl( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 		return -1;
 	}
 	c=(struct hp16500c_ctl *)ctl->dev;
-	if(check_calloc(sizeof(struct hp16500c_ctl), &c,__func__,&ctl->dev) ) return -1;
+	if(-1 ==check_calloc(sizeof(struct hp16500c_ctl), &c,__func__,&ctl->dev) ) return -1;
 		
 	switch(cmd){
 		case CTL_CLOSE:
-			if(c->debug) fprintf(stderr,"Closing hp INET\n");
+			if(c->debug) fprintf(stderr,"Got Close ctl. Doing nothing hp INET\n");
 			
 			break;
 		case CTL_SET_TIMEOUT:
@@ -245,8 +249,9 @@ int ctl_hp16500c_close(struct open_gpib_dev *ctl)
 	if(0!= (i=c->dev->funcs.og_close(c->dev)) ){
 		fprintf(stderr,"Error closing interface\n");
 	}
-	free (c);
-	ctl->dev=NULL;
+	fprintf(stderr,"hp16500C Close, free iface internal %s\n",c->dev->if_name);
+	free (c->dev);
+	c->dev=NULL;
 	return i;
 }
 
@@ -257,20 +262,36 @@ int ctl_hp16500c_init (struct open_gpib *g)
 }
 
 /***************************************************************************/
+/** Allocate our internal data structure.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+static void *calloc_internal(void)
+{
+	void *p;
+	if(-1 == check_calloc(sizeof(struct hp16500c_ctl), &p,__func__,NULL) ) 
+		return NULL;
+	return p;
+}
+
+/***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
 int register_hp16500c( struct open_gpib *g)
 {
-	if(NULL == g)
+	if(NULL == g){
+		fprintf(stderr,"%s, incomming struct null\n",__func__);
 		return -1;
-	if(check_calloc(sizeof(struct open_gpib_dev), &g->ctl,__func__,NULL) ) return -1;
+	}
+	if(-1 ==check_calloc(sizeof(struct open_gpib_dev), &g->ctl,__func__,NULL) ) return -1;
 	g->ctl->funcs.og_control=ctl_hp16500c_ctrl;
 	g->ctl->funcs.og_read=	ctl_hp16500c_read;
 	g->ctl->funcs.og_write=	ctl_hp16500c_write;
 	g->ctl->funcs.og_open=	ctl_hp16500c_open;
 	g->ctl->funcs.og_close=	ctl_hp16500c_close;
 	g->ctl->funcs.og_init=	ctl_hp16500c_init;
+	g->ctl->dev=calloc_internal();
 	return 0;
 }

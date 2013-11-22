@@ -68,7 +68,7 @@ int _fileio_open( struct open_gpib_dev *ctl, char *name)
 		return 1;
 	}
 	c=(struct fileio_ctl *)ctl->dev;
-	if( check_calloc(sizeof(struct fileio_ctl), &c, __func__,NULL) == -1) return -1;
+	if( -1 ==check_calloc(sizeof(struct fileio_ctl), &c, __func__,NULL) == -1) return -1;
   c->last_cmd=NULL;
 	c->name=strdup(name);
 	  /* Open the file for reading */
@@ -205,7 +205,7 @@ int control_fileio( struct open_gpib *g, int cmd, uint32_t data)
 	}
 	c=(struct fileio_ctl *)g->ctl;
 	/**sets g->ctl if it allocates new memory  */
-	if( check_calloc(sizeof(struct fileio_ctl), &c, __func__,&g->ctl) == -1) return -1;
+	if( -1 ==check_calloc(sizeof(struct fileio_ctl), &c, __func__,&g->ctl) == -1) return -1;
 		
 	switch(cmd){
 		case CTL_CLOSE:
@@ -265,7 +265,7 @@ int register_fileio( struct open_gpib *g)
 {
 	if(NULL == g)
 		return -1;
-	if(check_calloc(sizeof(struct open_gpib_dev), &g->ctl,__func__,NULL) ) return -1;
+	if(-1 == check_calloc(sizeof(struct open_gpib_dev), &g->ctl,__func__,NULL) ) return -1;
 	g->ctl->funcs.og_control=control_fileio;
 	g->ctl->funcs.og_read=	_fileio_read;
 	g->ctl->funcs.og_write=	_fileio_write;

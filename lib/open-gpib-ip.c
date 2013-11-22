@@ -107,6 +107,7 @@ static int read_if(struct open_gpib_dev *d, void *buf, int len)
 	char *m;
 	m=(char *)buf;
 	c=(struct ip_ctl *)d->dev;
+	fprintf(stderr,"%s read\n",d->if_name);
 	/*fprintf(stderr,"Looking for %d bytes\n",len); */
 	for (i=wait=0; i<len;){
 		int r;
@@ -146,7 +147,7 @@ static int write_if(struct open_gpib_dev *d, void *buf, int len)
 	struct ip_ctl *c;
 	int i;
 	char *m;
-	
+	printf("write_if %s\n",d->if_name);
 	c=(struct ip_ctl *)d->dev;
 	m=(char *)buf;
 	
@@ -218,7 +219,7 @@ static int control_if(struct open_gpib_dev *d, int cmd, uint32_t data)
 	p=(struct ip_ctl *)d->dev;
 	/**auto-allocate so we can use the control structure before we open.  */
 /*	fprintf(stderr,"p=%p &p=%p, &dev=%p\n",p,&p,&d->dev); */
-	if( check_calloc(sizeof(struct ip_ctl), &p, __func__,(void *)&d->dev) == -1) return -1;
+	if(-1==check_calloc(sizeof(struct ip_ctl), &p, __func__,(void *)&d->dev) == -1) return -1;
 		
 	switch(cmd){
 		case CMD_SET_CMD_TIMEOUT:
@@ -234,7 +235,7 @@ static int control_if(struct open_gpib_dev *d, int cmd, uint32_t data)
 			break;
 		case IP_CMD_SET_PORT:
 			p->port=data;
-			printf("ip port=%ld\n",(long)data);
+			printf("%s: ip port=%ld\n",d->if_name,(long)data);
 			break;
 	}
 	return 0;
@@ -246,9 +247,11 @@ static int control_if(struct open_gpib_dev *d, int cmd, uint32_t data)
 ****************************************************************************/
 static void *calloc_internal(void)
 {
-	void *p;
+	void *p=NULL;
+	printf("inet:calloc_internal\n");
 	if(-1 == check_calloc(sizeof(struct ip_ctl), &p,__func__,NULL) ) 
 		return NULL;
+	printf("rtncalloc\n");
 	return p;
 }
 /***************************************************************************/

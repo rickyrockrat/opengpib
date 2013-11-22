@@ -157,6 +157,7 @@ struct open_gpib_dev {
 	void *dev;            												/**transport-specific structure  */
 	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
 	int debug;
+	char *if_name;
 	uint32_t wait;
 };
 /**structure to talk to the host controller  */
@@ -179,6 +180,12 @@ struct ginstrument {
 	int (*init)(struct ginstrument *inst);									/**function to call to initialize instrument.  */
 };
 
+/**this function is created with the  GPIB_TRANSPORT_FUNCTION and 
+   GPIB_CONTROLLER_FUNCTION macro. It allocates the memory for 
+   itself and it's internal structure. Most internal structures
+   have a struct open_gpib pointing to the next level.
+   
+*/
 typedef struct open_gpib_dev *(*open_gpib_register)(void ); 	/**Returns: -1 on failure, 0 on success */
 
 /**structure to use for controller and transport registration  */
@@ -198,7 +205,7 @@ static void *calloc_internal(void); /**allocate internal structures.  */
 
 /** 	
 	void **x=p;	\
-if( check_calloc(sizeof(struct transport_dev), p, __func__,NULL) == -1) return -1;\
+if( -1 == check_calloc(sizeof(struct transport_dev), p, __func__,NULL) == -1) return -1;\
 		fprintf(stderr,"register_func passed %p read= %p\n",d,&d->funcs.og_read);\
 	fprintf(stderr,"ctl=%p\n",d->funcs.og_control); \
 	*/
@@ -210,7 +217,7 @@ if( check_calloc(sizeof(struct transport_dev), p, __func__,NULL) == -1) return -
 
 #define GPIB_TRANSPORT_FUNCTION(x) \
 struct open_gpib_dev *register_##x(void) {\
-	struct open_gpib_dev *d;\
+	struct open_gpib_dev *d=NULL;\
 	if(-1 == check_calloc(sizeof(struct open_gpib_dev), &d,__func__,NULL) ) return NULL;\
 	d->funcs.og_read=read_if;\
 	d->funcs.og_write=write_if;\
@@ -219,6 +226,8 @@ struct open_gpib_dev *register_##x(void) {\
 	d->funcs.og_control=control_if;\
 	d->funcs.og_init=init_if;\
 	d->dev=calloc_internal(); \
+	d->if_name=strdup(#x);\
+	printf("rtn from %s\n",__func__);\
 	return d; \
 }
 

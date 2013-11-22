@@ -56,6 +56,7 @@ static struct supported_dev s_dev[]={\
 int open_gpib_list_interfaces(void)
 {
 	int i;
+	fprintf(stderr,"listif, %s\n",IF_LIST[0].name);
 	for (i=0;NULL != IF_LIST[i].name; ++i){
 		fprintf(stderr,"%s, %d, %p\n",IF_LIST[i].name, IF_LIST[i].type, IF_LIST[i].func);
 	}
@@ -256,12 +257,16 @@ struct open_gpib *open_gpib(int ctype, int addr, char *dev_path, int buf_size)
 			}
 			break;
 		case GPIB_CTL_HP16500C:
+			printf("reg\n");
 			if(-1==register_hp16500c(open_gpibp))
 				goto err1;
+			printf("opt\n");
 			if(ctype&OPTION_DEBUG)
 				open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,1);
+			printf("open\n");
 			if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
 				goto err;
+			printf("init\n");
 			if(-1 == open_gpibp->ctl->funcs.og_init(open_gpibp)){
 				fprintf(stderr,"Controller init failed\n");
 				goto err;
@@ -302,8 +307,13 @@ int close_gpib ( struct open_gpib *open_gpibp)
 		open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_CLOSE,0);
 	if(NULL != open_gpibp->ctl->funcs.og_close)
 		open_gpibp->ctl->funcs.og_close(open_gpibp->ctl);
+	
+	fprintf(stderr,"Free %s\n",open_gpibp->dev_path);
 	if(NULL != open_gpibp->dev_path)
 		free(open_gpibp->dev_path);
+	fprintf(stderr,"Now freeing ctl\n");
+	free(open_gpibp->ctl);
+	open_gpibp->ctl=NULL;
 	return 0;
 }
 
