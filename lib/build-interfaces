@@ -1,21 +1,114 @@
+#!/bin/sh
+# script to build interfaces.h and open-gpib.h
+#
+# This file is part of OpenGPIB.
+# For details, see http://opengpib.sourceforge.net/projects
+#
+# Copyright (C) 2008-2014 Doug Springer <gpib@rickyrockrat.net>
+#   
+#    OpenGPIB is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License version 3 
+#    as published by the Free Software Foundation. Note that permission 
+#    is not granted to redistribute this program under the terms of any
+#    other version of the General Public License.
+#
+#    OpenGPIB is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
+#    
+#		The License should be in the file called COPYING.
+fail(){
+rm "$OFILE"
+exit 1
+}
+#fname input, input is output of grep.
+handle_cmds() {
+	# get just our lines
+	lines=$(echo "$2"|grep OPEN_GPIB_ADD_CMD)
+	#extract our line number(s)
+        #lineno=$(echo "$line"|sed 's!\(.*\):.*!\1!')
+        #line=$(echo "$line"|sed 's!.*:!!')
+        C=$(echo "$line"|grep -c OPEN_GPIB_ADD_CMD)
+        if [ "$C" = "0" ]; then # No commands in this file
+		return
+	fi
+	echo "$lines"|while read sline; do
+		cmd=$(echo "$sline"|grep OPEN_GPIB_ADD_CMD)
+		substr=$(echo "$cmd"|sed 's!.*:\(.\{17\}\).*!\1!')
+		if [ "$substr" != "OPEN_GPIB_ADD_CMD" ]; then
+			#echo "$sline"
+			#echo "$cmd"
+			#echo "$substr"
+			echo "Invalid OPEN_GPIB_ADD_CMD in $1, line $lineno"
+			fail
+		fi
+		cmd=$(echo "$cmd"|sed 's!.*(!!;s!).*!!'|tr -d ' ')
+		echo "	$cmd,">> "$OFILE"
+	done
+
+}
+if [ "$1" = "header" ]; then
+	OFILE="open-gpib.h"
+	IF="_open-gpib.h"
+	if [ ! -e interfaces.h ]; then
+		echo "interfaces.h Does not exist."
+		exit 1
+	fi
+#	echo "#ifndef _GPIB_H_" >> "$OFILE"
+#	echo "#define _GPIB_H_ 1" >> "$OFILE"
+	grep -v REMOVE_ME _open-gpib.h >"$OFILE"
+	cat interfaces.h >> "$OFILE"
+	echo "#endif" >> "$OFILE"
+#	grep -v _GPIB_H_ _open-gpib.h >>"$OFILE"
+	exit 0
+fi
 OFILE="interfaces.h"
+NL='\n'
 echo "#ifndef _INTERFACE_H_"> "$OFILE"
 echo "#define _INTERFACE_H_ 1">> "$OFILE"
-echo "#ifdef _ALLOC_REGISTER_" >> "$OFILE"
+echo "enum {" >> "$OFILE"
+echo "	CMD_SET_DEBUG=0," >> "$OFILE"
+echo "	CMD_SET_CMD_TIMEOUT," >> "$OFILE"
+
+
 for f in $@; do
-	line=$(grep "GPIB_TRANSPORT_FUNCTION\|GPIB_CONTROLLER_FUNCTION" $f)
-        if [ -n "$line" ]; then
-		T=$(echo "$line"|grep -c GPIB_TRANSPORT_FUNCTION)
-		sname=$(echo "$line"|sed 's!.*(!!;s!).*!!'|tr -d ' ')
-		func="register_$sname"
-		if [ "0" = "$T" ]; then
-			type="OPEN_GPIB_REG_TYPE_CONTROLLER"
-		else
-			type="OPEN_GPIB_REG_TYPE_TRANSPORT"
-		fi
-		ENTRY="{.name=\"$sname\",.type=$type,.func=$func}, $ENTRY"
-		echo "extern int $func(void *dev);" >> "$OFILE"
+	# put line numbers at beginning
+	line=$(grep -n "OPEN_GPIB_ADD_CMD\|GPIB_TRANSPORT_FUNCTION\|GPIB_CONTROLLER_FUNCTION" $f)
+        if [ -z "$line" ]; then
+		continue
 	fi
+	handle_cmds "$f" "$line"
+		
+	T=$(echo "$line"|grep -c GPIB_TRANSPORT_FUNCTION)
+	sname=$(echo "$line"|grep "GPIB_TRANSPORT_FUNCTION\|GPIB_CONTROLLER_FUNCTION")
+	substr=$(echo "$sname"|sed 's!.*:\(.\{5\}\).*!\1!')
+	if [ "$substr" != "GPIB_" ]; then
+		#echo "$line"
+		#echo "$sname"
+		#echo "$substr"
+		lineno=$(echo "$sname"|sed 's!\(.*\):.*!\1!')
+		echo "Invalid GPIB_TRANSPORT_FUNCTION or GPIB_CONTROLLER_FUNCTION in $f, line $lineno"
+		fail
+	fi
+	sname=$(echo "$sname"|sed 's!.*(!!;s!).*!!'|tr -d ' ')
+	func="register_$sname"
+	if [ "0" = "$T" ]; then
+		type="OPEN_GPIB_REG_TYPE_CONTROLLER"
+	else
+		type="OPEN_GPIB_REG_TYPE_TRANSPORT"
+	fi
+	ENTRY="{.name=\"$sname\",.type=$type,.func=$func}, $ENTRY"
+	FUNLIST="extern struct open_gpib_dev *$func(void);${NL}$FUNLIST"
+done
+echo "	CMD_LAST," >> "$OFILE"
+echo "};" >>"$OFILE"
+echo "#ifdef _ALLOC_REGISTER_" >> "$OFILE"
+echo "$FUNLIST"|while read fun; do
+	echo "$fun">> "$OFILE"
 done
 echo "struct open_gpib_interfaces open_gpib_interface_list []={" >> "$OFILE"
 

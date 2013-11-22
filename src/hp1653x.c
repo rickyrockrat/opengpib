@@ -38,7 +38,7 @@
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int set_channel_offset(struct gpib *g, int channel, float offset)
+int set_channel_offset(struct open_gpib *g, int channel, float offset)
 {
   return -1;
 }
@@ -49,7 +49,7 @@ int set_channel_offset(struct gpib *g, int channel, float offset)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int set_channel_range(struct gpib *g)
+int set_channel_range(struct open_gpib *g)
 {
   return -1;
 }
@@ -63,7 +63,7 @@ EXTERNAL
 \n\b Arguments:
 \n\b Returns: 0 for external, or 1-x for channel, or -1 on error
 ****************************************************************************/
-int get_trigger_source (struct gpib *g)
+int get_trigger_source (struct open_gpib *g)
 {
   sprintf(g->buf,":TRIG:SOUR?");
   if(0 == write_get_data(g,g->buf))
@@ -98,7 +98,7 @@ double og_get_xinc_mult(double v, int *x)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int oscope_parse_preamble(struct gpib *g, struct hp_scope_preamble *h)
+int oscope_parse_preamble(struct open_gpib *g, struct hp_scope_preamble *h)
 {
 	h->fmt=og_get_value_col(0,g->buf);
 	h->type=og_get_value_col(1,g->buf);
@@ -155,7 +155,7 @@ int check_oscope_channel(char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int oscope_get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h)
+int oscope_get_preamble(struct open_gpib *g,char *ch, struct hp_scope_preamble *h)
 {
 	int i;
 	if(NULL == ch)
@@ -188,7 +188,7 @@ int oscope_get_preamble(struct gpib *g,char *ch, struct hp_scope_preamble *h)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_oscope_data(struct gpib *g, char *ch, struct hp_scope_preamble *h)
+int get_oscope_data(struct open_gpib *g, char *ch, struct hp_scope_preamble *h)
 {
 	int i,x;
 	if(NULL == ch)
@@ -209,7 +209,7 @@ int get_oscope_data(struct gpib *g, char *ch, struct hp_scope_preamble *h)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init_oscope_instrument(struct hp_common_options *o, struct gpib *g)	 
+int init_oscope_instrument(struct hp_common_options *o, struct open_gpib *g)	 
 {
 	int slot,i;
   char buf[20];

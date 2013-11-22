@@ -59,21 +59,17 @@ off_t readlen(struct fileio_ctl *c, int len)
 \n\b Arguments:
 \n\b Returns: -1  on failure, 0 on success
 ****************************************************************************/
-int _fileio_open(struct gpib *g, char *name)
+int _fileio_open( struct open_gpib_dev *ctl, char *name)
 {
 	struct fileio_ctl *c;
   struct stat finfo;
-	if(NULL == g){
+	if(NULL == ctl){
 		fprintf(stderr,"%s: dev null\n",__func__);
 		return 1;
 	}
-	c=(struct fileio_ctl *)g->ctl;
+	c=(struct fileio_ctl *)ctl->dev;
 	if( check_calloc(sizeof(struct fileio_ctl), &c, __func__,NULL) == -1) return -1;
   c->last_cmd=NULL;
-	if(OPTION_DEBUG&g->type_ctl) 
-		c->debug=1;
-	else
-		c->debug=0;
 	c->name=strdup(name);
 	  /* Open the file for reading */
   if(NULL ==(c->f = fopen( c->name,"r")) ){
@@ -90,12 +86,12 @@ int _fileio_open(struct gpib *g, char *name)
   c->pos=0;
   c->readto=0;
 	fprintf(stderr,"Opened '%s', %ld bytes\n",c->name,c->filelen);
-	g->ctl=c;
+	ctl->dev=c;
 	return 0;
 	
 err:
 	free(c);
-	g->ctl=NULL;
+	ctl->dev=NULL;
 	return -1;
 }
 
@@ -199,7 +195,7 @@ end:
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int control_fileio(struct gpib *g, int cmd, uint32_t data)
+int control_fileio( struct open_gpib *g, int cmd, uint32_t data)
 {
 	struct fileio_ctl *c; 
 
@@ -239,7 +235,7 @@ int control_fileio(struct gpib *g, int cmd, uint32_t data)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _fileio_close(struct gpib *g)
+int _fileio_close( struct open_gpib *g)
 {
 	struct fileio_ctl *c;
 	if(NULL == g->ctl)
@@ -254,7 +250,10 @@ int _fileio_close(struct gpib *g)
 	return 0;
 }
 
-
+int _fileio_init(struct open_gpib_dev *x)
+{
+	
+}
 
 
 /***************************************************************************/
@@ -262,12 +261,16 @@ int _fileio_close(struct gpib *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int register_fileio(struct gpib *g)
+int register_fileio( struct open_gpib *g)
 {
-	g->control=control_fileio;
-	g->read=	_fileio_read;
-	g->write=	_fileio_write;
-	g->open=	_fileio_open;
-	g->close=	_fileio_close;
+	if(NULL == g)
+		return -1;
+	if(check_calloc(sizeof(struct open_gpib_dev), &g->ctl,__func__,NULL) ) return -1;
+	g->ctl->funcs.og_control=control_fileio;
+	g->ctl->funcs.og_read=	_fileio_read;
+	g->ctl->funcs.og_write=	_fileio_write;
+	g->ctl->funcs.og_open=	_fileio_open;
+	g->ctl->funcs.og_close=	_fileio_close;
+	g->ctl->funcs.og_init = _fileio_init;
 	return 0;
 }

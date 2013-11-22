@@ -34,7 +34,6 @@ included by <termios.h> */
 
 
 #include "open-gpib.h"
-#include "serial.h"
 #include <termios.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -382,7 +381,7 @@ int close_serial_port( struct serial_port *p)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number of byte read otherwise
 ****************************************************************************/
-int _serial_read(struct serial_dev *d, void *buf, int len)
+static int read_if(struct open_gpib_dev *d, void *buf, int len)
 {
 	struct serial_port *p; 				 
 	int i,count;
@@ -421,7 +420,7 @@ int _serial_read(struct serial_dev *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-int _serial_write(struct serial_dev *d, void *buf, int len)
+static int write_if(struct open_gpib_dev *d, void *buf, int len)
 {
 	int i;
 	struct serial_port *p;
@@ -436,7 +435,7 @@ int _serial_write(struct serial_dev *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _serial_close(struct serial_dev *d)
+static int close_if(struct open_gpib_dev  *d)
 {
 	return close_serial_port((struct serial_port *)d->dev);
 }
@@ -445,7 +444,7 @@ int _serial_close(struct serial_dev *d)
 \n\b Arguments:
 \n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
-int _serial_open(struct serial_dev *d, char *path)
+static int open_if(struct open_gpib_dev  *d, char *path)
 {
 	struct serial_port *p;
 	if(NULL == d){
@@ -472,16 +471,31 @@ int _serial_open(struct serial_dev *d, char *path)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _serial_control(struct serial_dev *d, int cmd, uint32_t data)
+static int control_if(struct open_gpib_dev  *d, int cmd, uint32_t data)
 {
 	struct serial_port *p;
-	p=(struct serial_port *)d->dev;
-	if(check_calloc(sizeof(struct serial_port), &p,__func__,d->dev) ) return -1;
+	p=(struct serial_port *)d;
+	if(-1 == check_calloc(sizeof(struct serial_port), &p,__func__,d->dev) ) return -1;
 	switch(cmd){
 		case SERIAL_CMD_SET_CHAR_TIMEOUT:
 			p->timeout=data;
 			break;
-		case SERIAL_CMD_SET_DEBUG:
+		case SERIAL_CMD_SET_BAUD:
+			p->baud=data;
+			break;
+		case SERIAL_CMD_SET_PARITY:
+			p->parity=data;
+			break;
+		case SERIAL_CMD_SET_DATA_BITS:
+			p->data_bits=data;
+			break;
+		case SERIAL_CMD_SET_STOP:
+			p->stop=data;
+			break;
+		case SERIAL_CMD_SET_FLOW:
+			p->flow=data;
+			break;
+		case CMD_SET_DEBUG:
 			if(data)
 				p->debug=1;
 			else
@@ -495,18 +509,35 @@ int _serial_control(struct serial_dev *d, int cmd, uint32_t data)
 	}
 	return 0;
 }
+
 /***************************************************************************/
-/** allocate and fill in our function structure.
+/** Allocate our internal data structure.
 \n\b Arguments:
-\n\b Returns: 0 on success, -1 on failure
+\n\b Returns:
 ****************************************************************************/
-int serial_register(struct serial_dev *d)
+static void *calloc_internal(void)
 {
-	d->read=		_serial_read;
-	d->write=		_serial_write;
-	d->open=		_serial_open;
-	d->close=		_serial_close;
-	d->control= _serial_control;
-	d->dev=NULL;
-	return 0;
+	void *p;
+	if(-1 == check_calloc(sizeof(struct serial_port), &p,__func__,NULL) ) 
+		return NULL;
+	return p;
 }
+/***************************************************************************/
+/** Nothing to do. Done in open.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+static int init_if(struct open_gpib *d)
+{
+	
+}
+
+/**set up auto-generation of commands and the register function via build-interfaces	*/
+GPIB_TRANSPORT_FUNCTION(serial)
+OPEN_GPIB_ADD_CMD(SERIAL_CMD_SET_CHAR_TIMEOUT)
+OPEN_GPIB_ADD_CMD(SERIAL_CMD_SET_BAUD)
+OPEN_GPIB_ADD_CMD(SERIAL_CMD_SET_PARITY)
+OPEN_GPIB_ADD_CMD(SERIAL_CMD_SET_DATA_BITS)
+OPEN_GPIB_ADD_CMD(SERIAL_CMD_SET_STOP)
+OPEN_GPIB_ADD_CMD(SERIAL_CMD_SET_FLOW)
+

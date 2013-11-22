@@ -70,7 +70,7 @@ struct freq_off {
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct gpib *g)	 
+struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct open_gpib *g)	 
 {
 	struct ginstrument *gi;
 	
@@ -80,25 +80,25 @@ struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct gpib *g
 	}
 	memset(gi,0,sizeof(struct ginstrument));
 	if(NULL == g){
-		if(NULL == (gi->g=open_gpib(type,addr,path,-1))){
+		if(NULL == (gi->open_gpibp=open_gpib(type,addr,path,-1))){
 			printf("Can't open %s. Fatal\n",path);
 			free(gi);
 			return NULL;
 		}	
 	}
-	if(NULL == gi->g)
-		gi->g=g;
+	if(NULL == gi->open_gpibp)
+		gi->open_gpibp=g;
 	gi->addr=addr;
 	printf("Initializing PSG2400L\n");
-	write_string(gi->g,"*CLS");
-	if(0 == write_wait_for_data(gi->g,"*IDN?",3)){
+	write_string(gi->open_gpibp,"*CLS");
+	if(0 == write_wait_for_data(gi->open_gpibp,"*IDN?",3)){
 		printf("No data for id for '%s'\n",PSG2400L_IDN_STR);
 		return NULL;
 	}
 		
 	/*printf("Got %d bytes\n",i); */
-	if(NULL == strstr(gi->g->buf,PSG2400L_IDN_STR)){
-		printf("Unable to find '"PSG2400L_IDN_STR"' in id string '%s'\n",gi->g->buf);
+	if(NULL == strstr(gi->open_gpibp->buf,PSG2400L_IDN_STR)){
+		printf("Unable to find '"PSG2400L_IDN_STR"' in id string '%s'\n",gi->open_gpibp->buf);
 		return NULL;
 	}
 	return gi;
@@ -109,7 +109,7 @@ struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct gpib *g
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct ginstrument *init_HP8595E(char *path, int type, int addr, struct gpib *g)	 
+struct ginstrument *init_HP8595E(char *path, int type, int addr, struct open_gpib *g)	 
 {
 	struct ginstrument *gi;
 	if(NULL ==(gi=malloc(sizeof(struct ginstrument)))){
@@ -118,24 +118,24 @@ struct ginstrument *init_HP8595E(char *path, int type, int addr, struct gpib *g)
 	}
 	memset(gi,0,sizeof(struct ginstrument));
 	if(NULL == g){
-		if(NULL == (gi->g=open_gpib(type,addr,path,-1))){
+		if(NULL == (gi->open_gpibp=open_gpib(type,addr,path,-1))){
 			printf("Can't open %s. Fatal\n",path);
 			free(gi);
 			return NULL;
 		}	
 	}
-	if(NULL == gi->g)
-		gi->g=g;
+	if(NULL == gi->open_gpibp)
+		gi->open_gpibp=g;
 	gi->addr=addr;
 	printf("Initializing %s\n",HP8595E_IDN_STR);
-	if(0 == write_wait_for_data(gi->g,"ID?",5)){
+	if(0 == write_wait_for_data(gi->open_gpibp,"ID?",5)){
 		printf("No data for write_get id\n");
 		return NULL;
 	}
 		
 	/*printf("Got %d bytes\n",i); */
-	if(NULL == strstr(gi->g->buf,HP8595E_IDN_STR)){
-		printf("Unable to find '"HP8595E_IDN_STR"' in id string '%s'\n",gi->g->buf);
+	if(NULL == strstr(gi->open_gpibp->buf,HP8595E_IDN_STR)){
+		printf("Unable to find '"HP8595E_IDN_STR"' in id string '%s'\n",gi->open_gpibp->buf);
 		return NULL;
 	}
 	return gi;
@@ -338,16 +338,16 @@ int main(int argc, char * argv[])
 /**INIT  */
 	if(NULL == (analyzer_inst=init_HP8595E(analyzer_dev, GPIB_CTL_PROLOGIXS|verbose, analyzer_addr, NULL))) {
 		return -1;
-	}
-	if(NULL == (signalgen_inst=init_PSG2400L(signalgen_dev, GPIB_CTL_PROLOGIXS|verbose, signalgen_addr, analyzer_dev==signalgen_dev?analyzer_inst->g:NULL))) {
+	}																																																																						  
+	if(NULL == (signalgen_inst=init_PSG2400L(signalgen_dev, GPIB_CTL_PROLOGIXS|verbose, signalgen_addr, analyzer_dev==signalgen_dev?analyzer_inst->open_gpibp:NULL))) {
 		return -1;
 	}
 /**set up analyzer to base   */	
 	sprintf(lbuf,"MKTYPE PSN;SNGLS;RB %f Hz;SP %f Hz;ST %f mS",rbw,span,sweeptime);
-	write_string(analyzer_inst->g,lbuf);
+	write_string(analyzer_inst->open_gpibp,lbuf);
 /**set the signal generator level  */
 	sprintf(lbuf,"CL %f dbM\n",slevel);
-	write_string(signalgen_inst->g,lbuf);
+	write_string(signalgen_inst->open_gpibp,lbuf);
 /** PEAK search, if set  */
 	printf("Resolution BW = %f Hz, span = %f Hz.\n",rbw,span);
 	if( mode & PEAK_SEARCH){
@@ -355,7 +355,7 @@ int main(int argc, char * argv[])
 		printf("Finding peak for start freq %f and level %f.\n",start,slevel);
 		
 		sprintf(lbuf,"CF %f Mhz",start);
-		write_string(signalgen_inst->g,lbuf);
+		write_string(signalgen_inst->open_gpibp,lbuf);
 		x=((span-10)/1000000);
 		
 		printf("Span = %f Mhz, starting at %f\n",x,start-(x*10));
@@ -364,12 +364,12 @@ int main(int argc, char * argv[])
 			float y;
 			if(verbose) printf("Looking at %f ",iter); 
 			sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",iter);
-			write_wait_for_data(analyzer_inst->g,lbuf,10);
-			sscanf(analyzer_inst->g->buf,"%f",&level);
-			if(verbose) printf("%s ",analyzer_inst->g->buf); 
+			write_wait_for_data(analyzer_inst->open_gpibp,lbuf,10);
+			sscanf(analyzer_inst->open_gpibp->buf,"%f",&level);
+			if(verbose) printf("%s ",analyzer_inst->open_gpibp->buf); 
 			sprintf(lbuf,"MKF?");
-			write_wait_for_data(analyzer_inst->g,lbuf,10);
-			sscanf(analyzer_inst->g->buf,"%f",&freq);
+			write_wait_for_data(analyzer_inst->open_gpibp,lbuf,10);
+			sscanf(analyzer_inst->open_gpibp->buf,"%f",&freq);
 			if(verbose) printf(" Peak at %f",freq);
 			y=fabs(fabs(level)-fabs(slevel/1000));
 			/*printf("l=%f sl=%f y= %f d= %f ",level,slevel,y,delta); */
@@ -392,15 +392,15 @@ int main(int argc, char * argv[])
 		
 		sprintf(lbuf,"CF %f Mhz",iter);
 		
-		write_string(signalgen_inst->g,lbuf);
+		write_string(signalgen_inst->open_gpibp,lbuf);
 		if(verbose) printf("Using %f for cf ",last_f);
 		sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",last_f);
-		write_wait_for_data(analyzer_inst->g,lbuf,10);
-		sscanf(analyzer_inst->g->buf,"%f",&level);
-		if(verbose)printf("%s ",analyzer_inst->g->buf);
+		write_wait_for_data(analyzer_inst->open_gpibp,lbuf,10);
+		sscanf(analyzer_inst->open_gpibp->buf,"%f",&level);
+		if(verbose)printf("%s ",analyzer_inst->open_gpibp->buf);
 		sprintf(lbuf,"MKF?");
-		write_wait_for_data(analyzer_inst->g,lbuf,10);
-		sscanf(analyzer_inst->g->buf,"%f",&freq);
+		write_wait_for_data(analyzer_inst->open_gpibp,lbuf,10);
+		sscanf(analyzer_inst->open_gpibp->buf,"%f",&freq);
 		freq/=1000000; /**convert to Mhz  */
 		if( follow){
 			/**use the last peak to estimate where the next one will be - 
@@ -410,7 +410,7 @@ int main(int argc, char * argv[])
 		}else
 			last_f+=inc;
 
-		if(verbose)printf("%s (%f, %fMhz)\n",analyzer_inst->g->buf,freq,last_f);
+		if(verbose)printf("%s (%f, %fMhz)\n",analyzer_inst->open_gpibp->buf,freq,last_f);
 		switch(mode){
 			case CAL:
 				fprintf(cal,"%f %f %f %f\n",iter,slevel,freq,level);

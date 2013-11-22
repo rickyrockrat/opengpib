@@ -30,7 +30,7 @@ Change Log: \n
 */
 
 
-#include "open-gpib-ip.h"
+#include "open-gpib.h"
 #include <sys/stat.h>
 #include <fcntl.h>
 
@@ -54,7 +54,7 @@ struct ip_ctl {
 \n\b Arguments:
 \n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
-static int open_if(struct transport_dev *d, char *ip)
+static int open_if(struct open_gpib_dev *d, char *ip)
 {
 	struct ip_ctl *c;
 	int i;
@@ -100,7 +100,7 @@ err:
 \n\b Arguments:
 \n\b Returns: number of bytes read 
 ****************************************************************************/
-static int read_if(struct transport_dev *d, void *buf, int len)
+static int read_if(struct open_gpib_dev *d, void *buf, int len)
 {
 	struct ip_ctl *c; 				 
 	int i,wait;
@@ -141,7 +141,7 @@ static int read_if(struct transport_dev *d, void *buf, int len)
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-static int write_if(struct transport_dev *d, void *buf, int len)
+static int write_if(struct open_gpib_dev *d, void *buf, int len)
 {
 	struct ip_ctl *c;
 	int i;
@@ -192,7 +192,7 @@ end:
 \n\b Arguments:
 \n\b Returns: -1 on error or 0 all OK
 ****************************************************************************/
-static int close_if(struct transport_dev *d)
+static int close_if(struct open_gpib_dev *d)
 {
 	int i;
 	struct ip_ctl *c;
@@ -212,7 +212,7 @@ static int close_if(struct transport_dev *d)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int control_if(struct transport_dev *d, int cmd, uint32_t data)
+static int control_if(struct open_gpib_dev *d, int cmd, uint32_t data)
 {
 	struct ip_ctl *p;
 	p=(struct ip_ctl *)d->dev;
@@ -239,21 +239,27 @@ static int control_if(struct transport_dev *d, int cmd, uint32_t data)
 	}
 	return 0;
 }
-GPIB_TRANSPORT_FUNCTION(inet)
 /***************************************************************************/
-/** 
+/** Allocate our internal data structure.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-/** int ip_register(struct transport_dev *d)
+static void *calloc_internal(void)
+{
+	void *p;
+	if(-1 == check_calloc(sizeof(struct ip_ctl), &p,__func__,NULL) ) 
+		return NULL;
+	return p;
+}
+/***************************************************************************/
+/** Nothing to do - open does it.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+static int init_if( struct open_gpib *d)
 {
 	
-	d->read=		_ip_read;
-	d->write=		_ip_write;
-	d->open=		_ip_open;
-	d->close=		_ip_close;
-	d->control= _ip_control;
-	
-	d->dev=NULL;
-	return 0;
-}		*/
+}
+GPIB_TRANSPORT_FUNCTION(inet)
+OPEN_GPIB_ADD_CMD(IP_CMD_SET_PORT)
+

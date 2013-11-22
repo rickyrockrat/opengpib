@@ -152,7 +152,7 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct gpib *g;
+	struct open_gpib *g;
 	struct hp_scope_preamble h;
 	struct hp_common_options copt;
 	FILE *ofd;

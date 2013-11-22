@@ -59,7 +59,7 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct gpib *g;
+	struct open_gpib *g;
 	struct hp_common_options copt;
 	int i, c, query,rtn,slot;
 	char *cmd;

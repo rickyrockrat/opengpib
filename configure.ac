@@ -23,7 +23,7 @@ PKG_PROG_PKG_CONFIG([0.20])
 AM_PROG_CC_C_O
 
 # make the build quiet
-#AM_SILENT_RULES([yes])
+AM_SILENT_RULES([yes])
 
 # use the C compiler for the following checks
 AC_LANG([C])

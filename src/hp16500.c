@@ -106,7 +106,7 @@ int print_card_model(int id)
 \n\b Arguments: slot is 1-5
 \n\b Returns:
 ****************************************************************************/
-int select_hp_card(int slot, struct gpib *g)
+int select_hp_card(int slot, struct open_gpib *g)
 {
 	char *model;
 	if(NULL == g->inst )
@@ -150,7 +150,7 @@ void show_known_hp_cards( void )
 \n\b      If no is 0, we use the last card found.
 \n\b Returns: card number found (1-5). 0 is system.
 ****************************************************************************/
-int hp16500_find_card(int cardtype, int no, struct gpib *g)
+int hp16500_find_card(int cardtype, int no, struct open_gpib *g)
 {
 	int i,s, info,ccount;
 	int slots[5], slot=-1;
@@ -355,7 +355,7 @@ struct gpib_optons common[]={
 ****************************************************************************/
 void parse_options(struct options *o)
 {
-	struct gpib *g;
+	struct open_gpib *g;
 	FILE *ofd,*cfd,*tfd,*vfd;
 	char *name, *ofname;
 	char *tname,*cname,*vname;

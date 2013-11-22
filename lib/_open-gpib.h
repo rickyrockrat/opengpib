@@ -115,12 +115,14 @@ enum {
 	CTL_SEND_CLR,
 	CTL_NONE,
 };
-/**control commands   */
+/**control commands - supplied by interfaces.h
+see build_interfaces to understand more.
 enum {
 	CMD_SET_DEBUG=0,
 	CMD_SET_CMD_TIMEOUT,
 	CMD_LAST,
 };
+*/
 
 #define CONTROLLER_TYPEMASK 0xFF
 #define OPTION_DEBUG 0x100
@@ -129,7 +131,55 @@ enum {
 	#define STRINGIFY(x) #x
 	#define TOSTRING(x) STRINGIFY(x)
 #endif
-typedef int (*open_gpib_register)(void *dev); 	/**Returns: -1 on failure, 0 on success */
+
+/**Auto-built interfaces.h (see build-interfaces)  */
+#define IF_LIST open_gpib_interface_list
+
+#define OPEN_GPIB_REG_TYPE_CONTROLLER 1
+#define OPEN_GPIB_REG_TYPE_TRANSPORT  2
+/**forward reference these two  */
+struct open_gpib_dev;
+struct open_gpib;
+/** #define _INTERFACE_DEF_(name,type,register_func)*/
+struct open_gpib_functions {
+	int (*og_read)(struct open_gpib_dev *dev, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
+	int (*og_write)(struct open_gpib_dev *dev, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
+	int (*og_open)(struct open_gpib_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
+	int (*og_close)(struct open_gpib_dev *d);									/**closes interface  */
+	int (*og_control)(struct open_gpib_dev *d, int cmd, uint32_t data); 			/**controller-interface control. Set addr, etc.  */	
+	int (*og_init)(struct open_gpib *d); 									/**Initialize the controller  */		
+};
+
+/**structure to talk to transport mechanisms (serial, usb, inet, pci, etc.) and 
+   controllers  */
+struct open_gpib_dev {  
+	struct open_gpib_functions funcs;
+	void *dev;            												/**transport-specific structure  */
+	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
+	int debug;
+	uint32_t wait;
+};
+/**structure to talk to the host controller  */
+struct open_gpib {
+	struct open_gpib_dev *ctl;										/**controller-specific structure, if any  */	
+	int addr; 																		/**instrument address. Check against inst addr  */
+	int type_ctl;					 												/**controller type, options at top.  */
+	char *buf;														/**GPIB buffer  */
+	int buf_len;													/**buffer length  */
+	char *dev_path;																/**physical device path.  */
+	void *inst;                                   /**instrument-specific structure, if any  */
+};
+
+
+/**structure to talk to the instrument  */
+struct ginstrument {
+	struct open_gpib *open_gpibp;
+	int type;
+	int addr;																							  /**instrument address.  */
+	int (*init)(struct ginstrument *inst);									/**function to call to initialize instrument.  */
+};
+
+typedef struct open_gpib_dev *(*open_gpib_register)(void ); 	/**Returns: -1 on failure, 0 on success */
 
 /**structure to use for controller and transport registration  */
 struct open_gpib_interfaces {
@@ -137,101 +187,71 @@ struct open_gpib_interfaces {
 	int type;
 	open_gpib_register func; 	/**Returns: -1 on failure, 0 otherwise */
 };
-/**Auto-built interfaces.h (see build-interfaces)  */
-#define IF_LIST open_gpib_interface_list
-
-#define OPEN_GPIB_REG_TYPE_CONTROLLER 1
-#define OPEN_GPIB_REG_TYPE_TRANSPORT  2
-#define _INTERFACE_DEF_(name,type,register_func)
-
-
-/**structure to talk to transport mechanisms (serial, usb, inet, pci, etc.  */
-struct transport_dev {
-	int (*read)(struct transport_dev *d, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
-	int (*write)(struct transport_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
-	int (*open)(struct transport_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
-	int (*close)(struct transport_dev *d);									/**closes interface  */
-	int (*control)(struct transport_dev *d, int cmd,uint32_t data); 			/**controller-interface control. Set addr, etc.  */
-	void *dev;            												/**transport-specific structure  */
-	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
-	int debug;
-};
-/**structure to talk to the host controller  */
-struct gpib {
-	int (*read)(void *dev, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
-	int (*write)(void *dev, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
-	int (*open)(struct gpib *g, char *path);			/** Returns: 1 on failure, 0 on success */
-	int (*close)(struct gpib *g);									/**closes interface  */
-	int (*control)(struct gpib *g, int cmd, uint32_t data); 			/**controller-interface control. Set addr, etc.  */	
-	void *ctl;																		/**controller-specific structure, if any  */	
-	int addr; 																		/**instrument address. Check against inst addr  */
-	int type_ctl;					 												/**controller type, options at top.  */
-	char *buf;														/**GPIB buffer  */
-	int buf_len;													/**buffer length  */
-	char *dev_path;																/**physical device path.  */
-	void *inst;                                   /**instrument-specific structure, if any  */
-	struct transport_dev *tdev;                   /**transport structure, if any.  */
-};
-
-
-/**structure to talk to the instrument  */
-struct ginstrument {
-	struct gpib *g;
-	int type;
-	int addr;																							  /**instrument address.  */
-	int (*init)(struct ginstrument *inst);									/**function to call to initialize instrument.  */
-};
-/** Set up our interface functions.  */
-static int read_if(struct transport_dev *d, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
-static int write_if(struct transport_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
-static int open_if(struct transport_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
-static int close_if(struct transport_dev *d);									/**closes interface  */
-static int control_if(struct transport_dev *d, int cmd,uint32_t data); 			/**controller-interface control. Set addr, etc.  */
+/** Set up our controller/transport functions.  */
+static int read_if(struct open_gpib_dev *d, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
+static int write_if(struct open_gpib_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
+static int open_if(struct open_gpib_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
+static int close_if(struct open_gpib_dev *d);									/**closes interface  */
+static int init_if( struct open_gpib *d);									/**initializes interface - usually for the controller setup.  */
+static int control_if(struct open_gpib_dev *d, int cmd,uint32_t data); 			/**controller-interface control. Set addr, etc.  */
+static void *calloc_internal(void); /**allocate internal structures.  */
 
 /** 	
 	void **x=p;	\
 if( check_calloc(sizeof(struct transport_dev), p, __func__,NULL) == -1) return -1;\
-		fprintf(stderr,"register_func passed %p read= %p\n",d,&d->read);\
-	fprintf(stderr,"ctl=%p\n",d->control); \
+		fprintf(stderr,"register_func passed %p read= %p\n",d,&d->funcs.og_read);\
+	fprintf(stderr,"ctl=%p\n",d->funcs.og_control); \
 	*/
+/**these macros are read with build-interfaces, and fills in the
+   open_gpib_interface_list structure, which is 
+   struct open_gpib_interfaces.
+   see build_interfaces to understand more
+  */
 
 #define GPIB_TRANSPORT_FUNCTION(x) \
-int register_##x(void *p) {\
-	struct transport_dev *d=(struct transport_dev *)p; \
-	d->read=read_if; \
-	d->write=write_if; \
-	d->open=open_if; \
-	d->close=close_if; \
-	d->control=control_if; \
-	d->dev=NULL; \
-	return 0; \
+struct open_gpib_dev *register_##x(void) {\
+	struct open_gpib_dev *d;\
+	if(-1 == check_calloc(sizeof(struct open_gpib_dev), &d,__func__,NULL) ) return NULL;\
+	d->funcs.og_read=read_if;\
+	d->funcs.og_write=write_if;\
+	d->funcs.og_open=open_if;\
+	d->funcs.og_close=close_if;\
+	d->funcs.og_control=control_if;\
+	d->funcs.og_init=init_if;\
+	d->dev=calloc_internal(); \
+	return d; \
 }
 
-#define GPIB_CONTROLLER_FUNCTION (x) \
+#define GPIB_CONTROLLER_FUNCTION GPIB_TRANSPORT_FUNCTION
+/** #define GPIB_CONTROLLER_FUNCTION (x) \
 int register_##x ( void *p) {\
-	struct gpib *d=(struct gpib *)p; \
-	d->read=read_if; \
-	d->write=write_if; \
-	d->open=open_if; \
-	d->close=close_if; \
-	d->control=control_if; \
-	d->dev=NULL; \
-	return 0; \
-}
+	 struct open_gpib *d=( struct open_gpib *)p;\
+	d->funcs.og_read=read_ctl;\
+	d->funcs.og_write=write_ctl;\
+	d->funcs.og_open=open_ctl;\
+	d->funcs.og_close=close_ctl;\
+	d->funcs.og_control=control_ctl;\
+	d->init=init_ctl;\
+	d->dev=NULL;\
+	return 0;\
+}		*/
+
+/**This becomes part of the global command set. Appended to  CMD_SET_, see build-interfaces.*/
+#define OPEN_GPIB_ADD_CMD(x)
 
 
 int open_gpib_list_interfaces(void);
 open_gpib_register open_gpib_find_interface(char *name, int type);
-int read_raw(struct gpib *g);
-int read_string(struct gpib *g);
-int write_string(struct gpib *g, char *msg);
-int write_get_data (struct gpib *g, char *cmd);
-int write_wait_for_data(struct gpib *g, char *cmd, int sec);
-struct gpib *open_gpib(int ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
-int close_gpib (struct gpib *g);
+int read_raw( struct open_gpib *g);
+int read_string( struct open_gpib *g);
+int write_string( struct open_gpib *g, char *msg);
+int write_get_data ( struct open_gpib *g, char *cmd);
+int write_wait_for_data( struct open_gpib *g, char *cmd, int sec);
+ struct open_gpib *open_gpib(int ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
+int close_gpib ( struct open_gpib *g);
 int gpib_option_to_type(char *op);
 void show_gpib_supported_controllers(void);
-int init_id(struct gpib *g, char *idstr);
+int init_id( struct open_gpib *g, char *idstr);
 int check_calloc(size_t size, void *p, const char *func, void *set);
 
 int is_string_number(char *s);
@@ -243,5 +263,6 @@ double og_get_value_col( int col, char *buf);
 char * og_get_string( char *f, char *buf);
 char * og_get_string_col( int col, char *buf); /**make sure resulting char * is has free() called on it  */
 void _usleep(int usec);
-#endif
+/*it is critial the line below stays here - it is used by build-interfaces */
+#endif /*REMOVE_ME/
 

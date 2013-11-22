@@ -29,6 +29,6 @@ Change Log: \n
 */
 #ifndef _PROLOGIXS_H_ 
 #define _PROLOGIXS_H_  1
-int register_prologixs(struct gpib *g);
+int register_prologixs( struct open_gpib *g);
 #endif
 

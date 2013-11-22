@@ -59,7 +59,7 @@ int check_channel(char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int set_channel(struct gpib *g,char *ch)
+int set_channel(struct open_gpib *g,char *ch)
 {
 	int i;
 	char *c;
@@ -76,13 +76,13 @@ int set_channel(struct gpib *g,char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init_instrument(struct gpib *g)	 
+int init_instrument(struct open_gpib *g)	 
 {
 	int i;
 	printf("Initializing Instrument\n");
-	g->control(g,CTL_SET_TIMEOUT,1000);
+	g->ctl->funcs.og_control(g->ctl,CTL_SET_TIMEOUT,1000);
 	while(read_string(g));
-	g->control(g,CTL_SET_TIMEOUT,500000);
+	g->ctl->funcs.og_control(g->ctl,CTL_SET_TIMEOUT,500000);
 	write_string(g,"id?");
 	if(-1 == (i=read_string(g)) ){
 		printf("%s:Unable to read from port on id\n",__func__);
@@ -102,7 +102,7 @@ int init_instrument(struct gpib *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_data(struct gpib *g)
+int get_data(struct open_gpib *g)
 {
 	int i;
 	write_string(g,"WAV?");
@@ -147,7 +147,7 @@ Todo:
 \n\b Returns:
 ****************************************************************************/
 
-int read_cursors(struct gpib *g)
+int read_cursors(struct open_gpib *g)
 {
 	char *target,lbuf[100], *function, *trigsrc;
 	float min,max,volts, diff,xinc;
@@ -242,7 +242,7 @@ void usage(void)
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct gpib *g;
+	struct open_gpib *g;
 	char *name, *ofname, *channel[MAX_CHANNELS], *lbuf;
 	FILE *ofd;
 	int i, c,inst_addr, rtn, ch_idx;

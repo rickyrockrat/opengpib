@@ -120,7 +120,7 @@ number of valid rows.
 \n\b Arguments:
 \n\b Returns: slot number of card.
 ****************************************************************************/
-int init_instrument(struct hp_common_options *o,struct gpib *g)	 
+int init_instrument(struct hp_common_options *o,struct open_gpib *g)	 
 {
 	int slot;
 	if(-1 == (slot=hp16500_find_card(o->cardtype,o->cardno,g)) )
@@ -142,7 +142,7 @@ int init_instrument(struct hp_common_options *o,struct gpib *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int wait_for_data(struct gpib *g)
+int wait_for_data(struct open_gpib *g)
 {
 	int i;
 	/**make sure it is enabled  */
@@ -166,7 +166,7 @@ int wait_for_data(struct gpib *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int message_avail(struct gpib *g)
+int message_avail(struct open_gpib *g)
 {
 	int i;
 	/**make sure it is enabled  */
@@ -209,7 +209,7 @@ void usage(void)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-long int write_data_to_file(struct gpib *g, FILE *fd)
+long int write_data_to_file(struct open_gpib *g, FILE *fd)
 {
 	
 	long int  sz,total;
@@ -264,7 +264,7 @@ long int write_data_to_file(struct gpib *g, FILE *fd)
 	fprintf(stderr,"Wrote %ld bytes\n",total);
 	if(total!=sz+HEADER_SIZE){	/**add header size of 10  */
 		fprintf(stderr,"Total does not match size. Sending CLR\n");
-		g->control(g,CTL_SEND_CLR,0);
+		g->ctl->funcs.og_control(g->ctl,CTL_SEND_CLR,0);
 	}
 	return total;
 }
@@ -275,7 +275,7 @@ long int write_data_to_file(struct gpib *g, FILE *fd)
 ****************************************************************************/
 int main(int argc, char * argv[])
 {
-	struct gpib *g;
+	struct open_gpib *g;
 	struct hp_common_options copt;
 	
 	FILE *ofd,*cfd,*tfd,*vfd;

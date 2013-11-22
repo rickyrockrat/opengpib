@@ -47,7 +47,7 @@ struct fileio_ctl {
   off_t pos;        /**current place in file  */
 };
 
-int register_fileio(struct gpib *g);
+int register_fileio( struct open_gpib *g);
 
 #endif
 
