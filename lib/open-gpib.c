@@ -32,7 +32,6 @@ Change Log: \n
 #include <stdlib.h>
 #include <unistd.h>
 #include "open-gpib.h"
-#include "hp16500ip.h"
 #include "fileio.h"
 
 struct supported_dev {
@@ -208,6 +207,41 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 	return write_string(gi->open_gpibp,cmd);
 		
 }
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns: 0 on success -1 on error
+****************************************************************************/
+int find_and_open(struct open_gpib_mstr *open_gpibp, char *name, int type, uint32_t debug, char *dev_path)
+{
+	open_gpib_register reg_func; 
+	
+	if(NULL == (reg_func=open_gpib_find_interface(name, type)))
+		goto err;
+	
+	if(DBG_TRACE<=debug)fprintf(stderr,"reg %s\n",name);
+	if(NULL == (open_gpibp->ctl=reg_func()) )
+		goto err; 
+	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s set_debug\n",name);
+	open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,debug);
+	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s open\n",name);
+	if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
+		goto err;
+	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s init\n",name);
+	if(-1==open_gpibp->ctl->funcs.og_init(open_gpibp))
+		goto err;
+	if(DBG_TRACE<=debug)fprintf(stderr,"%s Ready\n",name);
+	open_gpibp->dev_path=strdup(dev_path);
+	return 0;
+	
+err:
+	if(DBG_TRACE<=debug)fprintf(stderr,"%s Error on %s\n",__func__,name);
+	open_gpibp->ctl->funcs.og_close(open_gpibp->ctl);
+	free(open_gpibp->ctl);
+	open_gpibp->ctl=NULL;
+	return -1;
+}
 /***************************************************************************/													
 /** .
 \n\b Arguments:
@@ -216,6 +250,7 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path, int buf_size)
 {
 	struct open_gpib_mstr *open_gpibp;
+	uint32_t debug=OPTION_EXTRACT_DEBUG(ctype);
 	open_gpib_register reg_func; 
 	fprintf(stderr,"OpenGPIB Version %s\n",PACKAGE_VERSION);  
 	if(NULL == dev_path){
@@ -243,33 +278,12 @@ struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path, int b
 	/**set up the controller and interface. FIXME Replace with config file.  */
 	switch(ctype&CONTROLLER_TYPEMASK){
 		case GPIB_CTL_PROLOGIXS:
-			if(NULL == (reg_func=open_gpib_find_interface("prologixs", OPEN_GPIB_REG_TYPE_CONTROLLER)))
+			if(-1 == find_and_open(open_gpibp,"prologixs",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, dev_path))
 				goto err;
-			if(NULL == (open_gpibp->ctl=reg_func()) )
-				goto err; 
-			fprintf(stderr,"ctype=0x%x, extr 0x%x\n",ctype,OPTION_EXTRACT_DEBUG(ctype));
-			open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,OPTION_EXTRACT_DEBUG(ctype));
-			if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
-				goto err;
-			if(-1==open_gpibp->ctl->funcs.og_init(open_gpibp)){
-				open_gpibp->ctl->funcs.og_close(open_gpibp->ctl);
-				goto err;
-			}
 			break;
 		case GPIB_CTL_HP16500C:
-			printf("reg\n");
-			if(-1==register_hp16500c(open_gpibp))
-				goto err1;
-			printf("opt\n");
-			open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,OPTION_EXTRACT_DEBUG(ctype));
-			printf("open\n");
-			if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
+			if(-1 == find_and_open(open_gpibp,"hp16500cip",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, dev_path))
 				goto err;
-			printf("init\n");
-			if(-1 == open_gpibp->ctl->funcs.og_init(open_gpibp)){
-				fprintf(stderr,"Controller init failed\n");
-				goto err;
-			}
 			break;
     case GPIB_CTL_FILEIO:
 			if(-1==register_fileio(open_gpibp))
@@ -283,7 +297,7 @@ struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path, int b
 			goto err1;
 			break;
 	}
-	open_gpibp->dev_path=strdup(dev_path);
+	
 	return open_gpibp;
 err:
 	if(NULL != open_gpibp->ctl)

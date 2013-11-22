@@ -40,7 +40,7 @@ struct hp16500c_ctl {
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int hp16500c_init( struct open_gpib_mstr *g)
+int init__hp16500cip( struct open_gpib_mstr *g)
 {
 	fprintf(stderr,"h156c-init %d\n",g->type_ctl);
 	if(g->type_ctl&OPTION_DEBUG)fprintf(stderr,"Init HP 16500C INET controller\n");
@@ -62,7 +62,7 @@ int hp16500c_init( struct open_gpib_mstr *g)
 \n\b Arguments:
 \n\b Returns: -1 on failure, 0 on success
 ****************************************************************************/
-int ctl_hp16500c_open( struct open_gpib_dev *ctl, char *ip)
+int open_hp16500cip( struct open_gpib_dev *ctl, char *ip)
 {
 	open_gpib_register ip_reg;
 	if(NULL == ctl){
@@ -113,7 +113,7 @@ err:
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-int ctl_hp16500c_write(struct open_gpib_dev *ctl, void *buf, int len)
+int write_hp16500cip(struct open_gpib_dev *ctl, void *buf, int len)
 {
 	int i;
 	char *m=(char *)buf;
@@ -150,7 +150,7 @@ end:
 \n\b Arguments:
 \n\b Returns: -1 on failure, number of byte read otherwise
 ****************************************************************************/
-int ctl_hp16500c_read(struct open_gpib_dev *ctl, void *buf, int len)
+int read_hp16500cip(struct open_gpib_dev *ctl, void *buf, int len)
 {
 	struct hp16500c_ctl *c;
 	int i;
@@ -174,7 +174,7 @@ int ctl_hp16500c_read(struct open_gpib_dev *ctl, void *buf, int len)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int ctl_hp16500c_ctrl( struct open_gpib_dev *ctl, int cmd, uint32_t data)
+int control_hp16500cip( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 {
 	int i;
 	char buf[100];
@@ -209,7 +209,7 @@ int ctl_hp16500c_ctrl( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 			break;
 		case CTL_SEND_CLR:
 			i=sprintf(buf,"*CLS\n");
-			ctl_hp16500c_write(ctl,buf,i);
+			write_hp16500cip(ctl,buf,i);
 			break;
 		default:
 			fprintf(stderr,"Unsupported cmd '%d'\n",cmd);
@@ -223,7 +223,7 @@ int ctl_hp16500c_ctrl( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int ctl_hp16500c_close(struct open_gpib_dev *ctl)
+int close_hp16500cip(struct open_gpib_dev *ctl)
 {
 	int i;
 	
@@ -239,7 +239,7 @@ int ctl_hp16500c_close(struct open_gpib_dev *ctl)
 }
 
 
-int ctl_hp16500c_init (struct open_gpib_mstr *g)
+int init_hp16500cip (struct open_gpib_mstr *g)
 {
 	return 0;
 }
@@ -249,7 +249,7 @@ int ctl_hp16500c_init (struct open_gpib_mstr *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static void *calloc_internal(void)
+static void *calloc_internal_hp16500cip(void)
 {
 	void *p;
 	if(-1 == check_calloc(sizeof(struct hp16500c_ctl), &p,__func__,NULL) ) 
@@ -257,11 +257,13 @@ static void *calloc_internal(void)
 	return p;
 }
 
+GPIB_CONTROLLER_FUNCTION(hp16500cip)
+
 /***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns:
-****************************************************************************/
+***************************************************************************
 int register_hp16500c( struct open_gpib_mstr *g)
 {
 	if(NULL == g){
@@ -277,4 +279,4 @@ int register_hp16500c( struct open_gpib_mstr *g)
 	g->ctl->funcs.og_init=	ctl_hp16500c_init;
 	g->ctl->dev=calloc_internal();
 	return 0;
-}
+}*/
