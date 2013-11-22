@@ -200,14 +200,16 @@ struct open_gpib_interfaces {
 	int type;
 	open_gpib_register func; 	/**Returns: -1 on failure, 0 otherwise */
 };
-/** Set up our controller/transport functions.  */
-static int read_if(struct open_gpib_dev *d, void *buf, int len); 	/**Returns: -1 on failure, number of byte read otherwise */
-static int write_if(struct open_gpib_dev *d, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
-static int open_if(struct open_gpib_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
-static int close_if(struct open_gpib_dev *d);									/**closes interface  */
-static int init_if( struct open_gpib_mstr *d);									/**initializes interface - usually for the controller setup.  */
-static int control_if(struct open_gpib_dev *d, int cmd,uint32_t data); 			/**controller-interface control. Set addr, etc.  */
-static void *calloc_internal(void); /**allocate internal structures.  */
+
+/** Set up our controller/transport functions.  
+static int read_if(struct open_gpib_dev *d, void *buf, int len); 	//**Returns: -1 on failure, number of byte read otherwise 
+static int write_if(struct open_gpib_dev *d, void *buf, int len);	//**Returns: -1 on failure, number of bytes written otherwise  
+static int open_if(struct open_gpib_dev *d, char *path);			//** Returns: 1 on failure, 0 on success 
+static int close_if(struct open_gpib_dev *d);									//**closes interface  
+static int init_if( struct open_gpib_mstr *d);									//**initializes interface - usually for the controller setup.  
+static int control_if(struct open_gpib_dev *d, int cmd,uint32_t data); 			//controller-interface control. Set addr, etc.  
+static void *calloc_internal(void); //**allocate internal structures.  
+*/
 
 /** 	
 	void **x=p;	\
@@ -269,6 +271,7 @@ int gpib_option_to_type(char *op);
 void show_gpib_supported_controllers(void);
 int init_id( struct open_gpib_mstr *g, char *idstr);
 int check_calloc(size_t size, void *p, const char *func, void *set);
+void *calloc_internal( size_t size, const char *func);
 
 int is_string_number(char *s);
 int og_next_col(struct c_opts *o);

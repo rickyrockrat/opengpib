@@ -251,10 +251,7 @@ int init_hp16500cip (struct open_gpib_mstr *g)
 ****************************************************************************/
 static void *calloc_internal_hp16500cip(void)
 {
-	void *p;
-	if(-1 == check_calloc(sizeof(struct hp16500c_ctl), &p,__func__,NULL) ) 
-		return NULL;
-	return p;
+	return calloc_internal(sizeof(struct hp16500c_ctl),__func__);
 }
 
 GPIB_CONTROLLER_FUNCTION(hp16500cip)

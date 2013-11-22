@@ -29,12 +29,21 @@
 Change Log: \n
 */
 #define _GNU_SOURCE 1
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "open-gpib.h"
-#include "fileio.h"
+#include <sys/stat.h>
 
+struct fileio_ctl {
+	FILE *f;        /**file pointer for open file  */
+	int   fd;       /**file descriptor, not used, but available  */
+	char *name;     /**file name  */
+  char *last_cmd; /**string of write command  */
+  int last_cmd_len; /**length of string above  */
+  int state; /**for command states  */
+  int debug;
+  off_t readto; /**place to read to in the file  */
+  off_t filelen;        /**length of file  */
+  off_t pos;        /**current place in file  */
+};
 
 /***************************************************************************/
 /** .
@@ -59,7 +68,7 @@ off_t readlen(struct fileio_ctl *c, int len)
 \n\b Arguments:
 \n\b Returns: -1  on failure, 0 on success
 ****************************************************************************/
-int _fileio_open( struct open_gpib_dev *ctl, char *name)
+static int open_fileio( struct open_gpib_dev *ctl, char *name)
 {
 	struct fileio_ctl *c;
   struct stat finfo;
@@ -67,7 +76,7 @@ int _fileio_open( struct open_gpib_dev *ctl, char *name)
 		fprintf(stderr,"%s: dev null\n",__func__);
 		return 1;
 	}
-	c=(struct fileio_ctl *)ctl->dev;
+	c=(struct fileio_ctl *)ctl->internal;
 	if( -1 ==check_calloc(sizeof(struct fileio_ctl), &c, __func__,NULL) == -1) return -1;
   c->last_cmd=NULL;
 	c->name=strdup(name);
@@ -86,12 +95,12 @@ int _fileio_open( struct open_gpib_dev *ctl, char *name)
   c->pos=0;
   c->readto=0;
 	fprintf(stderr,"Opened '%s', %ld bytes\n",c->name,c->filelen);
-	ctl->dev=c;
+	ctl->internal=(void *)c;
 	return 0;
 	
 err:
 	free(c);
-	ctl->dev=NULL;
+	ctl->internal=NULL;
 	return -1;
 }
 
@@ -100,11 +109,11 @@ err:
 \n\b Arguments:
 \n\b Returns: -1 on failure, number bytes written otherwise
 ****************************************************************************/
-int _fileio_write(void *d, void *buf, int len)
+static int write_fileio(struct open_gpib_dev *ctl, void *buf, int len)
 {
 	struct fileio_ctl *c;
 	
-	c=(struct fileio_ctl *)d;
+	c=(struct fileio_ctl *)ctl->internal;
   if(NULL == buf)
     return -1;
   c->last_cmd=strdup((char *)buf);
@@ -118,7 +127,7 @@ bytes, then do what we should..
 \n\b Arguments:
 \n\b Returns: -1 on failure, number of byte read otherwise
 ****************************************************************************/
-int _fileio_read(void *d, void *buf, int len)
+static int read_fileio(struct open_gpib_dev *ctl, void *buf, int len)
 {
 	struct fileio_ctl *c;
 	int i,x;
@@ -126,7 +135,7 @@ int _fileio_read(void *d, void *buf, int len)
   char s[20];
   
 	m=(char *)buf;
-	c=(struct fileio_ctl *)d;
+	c=(struct fileio_ctl *)ctl->internal;
   if(NULL == buf )
     return -1;
   if(NULL == c->last_cmd){/**just read to file position  */
@@ -162,7 +171,8 @@ int _fileio_read(void *d, void *buf, int len)
       if( '#' != fgetc(c->f) ) goto hplogicerr;
       if( '8'== fgetc(c->f) )goto hplogicerr;
       if(EOF == fscanf(c->f,"%ld",&c->readto) ) goto hplogicerr;
-      fread(s,1,6,c->f);
+      if(fread(s,1,6,c->f)<6)
+      	fprintf(stderr,"%s: Short read\n",__func__);;
       if(strncasecmp("CONFIG",s,6)) goto hplogicerr;
       fprintf(stderr,"Found Config. Readto is %ld\n",c->readto);
       c->readto +=10;
@@ -195,17 +205,17 @@ end:
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int control_fileio( struct open_gpib_mstr *g, int cmd, uint32_t data)
+static int control_fileio( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 {
 	struct fileio_ctl *c; 
 
-	if(NULL == g){
+	if(NULL == ctl){
 		fprintf(stderr,"fileio: gpib null\n");
 		return 0;
 	}
-	c=(struct fileio_ctl *)g->ctl;
+	c=(struct fileio_ctl *)ctl->internal;
 	/**sets g->ctl if it allocates new memory  */
-	if( -1 ==check_calloc(sizeof(struct fileio_ctl), &c, __func__,&g->ctl) == -1) return -1;
+	if( -1 ==check_calloc(sizeof(struct fileio_ctl), &c, __func__,&ctl->internal) == -1) return -1;
 		
 	switch(cmd){
 		case CTL_CLOSE:
@@ -232,42 +242,34 @@ int control_fileio( struct open_gpib_mstr *g, int cmd, uint32_t data)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int _fileio_close( struct open_gpib_mstr *g)
+static int close_fileio(struct open_gpib_dev *ctl)
 {
 	struct fileio_ctl *c;
-	if(NULL == g->ctl)
+	if(NULL == ctl)
 		return 0;
-	c=(struct fileio_ctl *)g->ctl;
+	c=(struct fileio_ctl *)ctl->internal;
   if(c->last_cmd)
     free(c->last_cmd);
   c->last_cmd=NULL;
 	fclose(c->f);
-	free (g->ctl);
-	g->ctl=NULL;
+	free (ctl->internal);
+	ctl->internal=NULL;
 	return 0;
 }
 
-int _fileio_init(struct open_gpib_dev *x)
+static int init_fileio(struct open_gpib_mstr *g)
 {
 	
 }
-
-
 /***************************************************************************/
-/** .
+/** Allocate our internal data structure.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int register_fileio( struct open_gpib_mstr *g)
+static void *calloc_internal_fileio(void)
 {
-	if(NULL == g)
-		return -1;
-	if(-1 == check_calloc(sizeof(struct open_gpib_dev), &g->ctl,__func__,NULL) ) return -1;
-	g->ctl->funcs.og_control=control_fileio;
-	g->ctl->funcs.og_read=	_fileio_read;
-	g->ctl->funcs.og_write=	_fileio_write;
-	g->ctl->funcs.og_open=	_fileio_open;
-	g->ctl->funcs.og_close=	_fileio_close;
-	g->ctl->funcs.og_init = _fileio_init;
-	return 0;
+	return calloc_internal(sizeof(struct fileio_ctl),__func__);
 }
+
+GPIB_CONTROLLER_FUNCTION(fileio)
+

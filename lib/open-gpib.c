@@ -32,7 +32,6 @@ Change Log: \n
 #include <stdlib.h>
 #include <unistd.h>
 #include "open-gpib.h"
-#include "fileio.h"
 
 struct supported_dev {
 	int type;
@@ -286,11 +285,8 @@ struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path, int b
 				goto err;
 			break;
     case GPIB_CTL_FILEIO:
-			if(-1==register_fileio(open_gpibp))
+    	if(-1 == find_and_open(open_gpibp,"fileio",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, dev_path))
 				goto err1;
-			open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,OPTION_EXTRACT_DEBUG(ctype));
-			if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
-				goto err;
 			break;
 		default:
 			fprintf(stderr,"Unknown controller %d\n",ctype&CONTROLLER_TYPEMASK);
@@ -403,6 +399,21 @@ int check_calloc(size_t size, void *x, const char *func, void *s)
 	}
 	return 0;
 }
+
+/***************************************************************************/
+/** Wapper for check_alloc. Just allocate the memory
+\n\b Arguments:
+size is size in bytes to allocate
+\n\b Returns: NULL on error or memory allocated
+****************************************************************************/
+void *calloc_internal( size_t size, const char *func)
+{
+	void *p=NULL;
+	if(-1 == check_calloc(size,&p,func,NULL))
+		return NULL;
+	return p;
+}
+
 /*from common.c*/
 
 /***************************************************************************/
