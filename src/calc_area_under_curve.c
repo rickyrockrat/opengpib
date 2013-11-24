@@ -60,7 +60,7 @@ void usage( void)
 ****************************************************************************/
 int calc_area_under_curve(struct c_opts *o)
 {
-	float c,off,sum,ave,last;
+	float c,off,sum,ave,last=0;
 	int count;
 	off=99999;
 	sum=0;
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
 {
 	struct c_opts opts;
 	int c;
-	char *fname;
+	char *fname=NULL;
 	opts.dlm=' ';
 	opts.col=2;
 	opts.fd=NULL;

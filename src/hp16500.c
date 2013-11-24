@@ -67,7 +67,7 @@ struct hp_cards hp_cardlist[]=\
 	{CARDTYPE_16540A ,  MODEL_16540A ,  DESC_16540A },
 	{CARDTYPE_16541A ,  MODEL_16541A ,  DESC_16541A },
 	{CARDTYPE_16542A ,  MODEL_16542A ,  DESC_16542A },
-	{CARDTYPE_INVALID,NULL},
+	{CARDTYPE_INVALID,NULL,NULL},
 };
 
 /** Generic functions for accessing the HP16500C go here.  */
@@ -152,7 +152,7 @@ void show_known_hp_cards( void )
 ****************************************************************************/
 int hp16500_find_card(int cardtype, int no, struct open_gpib_mstr *g)
 {
-	int i,s, info,ccount;
+	int i,s, info=0,ccount;
 	int slots[5], slot=-1;
 	if(-1 != cardtype){
 		if(-1 == (info=get_hp_info_card(cardtype)) ){

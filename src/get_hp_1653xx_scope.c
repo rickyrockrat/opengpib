@@ -161,8 +161,9 @@ int main(int argc, char * argv[])
 	int i, c, rtn, ch_idx, raw,xy,process,hdr;
 #ifdef HAVE_LIBLA2VCD2	 
   int vcd=0;
-  struct la2vcd *l;
+  struct la2vcd *l=NULL;
 #endif
+	miny=maxy=0; /**kill -Wextra warnings  */
   process=1;
 	channel[0]="ch1";
 	

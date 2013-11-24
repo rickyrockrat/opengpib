@@ -202,13 +202,13 @@ struct open_gpib_interfaces {
 };
 
 /** Set up our controller/transport functions.  
-static int read_if(struct open_gpib_dev *d, void *buf, int len); 	//**Returns: -1 on failure, number of byte read otherwise 
-static int write_if(struct open_gpib_dev *d, void *buf, int len);	//**Returns: -1 on failure, number of bytes written otherwise  
-static int open_if(struct open_gpib_dev *d, char *path);			//** Returns: 1 on failure, 0 on success 
-static int close_if(struct open_gpib_dev *d);									//**closes interface  
-static int init_if( struct open_gpib_mstr *d);									//**initializes interface - usually for the controller setup.  
+static int read_if(struct open_gpib_dev *d, void *buf, int len); 	// **Returns: -1 on failure, number of byte read otherwise 
+static int write_if(struct open_gpib_dev *d, void *buf, int len);	// **Returns: -1 on failure, number of bytes written otherwise  
+static int open_if(struct open_gpib_dev *d, char *path);			// ** Returns: 1 on failure, 0 on success 
+static int close_if(struct open_gpib_dev *d);									// **closes interface  
+static int init_if( struct open_gpib_mstr *d);									// **initializes interface - usually for the controller setup.  
 static int control_if(struct open_gpib_dev *d, int cmd,uint32_t data); 			//controller-interface control. Set addr, etc.  
-static void *calloc_internal(void); //**allocate internal structures.  
+static void *calloc_internal(void); // **allocate internal structures.  
 */
 
 /** 	

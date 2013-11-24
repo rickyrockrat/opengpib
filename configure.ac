@@ -79,7 +79,7 @@ fi
 #AC_CHECK_LIB([$gtk_libs],gtk_status_icon_new,[],AC_MSG_ERROR(Requirement not met: gtk >= 2.10.0))
 
 
-
+CFLAGS="$CFLAGS -Wall -Wextra"
 #AC_CONFIG_FILES([src/Makefile Makefile lib/Makefile lib/libopen-gpib.pc lib/interfaces/Makefile])
 AC_CONFIG_FILES([src/Makefile Makefile lib/Makefile lib/libopen-gpib.pc ])
 

@@ -77,7 +77,7 @@ static int open_fileio( struct open_gpib_dev *ctl, char *name)
 		return 1;
 	}
 	c=(struct fileio_ctl *)ctl->internal;
-	if( -1 ==check_calloc(sizeof(struct fileio_ctl), &c, __func__,NULL) == -1) return -1;
+	if( -1 ==check_calloc(sizeof(struct fileio_ctl), &c, __func__,NULL) ) return -1;
   c->last_cmd=NULL;
 	c->name=strdup(name);
 	  /* Open the file for reading */
@@ -130,7 +130,7 @@ bytes, then do what we should..
 static int read_fileio(struct open_gpib_dev *ctl, void *buf, int len)
 {
 	struct fileio_ctl *c;
-	int i,x;
+	int i=0,x;
 	char *m;
   char s[20];
   
@@ -215,7 +215,7 @@ static int control_fileio( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 	}
 	c=(struct fileio_ctl *)ctl->internal;
 	/**sets g->ctl if it allocates new memory  */
-	if( -1 ==check_calloc(sizeof(struct fileio_ctl), &c, __func__,&ctl->internal) == -1) return -1;
+	if( -1 ==check_calloc(sizeof(struct fileio_ctl), &c, __func__,&ctl->internal) ) return -1;
 		
 	switch(cmd){
 		case CTL_CLOSE:
@@ -259,7 +259,9 @@ static int close_fileio(struct open_gpib_dev *ctl)
 
 static int init_fileio(struct open_gpib_mstr *g)
 {
-	
+	if(NULL == g)
+		return -1;
+	return 0;
 }
 /***************************************************************************/
 /** Allocate our internal data structure.

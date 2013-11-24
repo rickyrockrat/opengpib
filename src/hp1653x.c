@@ -40,7 +40,10 @@
 ****************************************************************************/
 int set_channel_offset(struct open_gpib_mstr *g, int channel, float offset)
 {
-  return -1;
+	/**kill -Wextra warnings  */
+	if(channel || offset || NULL ==g)
+		return -1;
+	return -1;
 }
 
 
@@ -51,7 +54,9 @@ int set_channel_offset(struct open_gpib_mstr *g, int channel, float offset)
 ****************************************************************************/
 int set_channel_range(struct open_gpib_mstr *g)
 {
-  return -1;
+	if(NULL == g) /**kill -Wextra warning.  */
+  	return -1;
+	return -1;
 }
 
 /***************************************************************************/

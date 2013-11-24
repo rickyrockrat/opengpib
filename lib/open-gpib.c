@@ -47,7 +47,7 @@ static struct supported_dev s_dev[]={\
 
 
 /***************************************************************************/
-/** .
+/** Just print out all interfaces auto-registered.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
@@ -58,7 +58,7 @@ int open_gpib_list_interfaces(void)
 	for (i=0;NULL != IF_LIST[i].name; ++i){
 		fprintf(stderr,"%s, %d, %p\n",IF_LIST[i].name, IF_LIST[i].type, IF_LIST[i].func);
 	}
-	
+	return 0;
 }
 
 /***************************************************************************/
@@ -74,7 +74,7 @@ open_gpib_register open_gpib_find_interface(char *name, int type)
 	int i;
 	char *tname=NULL;
 	if( NULL == name)
-		return;
+		return NULL;
 	switch (type){
 		case OPEN_GPIB_REG_TYPE_CONTROLLER:
 			tname="controller";
@@ -250,7 +250,7 @@ struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path, int b
 {
 	struct open_gpib_mstr *open_gpibp;
 	uint32_t debug=OPTION_EXTRACT_DEBUG(ctype);
-	open_gpib_register reg_func; 
+	
 	fprintf(stderr,"OpenGPIB Version %s\n",PACKAGE_VERSION);  
 	if(NULL == dev_path){
 		fprintf(stderr,"Device name is NULL. Must specify device.\n");

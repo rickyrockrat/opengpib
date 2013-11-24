@@ -152,7 +152,8 @@ int read_cursors(struct open_gpib_mstr *g)
 	char *target,lbuf[100], *function, *trigsrc;
 	float min,max,volts, diff,xinc;
 	int i, f;
-	
+	target=NULL;
+	volts=0;
 	printf("Reading Cursor\n");
 	write_string(g,"CURSOR?");
 	read_string(g);

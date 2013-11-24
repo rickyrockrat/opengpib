@@ -149,7 +149,7 @@ switch(data_bits)
   case 6: return( CS6);
   case 7: return( CS7);
   case 8: return( CS8);
-  default: return(-1);
+  default: return(CS8+1);
   }
 }
 
@@ -161,7 +161,7 @@ switch(stop)
   {
   case 1: return(0);
   case 2: return(CSTOPB);
-  default: return(-1);
+  default: return(CSTOPB+1);
   }
 }
 
@@ -176,7 +176,7 @@ switch(parity)
   case 'N': return(0); break;
   case 'E': return(PARENB); break;
   case 'O': return(PARENB|PARODD); break;
-  default: return(-1);
+  default: return(PARENB+1);
   }
 return(0);
 }
@@ -202,19 +202,19 @@ int _open_serial_port(struct serial_port *p)
 	
 	
 	if(p->debug) printf("Checking Data Width %d ",p->data_bits);
-	if(-1 == (data_bits = get_data_bits(p->data_bits)) ) {
+	if((CS8+1) == (data_bits = get_data_bits(p->data_bits)) ) {
 	  printf("Can't handle bits=%d. Must be 5,6,7,8\n",p->data_bits);
 	  return(-1);
 	}
 	
 	if(p->debug) printf("Checking Stop %d\n",p->stop);
-	  if(-1 == (stop_bits = get_stop_bits(p->stop)) ) {
+	  if((CSTOPB+1) == (stop_bits = get_stop_bits(p->stop)) ) {
 	    printf("Can't handle stop bits=%d. Must be 1,2\n",p->stop);
 	    return(-1);
 	  }
 	
 	if(p->debug) printf("Checking Parity %c ",p->parity);
-	  if ( -1 == (parity = get_parity(p->parity)) ) {
+	  if ( (PARENB+1) == (parity = get_parity(p->parity)) ) {
 	    printf("Can't handle parity=%c. Must be N,E,O\n",p->parity);
 	    return(-1);
 	  }
@@ -529,7 +529,9 @@ static void *calloc_internal_serial(void)
 ****************************************************************************/
 static int init_serial(struct open_gpib_mstr *d)
 {
-	
+	if(NULL == d)
+		return -1;
+	return 0;
 }
 
 /**set up auto-generation of commands and the register function via build-interfaces	*/

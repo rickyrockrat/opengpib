@@ -132,7 +132,7 @@ static int control_prologixs( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 		return 0;
 	}
 	c=(struct prologixs_ctl *)ctl->internal;
-	if( -1== check_calloc(sizeof(struct prologixs_ctl), &c, __func__,&ctl->internal) == -1) return -1;
+	if( -1== check_calloc(sizeof(struct prologixs_ctl), &c, __func__,&ctl->internal) ) return -1;
 		
 	switch(cmd){
 		case CTL_CLOSE:
@@ -270,7 +270,7 @@ static int open_prologixs(struct open_gpib_dev *ctl, char *path)
 		return 1;
 	}
 	c=(struct prologixs_ctl *)ctl->internal;
-	if(-1 == check_calloc(sizeof(struct prologixs_ctl), &c, __func__,&ctl->internal) == -1) 
+	if(-1 == check_calloc(sizeof(struct prologixs_ctl), &c, __func__,&ctl->internal) ) 
 		return -1;
 		
 	if(NULL == (reg_func=open_gpib_find_interface("serial", OPEN_GPIB_REG_TYPE_TRANSPORT))){

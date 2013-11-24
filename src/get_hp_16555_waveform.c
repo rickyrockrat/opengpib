@@ -213,7 +213,7 @@ long int write_data_to_file(struct open_gpib_mstr *g, FILE *fd)
 {
 	
 	long int  sz,total;
-	int nodata;
+	int nodata=0;
 	uint32_t i, off=0;
 	/*wait_for_data(g); */
 	usleep(1000000); 
@@ -281,7 +281,7 @@ int main(int argc, char * argv[])
 	FILE *ofd,*cfd,*tfd,*vfd;
 	char *ofname;
 	char *sname,*cname,*vname;
-	int i, c, rtn, raw,trigger,slot, speriod;
+	int i, c, rtn, raw,trigger,slot, speriod=0;
 	long int total;
 	rtn=1;
 	trigger=0;
@@ -447,20 +447,20 @@ int main(int argc, char * argv[])
 			usleep(10000);
 		}		
 	}
-	if(cfd>0 ||ofd>0){ /**grab config  */
+	if(NULL != cfd ||NULL !=ofd){ /**grab config  */
 		fprintf(stderr,"Retreiving Setup\n");
 		sprintf(g->buf,":SYSTEM:SETUP?");
 		i=write_string(g,g->buf);	
 		total=write_data_to_file(g,ofd?ofd:cfd);	
 
-		if(ofd>0){
+		if(NULL != ofd){
 			i=sprintf(g->buf,"\nDATA\n");
 			fwrite(g->buf,1,i,ofd);		
 		}
 	}
 	usleep(100000);
 	
-	if(tfd>0 ||ofd>0){ /**grab data  */
+	if(NULL != tfd ||NULL !=ofd){ /**grab data  */
 		
 		fprintf(stderr,"Retreiving Data\n");
 	/*	goto closem; */

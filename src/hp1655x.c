@@ -507,7 +507,7 @@ void search_state(int pod, uint16_t clk, uint16_t clkmask, uint16_t state, uint1
 	inc = ONE_CARD_ROWSIZE;
 	count=0;
 	while(s<pre->data + pre->data_sz){
-		uint16_t val,_clk,x;
+		uint16_t val,_clk=0,x;
 		
 		d=(struct one_card_data *)s;
 		val=d->pdata[p+1]|d->pdata[p]<<8;

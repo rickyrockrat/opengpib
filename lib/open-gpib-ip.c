@@ -218,7 +218,7 @@ static int control_inet(struct open_gpib_dev *d, int cmd, uint32_t data)
 	p=(struct ip_ctl *)d->internal;
 	/**auto-allocate so we can use the control structure before we open.  */
 /*	fprintf(stderr,"p=%p &p=%p, &dev=%p\n",p,&p,&d->internal); */
-	if(-1==check_calloc(sizeof(struct ip_ctl), &p, __func__,(void *)&d->internal) == -1) return -1;
+	if(-1==check_calloc(sizeof(struct ip_ctl), &p, __func__,(void *)&d->internal) ) return -1;
 		
 	switch(cmd){
 		case CMD_SET_CMD_TIMEOUT:
@@ -257,7 +257,9 @@ static void *calloc_internal_inet(void)
 ****************************************************************************/
 static int init_inet( struct open_gpib_mstr *d)
 {
-	
+	if(d)
+	return 0;
+	return 0;
 }
 GPIB_TRANSPORT_FUNCTION(inet)
 OPEN_GPIB_ADD_CMD(IP_CMD_SET_PORT)

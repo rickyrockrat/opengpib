@@ -241,6 +241,8 @@ int close_hp16500cip(struct open_gpib_dev *ctl)
 
 int init_hp16500cip (struct open_gpib_mstr *g)
 {
+	if(NULL == g)
+		return -1;
 	return 0;
 }
 
