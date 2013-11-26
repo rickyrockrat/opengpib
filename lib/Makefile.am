@@ -8,12 +8,12 @@ hdr_HEADERS = open-gpib.h
 # two libraries - one for my cflags, and one for all the rest.
 
 noinst_LTLIBRARIES = liba.la 
-liba_la_SOURCES = prologixs.c open-gpib-inet.c serial.c hp16500ip.c fileio.c
+liba_la_SOURCES = prologixs.c open-gpib-inet.c serial.c hp16500ip.c fileio.c open-gpib-param.c support.c
 liba_la_CFLAGS = $(AM_CFLAGS) 
 #LDADD = -fPIC
 
 # rest of them
-#libb_la_SOURCES = prologixs.c open-gpib-inet.c serial.c hp16500ip.c fileio.c
+#libb_la_SOURCES = prologixs.c open-gpib-inet.c serial.c hp16500ip.c fileio.c 
 
 #libopen-gpib.la: interfaces.h 
 open-gpib.c : open-gpib.h

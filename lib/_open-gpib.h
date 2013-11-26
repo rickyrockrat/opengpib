@@ -281,13 +281,7 @@ int register_##x ( void *p) {\
 #define OPEN_GPIB_ADD_CMD(x)
 
 
-int open_gpib_set_param(struct open_gpib_param *ptr,char *name, char *fmt, ...);
-int open_gpib_set_uint32_t(struct open_gpib_param *,char *name,uint32_t val);
-int open_gpib_set_int32_t(struct open_gpib_param *,char *name,int32_t val);
-int open_gpib_set_string(struct open_gpib_param *,char *name,char *str);
-int open_gpib_show_param(struct open_gpib_param *head);
-struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *name, char *fmt, ...);
-struct open_gpib_param *open_gpib_new_param_old(struct open_gpib_param *head, int type, char *name, void *val);
+
 int open_gpib_list_interfaces(void);
 open_gpib_register open_gpib_find_interface(char *name, int type);
 int read_raw( struct open_gpib_mstr *g);
@@ -313,5 +307,17 @@ char * og_get_string( char *f, char *buf);
 char * og_get_string_col( int col, char *buf); /**make sure resulting char * is has free() called on it  */
 void _usleep(int usec);
 /*it is critial the line below stays here - it is used by build-interfaces */
+
+/**in open-gpib-param.c  */
+int open_gpib_set_param(struct open_gpib_param *ptr,char *name, char *fmt, ...);
+int open_gpib_set_uint32_t(struct open_gpib_param *,char *name,uint32_t val);
+int open_gpib_set_int32_t(struct open_gpib_param *,char *name,int32_t val);
+int open_gpib_set_string(struct open_gpib_param *,char *name,char *str);
+char *open_gpib_get_string(struct open_gpib_param *head,char *name);
+uint32_t open_gpib_get_uint32_t(struct open_gpib_param *head,char *name);
+int open_gpib_show_param(struct open_gpib_param *head);
+int32_t open_gpib_get_int32_t(struct open_gpib_param *head,char *name);
+struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *name, char *fmt, ...);
+struct open_gpib_param *open_gpib_new_param_old(struct open_gpib_param *head, int type, char *name, void *val);
 #endif /*REMOVE_ME/
 
