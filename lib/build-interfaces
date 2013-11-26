@@ -106,10 +106,11 @@ for f in $@; do
 done
 echo "	CMD_LAST," >> "$OFILE"
 echo "};" >>"$OFILE"
-echo "#ifdef _ALLOC_REGISTER_" >> "$OFILE"
 echo "$FUNLIST"|while read fun; do
 	echo "$fun">> "$OFILE"
 done
+echo "#ifdef _ALLOC_REGISTER_" >> "$OFILE"
+
 echo "struct open_gpib_interfaces open_gpib_interface_list []={" >> "$OFILE"
 
 for e in $ENTRY; do
