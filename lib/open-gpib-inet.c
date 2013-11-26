@@ -1,5 +1,5 @@
 /** \file ******************************************************************
-\n\b File:        ip.c
+\n\b File:        open-gpib-inet.c
 \n\b Author:      Doug Springer
 \n\b Company:     DNK Designs Inc.
 \n\b Date:        08/01/2008  4:21 pm

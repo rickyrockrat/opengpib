@@ -66,6 +66,7 @@ other controllers.
 #include <errno.h> /* for errno */
 #include <ctype.h>
 #include <sys/types.h>
+#include <stdarg.h>
 
 #define MAX_CHANNELS 8
 
@@ -123,6 +124,25 @@ enum {
 	CMD_LAST,
 };
 */
+/**the defines below must correspond to the variable names
+in the union 'val' below.  */
+#define OG_PARAM_TYPE_UINT32 'u'
+#define OG_PARAM_TYPE_INT32  's'
+#define OG_PARAM_TYPE_STRING 'c'
+#define OG_PARAM_TYPE_NAME   'n'
+
+union param_val {
+		uint32_t u;
+		int32_t s;
+		char *c;
+};
+/**these are for named parameters in each interface  */
+struct open_gpib_param {
+	char *name;
+	union param_val val;
+	int type; 
+	struct open_gpib_param *next;
+};
 
 #define CONTROLLER_TYPEMASK 0xFF
 #define OPTION_DEBUG 0xF00
@@ -161,10 +181,12 @@ struct open_gpib_dev {
 	struct open_gpib_dev *dev;
 	struct open_gpib_functions funcs;
 	void *internal;            												/**transport-specific structure  */
+	
 	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
-	int debug;
-	char *if_name;
-	uint32_t wait;
+	int debug;                                    /**debug level  */
+	char *if_name;                                /**name of this interface  */
+	char *dev_path;																/**physical device path.  */
+	uint32_t wait;                                /**timeout for this interface  */
 };
 /**structure to talk to the host controller  */
 struct open_gpib_mstr {
@@ -173,8 +195,9 @@ struct open_gpib_mstr {
 	int type_ctl;					 												/**controller type, options at top.  */
 	char *buf;														/**GPIB buffer  */
 	int buf_len;													/**buffer length  */
-	char *dev_path;																/**physical device path.  */
 	void *inst;                                   /**instrument-specific structure, if any  */
+	uint32_t mdebug;							    						/**value to set debug of other layers  */
+	uint32_t cmd_timeout;                         /**value to set command timeout, in uS  */ 
 };
 
 
@@ -258,6 +281,13 @@ int register_##x ( void *p) {\
 #define OPEN_GPIB_ADD_CMD(x)
 
 
+int open_gpib_set_param(struct open_gpib_param *ptr,char *name, char *fmt, ...);
+int open_gpib_set_uint32_t(struct open_gpib_param *,char *name,uint32_t val);
+int open_gpib_set_int32_t(struct open_gpib_param *,char *name,int32_t val);
+int open_gpib_set_string(struct open_gpib_param *,char *name,char *str);
+int open_gpib_show_param(struct open_gpib_param *head);
+struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *name, char *fmt, ...);
+struct open_gpib_param *open_gpib_new_param_old(struct open_gpib_param *head, int type, char *name, void *val);
 int open_gpib_list_interfaces(void);
 open_gpib_register open_gpib_find_interface(char *name, int type);
 int read_raw( struct open_gpib_mstr *g);
@@ -265,7 +295,7 @@ int read_string( struct open_gpib_mstr *g);
 int write_string( struct open_gpib_mstr *g, char *msg);
 int write_get_data ( struct open_gpib_mstr *g, char *cmd);
 int write_wait_for_data( struct open_gpib_mstr *g, char *cmd, int sec);
- struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
+struct open_gpib_mstr *open_gpib(uint32_t ctype, int gpib_addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
 int close_gpib ( struct open_gpib_mstr *g);
 int gpib_option_to_type(char *op);
 void show_gpib_supported_controllers(void);

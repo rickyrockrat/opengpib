@@ -10,7 +10,7 @@ hdr_HEADERS = open-gpib.h
 noinst_LTLIBRARIES = liba.la 
 liba_la_SOURCES = prologixs.c open-gpib-inet.c serial.c hp16500ip.c fileio.c
 liba_la_CFLAGS = $(AM_CFLAGS) 
-LDADD = -fPIC
+#LDADD = -fPIC
 
 # rest of them
 #libb_la_SOURCES = prologixs.c open-gpib-inet.c serial.c hp16500ip.c fileio.c
@@ -41,6 +41,11 @@ interfaces.h: Makefile $(liba_la_SOURCES)
 	
 open-gpib.h: interfaces.h _open-gpib.h
 	./build-interfaces "header"
+
+bin_PROGRAMS =test
+
+test_SOURCES=test.c
+test_LDADD= $(LIBOPEN_GPIB_LIBS) 
 
 # pkg-config
 pkgconfigdir=$(libdir)/pkgconfig

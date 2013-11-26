@@ -45,6 +45,268 @@ static struct supported_dev s_dev[]={\
 	{-1,NULL,NULL},
 };
 
+/***************************************************************************/
+/** .
+\n\b Arguments:
+ptr is the single element, fmt contains u,s, or c.
+\n\b Returns: 1 on error 0 on success.
+****************************************************************************/
+int _open_gpib_set_param(struct open_gpib_param *ptr,char *fmt, ...)
+{
+	va_list ap;
+	if(NULL == ptr)
+		return 1;
+	
+	va_start(ap, fmt);
+	switch (*fmt) {
+		case OG_PARAM_TYPE_UINT32:  ptr->val.u=va_arg(ap, int32_t); break;
+		case OG_PARAM_TYPE_INT32:   ptr->val.s=va_arg(ap, int32_t); break;
+		case OG_PARAM_TYPE_STRING:  ptr->val.c=va_arg(ap, char *);	break;
+		default: fprintf(stderr,"%s: Unknown type '%c'\n",__func__,*fmt);
+			goto err;
+	}	
+	va_end(ap);	
+	ptr->type=*fmt;
+	return 0;
+err:
+	return 1;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+head is head of list
+name is name of var
+fmt is one of "u" "s" "c"
+last is value
+\n\b Returns: 1 on error 0 on success.
+****************************************************************************/
+int open_gpib_set_param(struct open_gpib_param *head,char *name, char *fmt, ...)
+{
+	va_list ap;
+	struct open_gpib_param *i;
+	
+	if(NULL == head || NULL == name)
+		return 1;
+	for (i=head;NULL != i; i=i->next){
+		if(!strcmp(name,i->name)){
+			void *ptr;
+			va_start(ap, fmt);
+			/**this trick only works because we have a limited number types, 
+			and a pointer should be large enough to pass all types we use */
+			ptr=va_arg(ap,void *); 
+			va_end(ap);
+			return(_open_gpib_set_param(i,fmt,ptr)); /**function only takes one arg.  */
+		}
+	}	
+	fprintf(stderr,"%s: not found %s\n",__func__,name);
+	return 1;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+struct open_gpib_param *open_gpib_get_param_ptr(struct open_gpib_param *head,char *name)
+{
+	struct open_gpib_param *i;
+	if(NULL == head || NULL == name)
+		return NULL;
+	for (i=head;NULL != i; i=i->next){
+		if(!strcmp(name,i->name))
+			return i;
+	}	
+	return NULL;
+}
+
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int open_gpib_set_uint32_t(struct open_gpib_param *head,char *name,uint32_t val)
+{
+	struct open_gpib_param *p=open_gpib_get_param_ptr(head,name);
+	if(NULL == p)
+		return 1;
+	p->val.u=val;
+	return 0;
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int open_gpib_set_string(struct open_gpib_param *head,char *name,char *str)
+{
+	struct open_gpib_param *p=open_gpib_get_param_ptr(head,name);
+	if(NULL == p || NULL ==str)
+		return 1;
+	if(NULL != p->val.c)
+		free(p->val.c);
+	
+	p->val.c=strdup(str);
+	return 0;
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int open_gpib_set_int32_t(struct open_gpib_param *head,char *name,int32_t val)
+{
+	struct open_gpib_param *p=open_gpib_get_param_ptr(head,name);
+	if(NULL == p)
+		return 1;
+	p->val.s=val;
+	return 0;
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int open_gpib_show_param(struct open_gpib_param *head)
+{
+	int n;
+	char *fmt;
+	struct open_gpib_param *i;
+	if(NULL == head)
+		return 0;
+	printf("paramlist: \n");
+	for (n=0,i=head;NULL != i; i=i->next,n=n+1){
+		fmt=NULL;
+		printf("%s=",i->name);
+		switch(i->type){
+			case OG_PARAM_TYPE_UINT32: printf("%d\n",i->val.u);	break;
+			case OG_PARAM_TYPE_INT32:  printf("%d\n",i->val.s); break;
+			case OG_PARAM_TYPE_STRING: printf("%s\n",i->val.c);	break;
+		}
+	}
+	return n;
+}
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *name, char *fmt, ...)
+{
+	va_list ap;
+	struct open_gpib_param *i,*p;
+	char buf[3];
+	void *ptr=NULL;
+	int type=0;
+	buf[0]=0;
+	if(NULL == name){
+		fprintf(stderr,"%s: Failed to supply name, '%c'\n",__func__,OG_PARAM_TYPE_NAME );
+		return head;
+	}
+	if(NULL == fmt){
+		fprintf(stderr,"%s: Failed to supply fmt\n",__func__);
+		return head;
+	}
+	va_start(ap, fmt);
+/*	while (*fmt){ */
+		switch (*fmt) {
+			case OG_PARAM_TYPE_UINT32: 
+			case OG_PARAM_TYPE_INT32:  
+			case OG_PARAM_TYPE_STRING: 
+				type=*fmt;
+				sprintf(buf,"%c",*fmt);
+				ptr=va_arg(ap,void *); 
+				break;
+			/** case OG_PARAM_TYPE_NAME:   
+				name=va_arg(ap, char *);	
+				break;*/
+			default: 
+				fprintf(stderr,"%s: Unknown type '%c'\n",__func__,*fmt);
+		}	
+/**  		++fmt;
+	}*/
+	
+	va_end(ap);
+	
+	if(0==type){
+		fprintf(stderr,"%s: Failed to supply type\n",__func__);
+		return head;
+	}
+	if(NULL !=head ){/**elements already in list  */
+		if(NULL != (p=open_gpib_get_param_ptr(head, name)) ){
+			if(NULL != ptr && p->type == type){
+				sprintf(buf,"%c",type);
+				_open_gpib_set_param(p,buf,ptr);
+				return head;
+			}
+		}
+	}		
+	
+	/**allocate new element  */
+	if(NULL == (p=calloc(1,sizeof(struct open_gpib_param)) ) ){
+		fprintf(stderr,"%s:out of mem allocating %s\n",__func__,name);
+		return NULL;
+	}	
+	
+	if(NULL !=head){
+		p->next=head;
+	}
+	p->name=strdup(name);
+	p->type=type;
+	_open_gpib_set_param(p,buf,ptr);
+	return p;
+}
+/***************************************************************************/
+/** Create and allocate memory for a new parameter.
+\n\b Arguments:
+type is the type of the paramters, currently:
+
+OG_PARAM_TYPE_UINT32
+OG_PARAM_TYPE_INT32
+OG_PARAM_TYPE_STRING
+name is the name of the parameter.
+\n\b Returns:
+****************************************************************************/
+struct open_gpib_param *open_gpib_new_param_old(struct open_gpib_param *head, int type, char *name, void *val)
+{
+	struct open_gpib_param *i,*p;
+/*	int vsize=sizeof(char *) > sizeof(uint32_t)?sizeof(char *):sizeof(uint32_t); */
+	if(NULL == name){
+		fprintf(stderr,"%s:NULL name\n",__func__);
+		return NULL;
+	}
+	
+	if(NULL !=head ){/**elements already in list  */
+		if(NULL != (p=open_gpib_get_param_ptr(head, name)) )
+			return NULL;
+		for (i=head;NULL != i->next; i=i->next);
+	}else 
+		i=NULL;
+	/**allocate new element  */
+	if(NULL == (p=calloc(1,sizeof(struct open_gpib_param)) ) ){
+		fprintf(stderr,"%s:out of mem allocating %s\n",__func__,name);
+		return NULL;
+	}		
+	p->name=strdup(name);
+	p->type=type;
+	switch(type){
+		case OG_PARAM_TYPE_UINT32: p->val.u=NULL==val?0:*(uint32_t *)val;	break;
+		case OG_PARAM_TYPE_INT32: p->val.s=NULL==val?0:*(int32_t *)val;	break;
+		case OG_PARAM_TYPE_STRING: p->val.c=NULL==val?NULL:strdup((char *)val);	break;
+		default:
+			fprintf(stderr,"%s: Unknown type %c\n",__func__,type);
+			free(p);
+			return NULL;
+	}
+	
+	if(NULL !=i){
+		i->next=p;
+		return head;
+	}
+		
+	return p;
+}
 
 /***************************************************************************/
 /** Just print out all interfaces auto-registered.
@@ -210,58 +472,65 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 /***************************************************************************/
 /** .
 \n\b Arguments:
-\n\b Returns: 0 on success -1 on error
+name is the name of the interface (see GPIB_TRANSPORT_FUNCTION, GPIB_CONTROLLER_FUNCTION)
+type is the type, either OPEN_GPIB_REG_TYPE_CONTROLLER or OPEN_GPIB_REG_TYPE_TRANSPORT
+debug is the debug level for this interface
+wait is the wait in uS for this interface (inter-character, inter-command, inter-xxx)
+dev_path is the path to the device. It can be a device name or IP address.
+\n\b Returns: allocated structure on success, NULL on fail
 ****************************************************************************/
-int find_and_open(struct open_gpib_mstr *open_gpibp, char *name, int type, uint32_t debug, char *dev_path)
+struct open_gpib_dev *find_and_open(char *if_name, int type, uint32_t debug, uint32_t wait, char *dev_path)
 {
 	open_gpib_register reg_func; 
+	struct open_gpib_dev *open_gpibp=NULL;
 	
-	if(NULL == (reg_func=open_gpib_find_interface(name, type)))
+	if(NULL == (reg_func=open_gpib_find_interface(if_name, type)))
 		goto err;
 	
-	if(DBG_TRACE<=debug)fprintf(stderr,"reg %s\n",name);
-	if(NULL == (open_gpibp->ctl=reg_func()) )
+	if(DBG_TRACE<=debug)fprintf(stderr,"reg %s\n",if_name);
+	/**this call allocates the interface's open_gpib_dev  structure
+		and allocates the internal structure. It also sets if_name.
+		see the macro in _open_gpib.h GPIB_TRANSPORT_FUNCTION
+	   */
+	if(NULL == (open_gpibp=reg_func()) )
 		goto err; 
-	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s set_debug\n",name);
-	open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_DEBUG,debug);
-	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s open\n",name);
-	if(-1==open_gpibp->ctl->funcs.og_open(open_gpibp->ctl,dev_path))
+	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s set_debug\n",if_name);
+	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_DEBUG,debug);
+	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s open\n",if_name);
+	if(-1==open_gpibp->funcs.og_open(open_gpibp,dev_path))
 		goto err;
-	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s init\n",name);
-	if(-1==open_gpibp->ctl->funcs.og_init(open_gpibp))
+	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s init\n",if_name);
+	if(-1==open_gpibp->funcs.og_init(open_gpibp))
 		goto err;
-	if(DBG_TRACE<=debug)fprintf(stderr,"%s Ready\n",name);
+	if(DBG_TRACE<=debug)fprintf(stderr,"%s Ready\n",if_name);
 	open_gpibp->dev_path=strdup(dev_path);
-	return 0;
+	return open_gpibp;
 	
 err:
-	if(DBG_TRACE<=debug)fprintf(stderr,"%s Error on %s\n",__func__,name);
-	open_gpibp->ctl->funcs.og_close(open_gpibp->ctl);
-	free(open_gpibp->ctl);
-	open_gpibp->ctl=NULL;
-	return -1;
+	if(DBG_TRACE<=debug)fprintf(stderr,"%s Error on %s\n",__func__,if_name);
+	open_gpibp->funcs.og_close(open_gpibp);
+	free(open_gpibp);
+	return NULL;
 }
-/***************************************************************************/													
-/** .
+
+/***************************************************************************/
+/** allocate data and initialize structures.
 \n\b Arguments:
+debug sets the debug level,
+cmd_timeout is in uS (microseconds)
+buf_size will set the size of the common buffer for communications.
 \n\b Returns:
 ****************************************************************************/
-struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path, int buf_size)
+struct open_gpib_mstr *open_gpib_new(uint32_t debug, uint32_t cmd_timeout, uint32_t buf_size)
 {
 	struct open_gpib_mstr *open_gpibp;
-	uint32_t debug=OPTION_EXTRACT_DEBUG(ctype);
 	
 	fprintf(stderr,"OpenGPIB Version %s\n",PACKAGE_VERSION);  
-	if(NULL == dev_path){
-		fprintf(stderr,"Device name is NULL. Must specify device.\n");
-		return NULL;
-	}
 	if(NULL == (open_gpibp=malloc(sizeof( struct open_gpib_mstr)) ) ){
 		fprintf(stderr,"Out of mem on gpib alloc\n");
 		return NULL;
 	}
 	memset(open_gpibp,0,sizeof( struct open_gpib_mstr));
-	open_gpibp->addr=addr;
 	if(0>= buf_size)
 		buf_size=8096;
   /**make sure it's a 8-byte multiple, so we stop on largest data boundry  */
@@ -271,21 +540,57 @@ struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path, int b
 		free(open_gpibp);
 		return NULL;
 	}
-	open_gpibp->buf_len=buf_size;
+	open_gpibp->buf_len=buf_size;	
+	open_gpibp->mdebug=debug;
+	open_gpibp->cmd_timeout=cmd_timeout;
+	return open_gpibp;
+}
+
+/***************************************************************************/													
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+struct open_gpib_mstr *open_gpib(uint32_t ctype, int gpib_addr, char *dev_path, int buf_size)
+{
+	struct open_gpib_mstr *open_gpibm;
+	uint32_t debug=OPTION_EXTRACT_DEBUG(ctype);
+	
+	fprintf(stderr,"OpenGPIB Version %s\n",PACKAGE_VERSION);  
+	if(NULL == dev_path){
+		fprintf(stderr,"Device name is NULL. Must specify device.\n");
+		return NULL;
+	}
+	if(NULL == (open_gpibm=malloc(sizeof( struct open_gpib_mstr)) ) ){
+		fprintf(stderr,"Out of mem on gpib alloc\n");
+		return NULL;
+	}
+	memset(open_gpibm,0,sizeof( struct open_gpib_mstr));
+	open_gpibm->addr=gpib_addr;
+	if(0>= buf_size)
+		buf_size=8096;
+  /**make sure it's a 8-byte multiple, so we stop on largest data boundry  */
+  buf_size=((buf_size+7)/8)*8;
+	if(NULL == (open_gpibm->buf=malloc(buf_size) ) ){
+		fprintf(stderr,"Out of mem on buf size of %d\n",buf_size);
+		free(open_gpibm);
+		return NULL;
+	}
+	open_gpibm->buf_len=buf_size;
 	/*fprintf(stderr,"Using %d buf size\n",open_gpibp->buf_len); */
-	open_gpibp->type_ctl=ctype;
+	open_gpibm->type_ctl=ctype;
 	/**set up the controller and interface. FIXME Replace with config file.  */
 	switch(ctype&CONTROLLER_TYPEMASK){
 		case GPIB_CTL_PROLOGIXS:
-			if(-1 == find_and_open(open_gpibp,"prologixs",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, dev_path))
+			if(NULL == (open_gpibm->ctl=find_and_open("prologixs",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, 5000, dev_path)))
 				goto err;
 			break;
 		case GPIB_CTL_HP16500C:
-			if(-1 == find_and_open(open_gpibp,"hp16500cip",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, dev_path))
+			if(NULL == (open_gpibm->ctl=find_and_open("hp16500cip",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, 5000,dev_path)))
 				goto err;
 			break;
     case GPIB_CTL_FILEIO:
-    	if(-1 == find_and_open(open_gpibp,"fileio",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, dev_path))
+    	if(NULL == (open_gpibm->ctl=find_and_open("fileio",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, 5000, dev_path)))
 				goto err1;
 			break;
 		default:
@@ -294,12 +599,12 @@ struct open_gpib_mstr *open_gpib(uint32_t ctype, int addr, char *dev_path, int b
 			break;
 	}
 	
-	return open_gpibp;
+	return open_gpibm;
 err:
-	if(NULL != open_gpibp->ctl)
-		open_gpibp->ctl->funcs.og_close(open_gpibp->ctl);
+	if(NULL != open_gpibm->ctl)
+		open_gpibm->ctl->funcs.og_close(open_gpibm->ctl);
 err1:
-	free(open_gpibp);
+	free(open_gpibm);
 	return NULL;
 }
 
@@ -316,9 +621,9 @@ int close_gpib ( struct open_gpib_mstr *open_gpibp)
 	if(NULL != open_gpibp->ctl->funcs.og_close)
 		open_gpibp->ctl->funcs.og_close(open_gpibp->ctl);
 	
-	fprintf(stderr,"Free %s\n",open_gpibp->dev_path);
-	if(NULL != open_gpibp->dev_path)
-		free(open_gpibp->dev_path);
+	fprintf(stderr,"Free %s\n",open_gpibp->ctl->dev_path);
+	if(NULL != open_gpibp->ctl->dev_path)
+		free(open_gpibp->ctl->dev_path);
 	fprintf(stderr,"Now freeing ctl\n");
 	free(open_gpibp->ctl);
 	open_gpibp->ctl=NULL;
