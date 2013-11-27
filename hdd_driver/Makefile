@@ -2,6 +2,10 @@
 # Makefile for the Linux fat filesystem support.
 #
 KERNEL_SOURCE = /lib/modules/`uname -r`/build
+KERNEL_INCLUDE =/lib/modules/`uname -r`/build/include
+
+EXTRA_CFLAGS += -I$(KERNEL_INCLUDE)
+
 CONFIG_FAT_FS=m
 CONFIG_VFAT_FS=m
 CONFIG_MSDOS_FS=m
