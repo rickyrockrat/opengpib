@@ -10,6 +10,7 @@
 
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
+#include <linux/slab.h>
 #include "fat.h"
 
 /* this must be > 0. */
