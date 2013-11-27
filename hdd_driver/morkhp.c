@@ -1,10 +1,10 @@
 /** \file ******************************************************************
-\n\b File:        readpartition.c
+\n\b File:        morkhp.c
 \n\b Author:      Doug Springer
 \n\b Company:     DNK Designs Inc.
 \n\b Date:        12/13/2010  8:45 am
 \n\b Description:  Read the first 512 bytes of a partition and dump contents
-Fat16 for now.
+Fat16 for now. Also modify the first 512 bytes to boot on HP16500C.
 */ /************************************************************************
 Change Log: \n
 Working 1.6G disk
@@ -144,6 +144,7 @@ int swap_buffer(char *buf, int no)
 	}
 	memcpy(b2,buf,no);
 	swab(b2,buf,no);
+	free(b2);
 	return 0;
 }
 
@@ -210,7 +211,7 @@ int display_fat16(char *buf, int no)
 __uint32_t check_div(char *name,__uint32_t val, __uint32_t div)
 {
 	if(val < div || 0 == val || (val%div)){
-		printf("%s (%d) zero, not large enough, or not evenly divisible by %d\n",name,val,div);
+		printf("New Param %s (%d) zero, not large enough, or not evenly divisible by %d\n",name,val,div);
 		return 0;
 	}
 	return val/div;
@@ -220,7 +221,7 @@ __uint32_t check_div(char *name,__uint32_t val, __uint32_t div)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int write_new_boot(char * buf, int no, int fd)
+int write_new_boot(char * buf, int no, int fd, int swap)
 {
 	int i;
 	struct fat16_boot *f=(struct fat16_boot *)buf;
@@ -313,6 +314,7 @@ int write_new_boot(char * buf, int no, int fd)
 	} else
 		printf("Sector size already 32768. Not modifying numbers.\n");
 err_num: /**don't modify the values or it'll hose. Instead, do everything else.  */		
+	printf("Not modifying block\n");
 	n.sector_size=f->sector_size;
 	n.sec_per_clus=f->sec_per_clus;
 	n.sectors=f->sectors;
@@ -321,10 +323,16 @@ err_num: /**don't modify the values or it'll hose. Instead, do everything else. 
 	n.fat_length=f->fat_length;
 	n.secs_track=f->secs_track;
 	n.hidden=f->hidden;
+	return 1;
 good:	/**number crunching done, write static  */
 	lseek(fd,0,SEEK_SET);
+	if(swap){
+		if(swap_buffer((char *)&n,512)){
+			printf("Swap buffer failed just before write. Abort write.\n");
+			return 1;
+		}
+	}	
 	write(fd,(void *)&n,512); 
-	display_fat16((char *)&n,512);
 	return 0;
 	
 }
@@ -407,7 +415,7 @@ int main(int argc, char *argv[])
 	}
 	display_fat16(buf,bytes_to_read);
 	if(rw)	{
-		write_new_boot(buf,bytes_to_read,devf);
+		write_new_boot(buf,bytes_to_read,devf,swap);
 	}
 	close(devf);
 	return 0;
