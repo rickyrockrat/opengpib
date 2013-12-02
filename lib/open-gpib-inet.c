@@ -255,12 +255,12 @@ static void *calloc_internal_inet(void)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int init_inet( struct open_gpib_mstr *d)
+static int init_inet( struct open_gpib_dev *d)
 {
 	if(d)
 	return 0;
 	return 0;
 }
-GPIB_TRANSPORT_FUNCTION(inet)
+GPIB_TRANSPORT_FUNCTION(inet,"TCP/IP Transport Layer")
 OPEN_GPIB_ADD_CMD(IP_CMD_SET_PORT)
 
