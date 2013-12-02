@@ -90,8 +90,8 @@ struct ginstrument *init_PSG2400L(char *path, int type, int addr, struct open_gp
 		gi->open_gpibp=g;
 	gi->addr=addr;
 	printf("Initializing PSG2400L\n");
-	write_string(gi->open_gpibp,"*CLS");
-	if(0 == write_wait_for_data(gi->open_gpibp,"*IDN?",3)){
+	write_string(gi->open_gpibp->ctl,"*CLS");
+	if(0 == write_wait_for_data(gi->open_gpibp->ctl,"*IDN?",3)){
 		printf("No data for id for '%s'\n",PSG2400L_IDN_STR);
 		return NULL;
 	}
@@ -128,7 +128,7 @@ struct ginstrument *init_HP8595E(char *path, int type, int addr, struct open_gpi
 		gi->open_gpibp=g;
 	gi->addr=addr;
 	printf("Initializing %s\n",HP8595E_IDN_STR);
-	if(0 == write_wait_for_data(gi->open_gpibp,"ID?",5)){
+	if(0 == write_wait_for_data(gi->open_gpibp->ctl,"ID?",5)){
 		printf("No data for write_get id\n");
 		return NULL;
 	}
@@ -344,10 +344,10 @@ int main(int argc, char * argv[])
 	}
 /**set up analyzer to base   */	
 	sprintf(lbuf,"MKTYPE PSN;SNGLS;RB %f Hz;SP %f Hz;ST %f mS",rbw,span,sweeptime);
-	write_string(analyzer_inst->open_gpibp,lbuf);
+	write_string(analyzer_inst->open_gpibp->ctl,lbuf);
 /**set the signal generator level  */
 	sprintf(lbuf,"CL %f dbM\n",slevel);
-	write_string(signalgen_inst->open_gpibp,lbuf);
+	write_string(signalgen_inst->open_gpibp->ctl,lbuf);
 /** PEAK search, if set  */
 	printf("Resolution BW = %f Hz, span = %f Hz.\n",rbw,span);
 	if( mode & PEAK_SEARCH){
@@ -355,7 +355,7 @@ int main(int argc, char * argv[])
 		printf("Finding peak for start freq %f and level %f.\n",start,slevel);
 		
 		sprintf(lbuf,"CF %f Mhz",start);
-		write_string(signalgen_inst->open_gpibp,lbuf);
+		write_string(signalgen_inst->open_gpibp->ctl,lbuf);
 		x=((span-10)/1000000);
 		
 		printf("Span = %f Mhz, starting at %f\n",x,start-(x*10));
@@ -364,11 +364,11 @@ int main(int argc, char * argv[])
 			float y;
 			if(verbose) printf("Looking at %f ",iter); 
 			sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",iter);
-			write_wait_for_data(analyzer_inst->open_gpibp,lbuf,10);
+			write_wait_for_data(analyzer_inst->open_gpibp->ctl,lbuf,10);
 			sscanf(analyzer_inst->open_gpibp->buf,"%f",&level);
 			if(verbose) printf("%s ",analyzer_inst->open_gpibp->buf); 
 			sprintf(lbuf,"MKF?");
-			write_wait_for_data(analyzer_inst->open_gpibp,lbuf,10);
+			write_wait_for_data(analyzer_inst->open_gpibp->ctl,lbuf,10);
 			sscanf(analyzer_inst->open_gpibp->buf,"%f",&freq);
 			if(verbose) printf(" Peak at %f",freq);
 			y=fabs(fabs(level)-fabs(slevel/1000));
@@ -392,14 +392,14 @@ int main(int argc, char * argv[])
 		
 		sprintf(lbuf,"CF %f Mhz",iter);
 		
-		write_string(signalgen_inst->open_gpibp,lbuf);
+		write_string(signalgen_inst->open_gpibp->ctl,lbuf);
 		if(verbose) printf("Using %f for cf ",last_f);
 		sprintf(lbuf,"CF %f MHz;TS;MKPK HI;MKA?",last_f);
-		write_wait_for_data(analyzer_inst->open_gpibp,lbuf,10);
+		write_wait_for_data(analyzer_inst->open_gpibp->ctl,lbuf,10);
 		sscanf(analyzer_inst->open_gpibp->buf,"%f",&level);
 		if(verbose)printf("%s ",analyzer_inst->open_gpibp->buf);
 		sprintf(lbuf,"MKF?");
-		write_wait_for_data(analyzer_inst->open_gpibp,lbuf,10);
+		write_wait_for_data(analyzer_inst->open_gpibp->ctl,lbuf,10);
 		sscanf(analyzer_inst->open_gpibp->buf,"%f",&freq);
 		freq/=1000000; /**convert to Mhz  */
 		if( follow){

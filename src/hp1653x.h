@@ -49,11 +49,11 @@ struct hp_scope_preamble {
   int point_start; /**location in buffer where points start.  */
 };
 /**scope functions  */
-int get_trigger_source(struct open_gpib_mstr *g);
-int oscope_parse_preamble(struct open_gpib_mstr *g, struct hp_scope_preamble *h);
+int get_trigger_source(struct open_gpib_dev *g);
+int oscope_parse_preamble(struct open_gpib_dev *g, struct hp_scope_preamble *h);
 int check_oscope_channel(char *ch);
-int oscope_get_preamble(struct open_gpib_mstr *g,char *ch, struct hp_scope_preamble *h);
-int get_oscope_data(struct open_gpib_mstr *g, char *ch, struct hp_scope_preamble *h);
+int oscope_get_preamble(struct open_gpib_dev *g,char *ch, struct hp_scope_preamble *h);
+int get_oscope_data(struct open_gpib_dev *g, char *ch, struct hp_scope_preamble *h);
 int init_oscope_instrument(struct hp_common_options *o, struct open_gpib_mstr *g); 
 #endif
 

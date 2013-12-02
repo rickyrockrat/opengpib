@@ -326,7 +326,7 @@ int main(int argc, char * argv[])
       }
     }  
   	fprintf(stderr,"Reading Channel %s\n",channel[c]);
-  	if( 0 >= (i=oscope_get_preamble(g,channel[c],&h))){
+  	if( 0 >= (i=oscope_get_preamble(g->ctl,channel[c],&h))){
   		fprintf(stderr,"Preable failed on %s\n",channel[c]);
   		goto closem;
   	}
@@ -339,7 +339,7 @@ int main(int argc, char * argv[])
   	Time= (point# -Xref)*Xinc + Xorigin */
     if(!process)
   	  fwrite(g->buf,1,i,ofd);	
-  	if(-1 == (i=get_oscope_data(g,channel[c],&h)) ){
+  	if(-1 == (i=get_oscope_data(g->ctl,channel[c],&h)) ){
   		fprintf(stderr,"Unable to get waveform??\n");
   		goto closem;
   	}	
@@ -415,7 +415,7 @@ int main(int argc, char * argv[])
       } else { /**! process  */
         fwrite(g->buf,1,i,ofd);
       }
-		  i=read_string(g);
+		  i=read_string(g->ctl);
       h.point_start=0;
   	} /**end read block loop  */
 		

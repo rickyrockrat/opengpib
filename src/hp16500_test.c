@@ -136,10 +136,10 @@ int main(int argc, char * argv[])
 				return -1;
 			}
 			select_hp_card(slot, g);
-			sprintf(g->buf,"%s",cmd);
-	    write_get_data(g,g->buf);	
-      fprintf(stderr,"Sent '%s' Command. Reply: '%s'\n",cmd,g->buf);
-      fprintf(stdout,"%s",g->buf);
+			sprintf(g->ctl->buf,"%s",cmd);
+	    write_get_data(g->ctl,g->ctl->buf);	
+      fprintf(stderr,"Sent '%s' Command. Reply: '%s'\n",cmd,g->ctl->buf);
+      fprintf(stdout,"%s",g->ctl->buf);
 			break;
     case QTEST:
       if(-1 == (slot=hp16500_find_card(copt.cardtype,copt.cardno,g)) ) {
@@ -147,7 +147,7 @@ int main(int argc, char * argv[])
 				return -1;
 			}
 			select_hp_card(slot, g);
-      fprintf(stderr,"Trigger source is %d\n",get_trigger_source(g));
+      fprintf(stderr,"Trigger source is %d\n",get_trigger_source(g->ctl));
       break;
 	}
 close:

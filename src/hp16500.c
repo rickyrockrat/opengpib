@@ -113,17 +113,17 @@ int select_hp_card(int slot, struct open_gpib_mstr *g)
 		model="Unknown";
 	else 
 		model=((struct card_info *)g->inst)->info->model;
-	write_get_data(g,":SELECT?");
+	write_get_data(g->ctl,":SELECT?");
 
-	if(slot == (g->buf[0]-0x30)){
-		fprintf(stderr,"Slot %c (%s) %s already selected\n",0x30!=g->buf[0]?g->buf[0]+'A'-'0'-1:g->buf[0],model,g->buf);
+	if(slot == (g->ctl->buf[0]-0x30)){
+		fprintf(stderr,"Slot %c (%s) %s already selected\n",0x30!=g->ctl->buf[0]?g->ctl->buf[0]+'A'-'0'-1:g->ctl->buf[0],model,g->ctl->buf);
 	}	else{
-		sprintf(g->buf,":SELECT %d",slot);
-		write_string(g,g->buf);	
+		sprintf(g->ctl->buf,":SELECT %d",slot);
+		write_string(g->ctl,g->ctl->buf);	
 	}
-	write_get_data(g,":SELECT?");
-/*	i=write_get_data(g,":?"); */
-	fprintf(stderr,"Selected Card %c to talk to.\n",0x30!=g->buf[0]?g->buf[0]+'A'-'0'-1:g->buf[0]);
+	write_get_data(g->ctl,":SELECT?");
+/*	i=write_get_data(g->ctl,":?"); */
+	fprintf(stderr,"Selected Card %c to talk to.\n",0x30!=g->ctl->buf[0]?g->ctl->buf[0]+'A'-'0'-1:g->ctl->buf[0]);
 	return 0;
 
 }
@@ -179,7 +179,7 @@ int hp16500_find_card(int cardtype, int no, struct open_gpib_mstr *g)
   if(CARDTYPE_16500C == cardtype){ /**talking to system  */
     return SLOTNO_16500C;
   }else{
-    if(0 == write_get_data(g,":CARDCAGE?")){
+    if(0 == write_get_data(g->ctl,":CARDCAGE?")){
   		fprintf(stderr,"Error sending Cardcage command\n");
   		return -1;
   	}

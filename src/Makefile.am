@@ -1,4 +1,4 @@
-# Binary build
+# Binary build - This file is part of OpenGPIB.
 #PACKAGE_VERSION = @PACKAGE_VERSION@
 
 #AM_CFLAGS -Wall

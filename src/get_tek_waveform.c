@@ -59,7 +59,7 @@ int check_channel(char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int set_channel(struct open_gpib_mstr *g,char *ch)
+int set_channel(struct open_gpib_dev *g,char *ch)
 {
 	int i;
 	char *c;
@@ -81,20 +81,20 @@ int init_instrument(struct open_gpib_mstr *g)
 	int i;
 	printf("Initializing Instrument\n");
 	g->ctl->funcs.og_control(g->ctl,CTL_SET_TIMEOUT,1000);
-	while(read_string(g));
+	while(read_string(g->ctl));
 	g->ctl->funcs.og_control(g->ctl,CTL_SET_TIMEOUT,500000);
-	write_string(g,"id?");
-	if(-1 == (i=read_string(g)) ){
+	write_string(g->ctl,"id?");
+	if(-1 == (i=read_string(g->ctl)) ){
 		printf("%s:Unable to read from port on id\n",__func__);
 		return -1;
 	}
 	/*printf("Got %d bytes\n",i); */
-	if(NULL == strstr(g->buf,"TEK/2440")){
-		printf("Unable to find 'TEK/2440' in id string '%s'\n",g->buf);
+	if(NULL == strstr(g->ctl->buf,"TEK/2440")){
+		printf("Unable to find 'TEK/2440' in id string '%s'\n",g->ctl->buf);
 		return -1;
 	}
-	printf("Talking to addr %d: '%s'\n",g->addr,g->buf);
-	return write_string(g,"DATA ENCDG:ASCI");
+	printf("Talking to addr %d: '%s'\n",g->addr,g->ctl->buf);
+	return write_string(g->ctl,"DATA ENCDG:ASCI");
 }
 
 /***************************************************************************/
@@ -102,7 +102,7 @@ int init_instrument(struct open_gpib_mstr *g)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_data(struct open_gpib_mstr *g)
+int get_data(struct open_gpib_dev *g)
 {
 	int i;
 	write_string(g,"WAV?");
@@ -147,7 +147,7 @@ Todo:
 \n\b Returns:
 ****************************************************************************/
 
-int read_cursors(struct open_gpib_mstr *g)
+int read_cursors(struct open_gpib_dev *g)
 {
 	char *target,lbuf[100], *function, *trigsrc;
 	float min,max,volts, diff,xinc;
@@ -335,22 +335,22 @@ int main(int argc, char * argv[])
 			}
 		}	
 		if(!strcmp(CH_LIST[CURSORS],channel[c])) {
-			if(-1 == (i=read_cursors(g)) )
+			if(-1 == (i=read_cursors(g->ctl)) )
 				goto closem;
 		} else {
-			set_channel(g,channel[c]);
+			set_channel(g->ctl,channel[c]);
 			printf("Reading Channel %s\n",channel[c]);
-			if(-1 == (i=get_data(g)) ){
+			if(-1 == (i=get_data(g->ctl)) ){
 				printf("Unable to get waveform??\n");
 				goto closem;
 			}	
 			while(i>0){	/**suck out all data from cmd above  */
-				fwrite(g->buf,1,i,ofd);
-				i=read_string(g);
+				fwrite(g->ctl->buf,1,i,ofd);
+				i=read_string(g->ctl);
 			}
 		}
 		
-		/*fwrite(g->buf,1,i,ofd);	 */
+		/*fwrite(g->ctl->buf,1,i,ofd);	 */
 		if(NULL != ofd){
 			fclose(ofd);
 			ofd=NULL;

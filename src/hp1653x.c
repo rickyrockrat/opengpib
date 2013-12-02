@@ -68,7 +68,7 @@ EXTERNAL
 \n\b Arguments:
 \n\b Returns: 0 for external, or 1-x for channel, or -1 on error
 ****************************************************************************/
-int get_trigger_source (struct open_gpib_mstr *g)
+int get_trigger_source (struct open_gpib_dev *g)
 {
   sprintf(g->buf,":TRIG:SOUR?");
   if(0 == write_get_data(g,g->buf))
@@ -103,7 +103,7 @@ double og_get_xinc_mult(double v, int *x)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int oscope_parse_preamble(struct open_gpib_mstr *g, struct hp_scope_preamble *h)
+int oscope_parse_preamble(struct open_gpib_dev *g, struct hp_scope_preamble *h)
 {
 	h->fmt=og_get_value_col(0,g->buf);
 	h->type=og_get_value_col(1,g->buf);
@@ -160,7 +160,7 @@ int check_oscope_channel(char *ch)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int oscope_get_preamble(struct open_gpib_mstr *g,char *ch, struct hp_scope_preamble *h)
+int oscope_get_preamble(struct open_gpib_dev *g,char *ch, struct hp_scope_preamble *h)
 {
 	int i;
 	if(NULL == ch)
@@ -193,7 +193,7 @@ int oscope_get_preamble(struct open_gpib_mstr *g,char *ch, struct hp_scope_pream
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int get_oscope_data(struct open_gpib_mstr *g, char *ch, struct hp_scope_preamble *h)
+int get_oscope_data(struct open_gpib_dev *g, char *ch, struct hp_scope_preamble *h)
 {
 	int i,x;
 	if(NULL == ch)
@@ -233,9 +233,9 @@ int init_oscope_instrument(struct hp_common_options *o, struct open_gpib_mstr *g
      sprintf(buf,"BYTE");  break;
   }
 	
-  sprintf(g->buf,":WAV:REC FULL;:WAV:FORM %s;:SELECT?",buf);
-	i=write_get_data(g,g->buf);
-	fprintf(stderr,"Selected Card %s to talk to.\n",g->buf);
+  sprintf(g->ctl->buf,":WAV:REC FULL;:WAV:FORM %s;:SELECT?",buf);
+	i=write_get_data(g->ctl,g->ctl->buf);
+	fprintf(stderr,"Selected Card %s to talk to.\n",g->ctl->buf);
 
 	return i;
 /*34,-1,12,12,11,1,0,5,5,5 */
