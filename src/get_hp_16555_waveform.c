@@ -128,58 +128,16 @@ int init_instrument(struct hp_common_options *o,struct open_gpib_mstr *g)
   if(SLOTNO_16500C != slot)
 	  select_hp_card(slot, g);
 	
-	sprintf(g->buf,"*OPC\n");
-	write_string(g,g->buf);	
+	sprintf(g->ctl->buf,"*OPC\n");
+	write_string(g->ctl,g->ctl->buf);	
 	sprintf(g->buf,":menu %d,0\n",slot);
-	write_string(g,g->buf);	
+	write_string(g->ctl,g->ctl->buf);	
 	return slot;
 /*34,-1,12,12,11,1,0,5,5,5 */
 	/** :WAV:REC FULL;:WAV:FORM ASC;:SELECT? */
 }
 
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int wait_for_data(struct open_gpib_mstr *g)
-{
-	int i;
-	/**make sure it is enabled  */
-	usleep(10000);
-	sprintf(g->buf,"*OPC\n");
-	write_string(g,g->buf);	
-	while(1){
-		sprintf(g->buf,"*OPC?\n");
-		i=write_get_data(g,g->buf);	
-		if( i ){
-			if(g->buf[0] == '1')
-				break;
-		}
-		usleep(10000);
-	}
-	return i;
-}
 
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int message_avail(struct open_gpib_mstr *g)
-{
-	int i;
-	/**make sure it is enabled  */
-	usleep(10000);
-	sprintf(g->buf,"*STB?\n");
-	i=write_get_data(g,g->buf);	
-	if( i ){
-		if(g->buf[0] & 0x10)
-			return 1;
-	}
-	usleep(10000);
-	return 0;
-}
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -209,13 +167,13 @@ void usage(void)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-long int write_data_to_file(struct open_gpib_mstr *g, FILE *fd)
+long int write_data_to_file(struct open_gpib_dev *g, FILE *fd)
 {
 	
 	long int  sz,total;
 	int nodata=0;
 	uint32_t i, off=0;
-	/*wait_for_data(g); */
+	/*wait_for_data(g->ctl); */
 	usleep(1000000); 
 	sz=total=0;
 	
@@ -264,7 +222,7 @@ long int write_data_to_file(struct open_gpib_mstr *g, FILE *fd)
 	fprintf(stderr,"Wrote %ld bytes\n",total);
 	if(total!=sz+HEADER_SIZE){	/**add header size of 10  */
 		fprintf(stderr,"Total does not match size. Sending CLR\n");
-		g->ctl->funcs.og_control(g->ctl,CTL_SEND_CLR,0);
+		g->funcs.og_control(g,CTL_SEND_CLR,0);
 	}
 	return total;
 }
@@ -411,51 +369,51 @@ int main(int argc, char * argv[])
 		char range[100], period[100];
 		range[0]=period[0]=0;
 		/**set waveform to minimal waveform display, so it doesn't take forever to draw  */
-		sprintf(g->buf,":mach1:TWAV:RANGE?\n");
-		i=write_wait_for_data(g,g->buf,5);
+		sprintf(g->ctl->buf,":mach1:TWAV:RANGE?\n");
+		i=write_wait_for_data(g->ctl,g->ctl->buf,5);
 		if(i && i<100)
-			sprintf(range,"%s",g->buf);
+			sprintf(range,"%s",g->ctl->buf);
 		if(0 != speriod){
 				/**set the sample period*/
-			sprintf(g->buf,":mach1:TTR:SPER?\n");
-			i=write_wait_for_data(g,g->buf,5);
+			sprintf(g->ctl->buf,":mach1:TTR:SPER?\n");
+			i=write_wait_for_data(g->ctl,g->ctl->buf,5);
 			if(i && i<100)
-				sprintf(period,"%s",g->buf);
-			sprintf(g->buf,":mach1:TTR:SPER %dE-9\n",speriod);
-			i=write_string(g,g->buf);	
+				sprintf(period,"%s",g->ctl->buf);
+			sprintf(g->ctl->buf,":mach1:TTR:SPER %dE-9\n",speriod);
+			i=write_string(g->ctl,g->ctl->buf);	
 		}
 		
-		sprintf(g->buf,":mach1:TWAV:RANGE 10E-9\n");
-		i=write_string(g,g->buf);	
+		sprintf(g->ctl->buf,":mach1:TWAV:RANGE 10E-9\n");
+		i=write_string(g->ctl,g->ctl->buf);	
 		fprintf(stderr,"Starting Aquisition. Waiting for Data\n");
-		sprintf(g->buf,":RMODE SINGLE");
-		i=write_string(g,g->buf);	
-		sprintf(g->buf,":START");
-		i=write_string(g,g->buf);	
-		wait_for_data(g);
+		sprintf(g->ctl->buf,":RMODE SINGLE");
+		i=write_string(g->ctl,g->ctl->buf);	
+		sprintf(g->ctl->buf,":START");
+		i=write_string(g->ctl,g->ctl->buf);	
+		wait_for_data(g->ctl);
 		/**move menu to config so it won't paint the screen...  */
-		sprintf(g->buf,":menu %d,0\n",slot+1);
-		write_string(g,g->buf);	
+		sprintf(g->ctl->buf,":menu %d,0\n",slot+1);
+		write_string(g->ctl,g->ctl->buf);	
 		if(range[0]){
-			sprintf(g->buf,":mach1:TWAV:RANGE %s\n",range);
-			write_string(g,g->buf);
+			sprintf(g->ctl->buf,":mach1:TWAV:RANGE %s\n",range);
+			write_string(g->ctl,g->ctl->buf);
 			usleep(10000);
 		}
 		if(period[0]){
-			sprintf(g->buf,":mach1:TTR:SPER %s\n",period);
-			write_string(g,g->buf);
+			sprintf(g->ctl->buf,":mach1:TTR:SPER %s\n",period);
+			write_string(g->ctl,g->ctl->buf);
 			usleep(10000);
 		}		
 	}
 	if(NULL != cfd ||NULL !=ofd){ /**grab config  */
 		fprintf(stderr,"Retreiving Setup\n");
-		sprintf(g->buf,":SYSTEM:SETUP?");
-		i=write_string(g,g->buf);	
-		total=write_data_to_file(g,ofd?ofd:cfd);	
+		sprintf(g->ctl->buf,":SYSTEM:SETUP?");
+		i=write_string(g->ctl,g->ctl->buf);	
+		total=write_data_to_file(g->ctl,ofd?ofd:cfd);	
 
 		if(NULL != ofd){
-			i=sprintf(g->buf,"\nDATA\n");
-			fwrite(g->buf,1,i,ofd);		
+			i=sprintf(g->ctl->buf,"\nDATA\n");
+			fwrite(g->ctl->buf,1,i,ofd);		
 		}
 	}
 	usleep(100000);
@@ -464,9 +422,9 @@ int main(int argc, char * argv[])
 		
 		fprintf(stderr,"Retreiving Data\n");
 	/*	goto closem; */
-		sprintf(g->buf,":DBLOCK %s;:SYSTEM:DATA?",raw?"PACKED":"UNPACKED");
-		i=write_string(g,g->buf);	
-		total=write_data_to_file(g,ofd?ofd:tfd);	
+		sprintf(g->ctl->buf,":DBLOCK %s;:SYSTEM:DATA?",raw?"PACKED":"UNPACKED");
+		i=write_string(g->ctl,g->ctl->buf);	
+		total=write_data_to_file(g->ctl,ofd?ofd:tfd);	
 	}	
 	
 	rtn=0;
@@ -539,80 +497,4 @@ endvcd:
 				
 	return rtn;
 }
-#if 0
-/**  		while (!message_avail(g))
-			usleep(10000);*/
-/*		wait_for_data(g); */
-		usleep(100000); 
-		sz=total=0;
-		
-		while(1){
-			i=read_raw(g);
-			if(i && 0 == total){
-				sz=get_datsize(g->buf);
-				fprintf(stderr,"Len %ld Got %d ",sz,i);
-			}else
-				fprintf(stderr,"%ld ",sz-total);
-			fflush(NULL);
-			fwrite(g->buf,1,i,ofd?ofd:cfd);	
-			total+=i;
-			if(sz && total>= sz+HEADER_SIZE)
-				break;
-			if(0 == i){
-				++nodata;
-				if(nodata>10){
-					fprintf(stderr,"No Data for 10 tries\n");
-					break;
-				}
-			}else
-				nodata=0;
-				
-		}	
-		
-/**DATA  */
-		/*wait_for_data(g); */
-		usleep(1000000); 
-		sz=total=0;
-		
-		while(1){
-			uint32_t off=0;
-			i=read_raw(g);
-			if(i && 0 == total){
-				if(g->buf[0]!='#'){
-					for (off=0;off<i && g->buf[off] != '#';++off);
-					if(i == off){
-						fprintf(stderr,"discarding first buffer of %d\n",i);
-						i=0;
-						++nodata;
-					}else if(off){
-						fprintf(stderr,"Discarding first %d byte(s)\n",off);
-						i-=off;
-					}
-				}
-				if(i)	{
-					sz=get_datsize(g->buf);
-					fprintf(stderr,"Len %ld Got %d ",sz,i);	
-				}
-				
-			}else{
-				fprintf(stderr,"%ld ",sz-total);
-				off=0;
-			}
-				
-			fflush(NULL);
-			fwrite(&g->buf[off],1,i,ofd?ofd:tfd);	
-			total+=i;
-			if(sz && total> sz)
-				break;
-			if(0 == i){
-				++nodata;
-				if(nodata>10){
-					fprintf(stderr,"No Data for 10 tries\n");
-					break;
-				}
-					
-			}else
-				nodata=0;
-				
-		}
-#endif
+
