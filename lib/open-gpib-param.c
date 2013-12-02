@@ -31,6 +31,7 @@
 /** .
 \n\b Arguments:
 ptr is the single element, fmt contains u,s, or c.
+dynamically allocates/deallocates strings.
 \n\b Returns: 1 on error 0 on success.
 ****************************************************************************/
 int _open_gpib_set_param(struct open_gpib_param *ptr,char *fmt, ...)
@@ -43,7 +44,11 @@ int _open_gpib_set_param(struct open_gpib_param *ptr,char *fmt, ...)
 	switch (*fmt) {
 		case OG_PARAM_TYPE_UINT32:  ptr->val.u=va_arg(ap, int32_t); break;
 		case OG_PARAM_TYPE_INT32:   ptr->val.s=va_arg(ap, int32_t); break;
-		case OG_PARAM_TYPE_STRING:  ptr->val.c=va_arg(ap, char *);	break;
+		case OG_PARAM_TYPE_STRING:  
+			if(NULL != ptr->val.c)
+				free(ptr->val.c);
+			ptr->val.c=strdup(va_arg(ap, char *));	
+			break;
 		default: fprintf(stderr,"%s: Unknown type '%c'\n",__func__,*fmt);
 			goto err;
 	}	
@@ -205,6 +210,40 @@ int open_gpib_show_param(struct open_gpib_param *head)
 		}
 	}
 	return n;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns: new head of list
+****************************************************************************/
+struct open_gpib_param *open_gpib_del_param(struct open_gpib_param *head,char *name)
+{
+	struct open_gpib_param *i, *last;
+	if(NULL == name){
+		fprintf(stderr,"%s: Failed to supply name, '%c'\n",__func__,OG_PARAM_TYPE_NAME );
+		return head;
+	}
+	
+	if(NULL == head || NULL == name)
+		return NULL;
+	for (last=i=head;NULL != i; i=i->next){
+		if(!strcmp(name,i->name)){
+			if(OG_PARAM_TYPE_STRING==i->type && NULL != i->val.c)
+				free(i->val.c);
+			if(head == i){/**use last as return value.  */
+				last=i->next;
+			}else{
+				last->next=i->next;
+				last=head;
+			}
+			free(i);
+			return last;
+		}
+		last=i;	
+	}	
+	fprintf(stderr,"%s: Unable to find parameter '%s'\n",__func__,name);
+	return NULL;
 }
 /***************************************************************************/
 /** .
