@@ -33,15 +33,15 @@
 len is max_len for msg.
 \n\b Returns: number of chars read.
 ****************************************************************************/
-int read_raw( struct open_gpib_mstr *open_gpibp)
+int read_raw( struct open_gpib_dev *open_gpibd)
 {
 	int i,j;
 	i=0;
-	while( (j=open_gpibp->ctl->funcs.og_read(open_gpibp->ctl,&open_gpibp->buf[i],open_gpibp->buf_len-i)) >0){
+	while( (j=open_gpibd->funcs.og_read(open_gpibd,&open_gpibd->buf[i],open_gpibd->buf_len-i)) >0){
 		i+=j;
 		usleep(1000);
 	}
-	/*fprintf(stderr,"Got %d bytes\n'%s'\n",i,open_gpibp->buf); */
+	/*fprintf(stderr,"Got %d bytes\n'%s'\n",i,open_gpibd->buf); */
 	return i;
 }
 
@@ -52,16 +52,16 @@ int read_raw( struct open_gpib_mstr *open_gpibp)
 len is max_len for msg.
 \n\b Returns: number of chars read.
 ****************************************************************************/
-int read_string( struct open_gpib_mstr *open_gpibp)
+int read_string( struct open_gpib_dev *open_gpibd)
 {
 	int i,j;
 	i=0;
-	while( (j=open_gpibp->ctl->funcs.og_read(open_gpibp->ctl,&open_gpibp->buf[i],open_gpibp->buf_len-i)) >0){
+	while( (j=open_gpibd->funcs.og_read(open_gpibd,&open_gpibd->buf[i],open_gpibd->buf_len-i)) >0){
 		i+=j;
 		usleep(1000);
 	}
-	open_gpibp->buf[i]=0;
-	/*fprintf(stderr,"Got %d bytes\n'%s'\n",i,open_gpibp->buf);  */
+	open_gpibd->buf[i]=0;
+	/*fprintf(stderr,"Got %d bytes\n'%s'\n",i,open_gpibd->buf);  */
 	return i;
 }
 /***************************************************************************/
@@ -69,7 +69,7 @@ int read_string( struct open_gpib_mstr *open_gpibp)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int write_string( struct open_gpib_mstr *open_gpibp, char *msg)
+int write_string( struct open_gpib_dev *open_gpibd, char *msg)
 {
 	int i;
 	if(NULL == msg){
@@ -78,7 +78,7 @@ int write_string( struct open_gpib_mstr *open_gpibp, char *msg)
 	}
 	/*fprintf(stderr,"WS:%s",msg); */
 	i=strlen(msg);
-	return open_gpibp->ctl->funcs.og_write(open_gpibp->ctl,msg,i);
+	return open_gpibd->funcs.og_write(open_gpibd,msg,i);
 }
 
 /***************************************************************************/
@@ -86,13 +86,13 @@ int write_string( struct open_gpib_mstr *open_gpibp, char *msg)
 \n\b Arguments:
 \n\b Returns: 0 on fail or number of chars read on success.
 ****************************************************************************/
-int write_get_data ( struct open_gpib_mstr *open_gpibp, char *cmd)
+int write_get_data ( struct open_gpib_dev *open_gpibd, char *cmd)
 {
 	int i;
 	/*fprintf(stderr,"Write... "); */
-	write_string(open_gpibp,cmd);
+	write_string(open_gpibd,cmd);
 	/*fprintf(stderr,"Read..."); */
-	if(-1 == (i=read_string(open_gpibp)) ){
+	if(-1 == (i=read_string(open_gpibd)) ){
 		fprintf(stderr,"%s:Unable to read from port for %s\n",__func__,cmd);
 		return 0;
 	}
@@ -105,17 +105,36 @@ int write_get_data ( struct open_gpib_mstr *open_gpibp, char *cmd)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int write_wait_for_data( struct open_gpib_mstr *open_gpibp, char *cmd, int sec)
+int write_wait_for_data( struct open_gpib_dev *open_gpibd, char *cmd, int sec)
 {
 	int i,rtn;
 	rtn =0;
-	write_string(open_gpibp,cmd);
+	write_string(open_gpibd,cmd);
 	for (i=0; i<sec*2;++i){
-		if((rtn=read_string(open_gpibp)))
+		if((rtn=read_string(open_gpibd)))
 			break;
 		usleep(500000);
 	}
 	return rtn;
+}
+/***************************************************************************/
+/** Set the instrument address.
+\n\b Arguments:
+\n\b Returns: -1 on error or 0 on success.
+****************************************************************************/
+int set_device_address( struct open_gpib_dev *d, int addr)
+{
+	if(NULL !=d->funcs.og_control){
+		if(0 == d->funcs.og_control(d,CTL_SET_ADDR,addr)){
+			if(d->debug) fprintf(stderr,"Set instrument address to %d\n",addr);
+			return 0;
+		}
+		fprintf(stderr,"Unable to set instrument address %d\n",addr);
+	}else{
+		fprintf(stderr,"Unable to set instrument address (%d). device control not set\n",addr);
+	}
+	
+	return -1;
 }
 /***************************************************************************/
 /** .
@@ -135,10 +154,52 @@ int write_cmd(struct ginstrument *gi, char *cmd)
 			fprintf(stderr,"Unable to set instrument address (%d!=%d). device control not set\n",gi->addr,gi->open_gpibp->addr);
 		}
 	}
-	return write_string(gi->open_gpibp,cmd);
+	return write_string(gi->open_gpibp->ctl,cmd);
 		
 }
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int wait_for_data(struct open_gpib_dev *g)
+{
+	int i;
+	/**make sure it is enabled  */
+	usleep(10000);
+	sprintf(g->buf,"*OPC\n");
+	write_string(g,g->buf);	
+	while(1){
+		sprintf(g->buf,"*OPC?\n");
+		i=write_get_data(g,g->buf);	
+		if( i ){
+			if(g->buf[0] == '1')
+				break;
+		}
+		usleep(10000);
+	}
+	return i;
+}
 
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int message_avail(struct open_gpib_dev *g)
+{
+	int i;
+	/**make sure it is enabled  */
+	usleep(10000);
+	sprintf(g->buf,"*STB?\n");
+	i=write_get_data(g,g->buf);	
+	if( i ){
+		if(g->buf[0] & 0x10)
+			return 1;
+	}
+	usleep(10000);
+	return 0;
+}
 /***************************************************************************/
 /** Check a pointer, if it is null, allocate to specified size.
 \n\b Arguments:
