@@ -51,6 +51,8 @@ handle_cmds() {
 	done
 
 }
+
+# BEGIN Script
 if [ "$1" = "header" ]; then
 	OFILE="open-gpib.h"
 	IF="_open-gpib.h"
@@ -94,14 +96,15 @@ for f in $@; do
 		echo "Invalid GPIB_TRANSPORT_FUNCTION or GPIB_CONTROLLER_FUNCTION in $f, line $lineno"
 		fail
 	fi
-	sname=$(echo "$sname"|sed 's!.*(!!;s!).*!!'|tr -d ' ')
+	desc=$(echo "$sname"|sed  's!.*, *"!!;s!" *).*!!')
+	sname=$(echo "$sname"|sed 's!.*(!!;s!,.*!!'|tr -d ' ')
 	func="register_$sname"
 	if [ "0" = "$T" ]; then
 		type="OPEN_GPIB_REG_TYPE_CONTROLLER"
 	else
 		type="OPEN_GPIB_REG_TYPE_TRANSPORT"
 	fi
-	ENTRY="{.name=\"$sname\",.type=$type,.func=$func}, $ENTRY"
+	ENTRY="{.name=\"$sname\",.type=$type,.func=$func,.desc=\"$desc\"},\n$ENTRY"
 	FUNLIST="extern struct open_gpib_dev *$func(void);${NL}$FUNLIST"
 done
 echo "	CMD_LAST," >> "$OFILE"
@@ -113,7 +116,7 @@ echo "#ifdef _ALLOC_REGISTER_" >> "$OFILE"
 
 echo "struct open_gpib_interfaces open_gpib_interface_list []={" >> "$OFILE"
 
-for e in $ENTRY; do
+echo "$ENTRY"|while read e; do
 	echo "$e" >> "$OFILE"
 done
 echo "{.name=NULL,.type=0, .func=NULL}," >> "$OFILE"
