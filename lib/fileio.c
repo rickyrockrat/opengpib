@@ -257,7 +257,7 @@ static int close_fileio(struct open_gpib_dev *ctl)
 	return 0;
 }
 
-static int init_fileio(struct open_gpib_mstr *g)
+static int init_fileio(struct open_gpib_dev *g)
 {
 	if(NULL == g)
 		return -1;
@@ -273,5 +273,5 @@ static void *calloc_internal_fileio(void)
 	return calloc_internal(sizeof(struct fileio_ctl),__func__);
 }
 
-GPIB_CONTROLLER_FUNCTION(fileio)
+GPIB_CONTROLLER_FUNCTION(fileio,"File Reader and Writer")
 

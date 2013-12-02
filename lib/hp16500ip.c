@@ -40,10 +40,10 @@ struct hp16500c_ctl {
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int init__hp16500cip( struct open_gpib_mstr *g)
+int init_hp16500cip( struct open_gpib_dev *g)
 {
-	fprintf(stderr,"h156c-init %d\n",g->type_ctl);
-	if(g->type_ctl&OPTION_DEBUG)fprintf(stderr,"Init HP 16500C INET controller\n");
+	fprintf(stderr,"h156c-init %s\n",g->if_name);
+	if(g->debug)fprintf(stderr,"Init HP 16500C INET controller\n");
 	if(0 == write_get_data(g,"*IDN?"))
 		return -1;
 	/*fprintf(stderr,"Got %d bytes\n",i); */
@@ -52,7 +52,7 @@ int init__hp16500cip( struct open_gpib_mstr *g)
 		return -1;
 	}	
 	fprintf(stderr,"Init done\n");
-	if(g->type_ctl&OPTION_DEBUG) fprintf(stderr,"Talking to Controller '%s'\n",g->buf);
+	if(g->debug) fprintf(stderr,"Talking to Controller '%s'\n",g->buf);
 	
 	return 0;
 }
@@ -239,13 +239,6 @@ int close_hp16500cip(struct open_gpib_dev *ctl)
 }
 
 
-int init_hp16500cip (struct open_gpib_mstr *g)
-{
-	if(NULL == g)
-		return -1;
-	return 0;
-}
-
 /***************************************************************************/
 /** Allocate our internal data structure.
 \n\b Arguments:
@@ -256,26 +249,5 @@ static void *calloc_internal_hp16500cip(void)
 	return calloc_internal(sizeof(struct hp16500c_ctl),__func__);
 }
 
-GPIB_CONTROLLER_FUNCTION(hp16500cip)
+GPIB_CONTROLLER_FUNCTION(hp16500cip,"HP 16500C LAN Controller")
 
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-***************************************************************************
-int register_hp16500c( struct open_gpib_mstr *g)
-{
-	if(NULL == g){
-		fprintf(stderr,"%s, incomming struct null\n",__func__);
-		return -1;
-	}
-	if(-1 ==check_calloc(sizeof(struct open_gpib_dev), &g->ctl,__func__,NULL) ) return -1;
-	g->ctl->funcs.og_control=ctl_hp16500c_ctrl;
-	g->ctl->funcs.og_read=	ctl_hp16500c_read;
-	g->ctl->funcs.og_write=	ctl_hp16500c_write;
-	g->ctl->funcs.og_open=	ctl_hp16500c_open;
-	g->ctl->funcs.og_close=	ctl_hp16500c_close;
-	g->ctl->funcs.og_init=	ctl_hp16500c_init;
-	g->ctl->dev=calloc_internal();
-	return 0;
-}*/

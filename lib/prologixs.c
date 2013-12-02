@@ -44,7 +44,7 @@ struct prologixs_ctl {
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int verify( struct open_gpib_mstr *g, char *msg)
+int verify( struct open_gpib_dev *g, char *msg)
 {
 	sprintf(g->buf,"%s\r",msg);
 	write_string(g,g->buf);
@@ -52,26 +52,18 @@ int verify( struct open_gpib_mstr *g, char *msg)
 	printf("'%s' = '%s'\n",msg,g->buf);	 
 	return 0;
 }
+
 /***************************************************************************/
 /** .
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-int prologixs_set_addr()
-{
-	return 0;
-}
-/***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-static int init_prologixs( struct open_gpib_mstr *g)
+static int init_prologixs( struct open_gpib_dev *g)
 {
 	int i;
 	struct prologixs_ctl *c;
-	c=(struct prologixs_ctl *)g->ctl->internal;
-	if(g->type_ctl&OPTION_DEBUG)printf("Init Prologix controller, dbg=%d\n",g->ctl->debug);
+	c=(struct prologixs_ctl *)g->internal;
+	if(g->debug)printf("Init Prologix controller, dbg=%d\n",g->debug);
 	write_string(g,"++clr");
 	read_string(g);
 	/*make sure auto reply is on*/
@@ -91,26 +83,25 @@ static int init_prologixs( struct open_gpib_mstr *g)
 		printf("%s:Unable to find correct ver in\n%s\n",__func__,g->buf);
 		goto err;
 	}
-	if(g->type_ctl&OPTION_DEBUG) printf("Talking to Controller '%s'\n",g->buf);
-	if(g->ctl->debug >= DBG_TRACE)	fprintf(stderr,"write mode\n");
+	if(g->debug) printf("Talking to Controller '%s'\n",g->buf);
+	if(g->debug >= DBG_TRACE)	fprintf(stderr,"write mode\n");
 	/*Then set to Controller mode */
 	write_string(g,"++mode 1");
-	if(g->ctl->debug >= DBG_TRACE)	fprintf(stderr,"write addr\n");
+	if(g->debug >= DBG_TRACE)	fprintf(stderr,"write addr\n");
 	/*Set the address to talk to */
-	sprintf(g->buf,"++addr %d",g->addr);
-	c->addr=g->addr;
+	sprintf(g->buf,"++addr %d",c->addr);
 	write_string(g,g->buf);
 	/*Set the eoi mode (EOI after cmd) */
 	write_string(g,"++eoi 1");
 	/*Set the eos mode (LF) */
 	write_string(g,"++eos 2");
-	if(g->type_ctl&OPTION_DEBUG){
+	if(g->debug){
 		verify(g,"++addr");
 		verify(g,"++eoi");
 		verify(g,"++eos");
 		verify(g,"++auto");	
 	}
-	if(g->ctl->debug >= DBG_TRACE)	fprintf(stderr,"%s: return\n",__func__);
+	if(g->debug >= DBG_TRACE)	fprintf(stderr,"%s: return\n",__func__);
 	return 0;
 err:
 	fprintf(stderr,"Controller init failed\n");
@@ -305,5 +296,5 @@ static void *calloc_internal_prologixs(void)
 	return p;
 }
 
-GPIB_CONTROLLER_FUNCTION(prologixs)
+GPIB_CONTROLLER_FUNCTION(prologixs,"Prologix Serial GPIB Controller")
 

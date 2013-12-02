@@ -469,7 +469,7 @@ static int open_serial(struct open_gpib_dev  *d, char *path)
 /***************************************************************************/
 /** .
 \n\b Arguments:
-\n\b Returns:
+\n\b Returns:	-1 on error, 0 on OK
 ****************************************************************************/
 static int control_serial(struct open_gpib_dev  *d, int cmd, uint32_t data)
 {
@@ -527,7 +527,7 @@ static void *calloc_internal_serial(void)
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-static int init_serial(struct open_gpib_mstr *d)
+static int init_serial(struct open_gpib_dev *d)
 {
 	if(NULL == d)
 		return -1;
@@ -535,7 +535,7 @@ static int init_serial(struct open_gpib_mstr *d)
 }
 
 /**set up auto-generation of commands and the register function via build-interfaces	*/
-GPIB_TRANSPORT_FUNCTION(serial)
+GPIB_TRANSPORT_FUNCTION(serial,"Serial Transport Layer")
 OPEN_GPIB_ADD_CMD(SERIAL_CMD_SET_CHAR_TIMEOUT)
 OPEN_GPIB_ADD_CMD(SERIAL_CMD_SET_BAUD)
 OPEN_GPIB_ADD_CMD(SERIAL_CMD_SET_PARITY)
