@@ -68,6 +68,13 @@ other controllers.
 #include <sys/types.h>
 #include <stdarg.h>
 
+
+struct og_conf {
+	char *fname;
+	void *dat;
+};
+
+
 #define MAX_CHANNELS 8
 
 #ifdef _GLOBAL_TEK_2440_
@@ -93,12 +100,6 @@ struct c_opts {
 	float mul;
 };
 
-/**interface types  */
-enum {
-	GPIB_IF_SERIAL=0,
-	GPIB_IF_IP,
-	GPIB_IF_NONE,
-};
 /**controller types  */
 enum {
 	GPIB_CTL_PROLOGIXS=0,
@@ -171,21 +172,21 @@ struct open_gpib_functions {
 	int (*og_write)(struct open_gpib_dev *dev, void *buf, int len);	/**Returns: -1 on failure, number of bytes written otherwise  */
 	int (*og_open)(struct open_gpib_dev *d, char *path);			/** Returns: 1 on failure, 0 on success */
 	int (*og_close)(struct open_gpib_dev *d);									/**closes interface  */
-	int (*og_control)(struct open_gpib_dev *d, int cmd, uint32_t data); 			/**controller-interface control. Set addr, etc.  */	
-	int (*og_init)(struct open_gpib_mstr *d); 									/**Initialize the controller  */		
+	int (*og_control)(struct open_gpib_dev *d, int cmd, uint32_t data); 			/**controller-interface control. Set addr, timeout, port, etc.  */	
+	int (*og_init)(struct open_gpib_dev *d); 									/**Initialize the controller  */		
 };
 
 /**structure to talk to transport mechanisms (serial, usb, inet, pci, etc.) and 
    controllers  */
 struct open_gpib_dev {  
-	struct open_gpib_dev *dev;
+	struct open_gpib_dev *dev; 										/**lower level interface  */  
 	struct open_gpib_functions funcs;
-	void *internal;            												/**transport-specific structure  */
-	
-	int type_if;																	/**set type of interface (see GPIB_IF_*).  */	
+	void *internal;            										/**internal structure(s)  */
 	int debug;                                    /**debug level  */
 	char *if_name;                                /**name of this interface  */
 	char *dev_path;																/**physical device path.  */
+	char *buf;																		/**same buffer for all layers  */
+	int buf_len;
 	uint32_t wait;                                /**timeout for this interface  */
 };
 /**structure to talk to the host controller  */
@@ -193,8 +194,8 @@ struct open_gpib_mstr {
 	struct open_gpib_dev *ctl;										/**controller-specific structure, if any  */	
 	int addr; 																		/**instrument address. Check against inst addr  */
 	int type_ctl;					 												/**controller type, options at top.  */
-	char *buf;														/**GPIB buffer  */
-	int buf_len;													/**buffer length  */
+	char *buf;																		/**GPIB buffer  */
+	int buf_len;																	/**buffer length  */
 	void *inst;                                   /**instrument-specific structure, if any  */
 	uint32_t mdebug;							    						/**value to set debug of other layers  */
 	uint32_t cmd_timeout;                         /**value to set command timeout, in uS  */ 
@@ -222,6 +223,7 @@ struct open_gpib_interfaces {
 	const char *name;
 	int type;
 	open_gpib_register func; 	/**Returns: -1 on failure, 0 otherwise */
+	const char *desc;
 };
 
 /** Set up our controller/transport functions.  
@@ -245,8 +247,10 @@ if( -1 == check_calloc(sizeof(struct transport_dev), p, __func__,NULL) == -1) re
    struct open_gpib_interfaces.
    see build_interfaces to understand more
   */
+#define OPEN_GPIB_PARAM(name,type,value) \
 
-#define GPIB_TRANSPORT_FUNCTION(x) \
+
+#define GPIB_TRANSPORT_FUNCTION(x,desc) \
 struct open_gpib_dev *register_##x(void) {\
 	struct open_gpib_dev *d=NULL;\
 	if(-1 == check_calloc(sizeof(struct open_gpib_dev), &d,__func__,NULL) ) return NULL;\
@@ -284,19 +288,23 @@ int register_##x ( void *p) {\
 
 int open_gpib_list_interfaces(void);
 open_gpib_register open_gpib_find_interface(char *name, int type);
-int read_raw( struct open_gpib_mstr *g);
-int read_string( struct open_gpib_mstr *g);
-int write_string( struct open_gpib_mstr *g, char *msg);
-int write_get_data ( struct open_gpib_mstr *g, char *cmd);
-int write_wait_for_data( struct open_gpib_mstr *g, char *cmd, int sec);
+
 struct open_gpib_mstr *open_gpib(uint32_t ctype, int gpib_addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
 int close_gpib ( struct open_gpib_mstr *g);
 int gpib_option_to_type(char *op);
 void show_gpib_supported_controllers(void);
 int init_id( struct open_gpib_mstr *g, char *idstr);
+/**in support.c  */
+int read_raw( struct open_gpib_dev *g);
+int read_string( struct open_gpib_dev *g);
+int write_string( struct open_gpib_dev *g, char *msg);
+int write_get_data ( struct open_gpib_dev *g, char *cmd);
+int write_wait_for_data( struct open_gpib_dev *g, char *cmd, int sec);
+int set_device_address( struct open_gpib_dev *d, int addr);
+int wait_for_data(struct open_gpib_dev *g);
+int message_avail(struct open_gpib_dev *g);
 int check_calloc(size_t size, void *p, const char *func, void *set);
 void *calloc_internal( size_t size, const char *func);
-
 int is_string_number(char *s);
 int og_next_col(struct c_opts *o);
 int og_get_col(struct c_opts *o, float *f);
@@ -319,5 +327,16 @@ int open_gpib_show_param(struct open_gpib_param *head);
 int32_t open_gpib_get_int32_t(struct open_gpib_param *head,char *name);
 struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *name, char *fmt, ...);
 struct open_gpib_param *open_gpib_new_param_old(struct open_gpib_param *head, int type, char *name, void *val);
+struct open_gpib_param *open_gpib_del_param(struct open_gpib_param *head,char *name);
+
+/**in config.h  */
+
+struct og_conf *og_conf_open(char *path);
+void og_conf_close(struct og_conf *ogc);
+int og_conf_get_group(struct og_conf *ogc, char *name);
+int og_conf_get_uint32(struct og_conf *ogc, char *name, uint32_t *val);
+const char *og_conf_get_string(struct og_conf *ogc, char *name);
+
+/**note: The comment below, 'REMOVE_ME' MUST stay here so build-interfaces will correctly build the header file. */
 #endif /*REMOVE_ME/
 

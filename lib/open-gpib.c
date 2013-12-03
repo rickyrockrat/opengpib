@@ -94,6 +94,62 @@ open_gpib_register open_gpib_find_interface(char *name, int type)
 }
 
 /***************************************************************************/
+/** Finds the interface, then calls the register function which should
+allocate all the data structures. Set our buffer and length and return.
+\n\b Arguments:
+\n\b Returns: Structure or NULL on error.
+****************************************************************************/
+struct open_gpib_dev *find_and_register_if(char *if_name, int type, uint32_t debug,char *buf, int blen)
+{
+	open_gpib_register reg_func; 
+	struct open_gpib_dev *open_gpibp=NULL;
+	
+	if(NULL == (reg_func=open_gpib_find_interface(if_name, type)))
+		return NULL;
+	
+	if(DBG_TRACE<=debug)fprintf(stderr,"reg %s\n",if_name);
+	/**this call allocates the interface's open_gpib_dev  structure
+		and allocates the internal structure. It also sets if_name.
+		see the macro in _open_gpib.h GPIB_TRANSPORT_FUNCTION
+	   */
+	if(NULL == (open_gpibp=reg_func()) )
+		return NULL; 
+	open_gpibp->buf=buf;
+	open_gpibp->buf_len=blen;	
+	open_gpibp->debug=debug;
+	return open_gpibp;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns: 1 on error, 0 on success.
+****************************************************************************/
+int setup_interface (struct open_gpib_dev *open_gpibp, uint32_t wait, uint32_t addr, char *dev_path)
+{
+	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s set_debug\n",open_gpibp->if_name);
+	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_DEBUG,open_gpibp->debug);
+	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s set timeout\n",open_gpibp->if_name);
+	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_TIMEOUT,wait);
+	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s set addr\n",open_gpibp->if_name);
+	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_ADDR,addr);
+	
+	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s open\n",open_gpibp->if_name);
+	if(-1==open_gpibp->funcs.og_open(open_gpibp,dev_path))
+		goto err;
+	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s init\n",open_gpibp->if_name);
+	if(-1==open_gpibp->funcs.og_init(open_gpibp))
+		goto err;
+	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"%s Ready\n",open_gpibp->if_name);
+	open_gpibp->dev_path=strdup(dev_path);
+	return 0;
+err:
+	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"%s Error on %s\n",__func__,open_gpibp->if_name);
+	open_gpibp->funcs.og_close(open_gpibp);
+	free(open_gpibp);
+	return 1;
+}
+/***************************************************************************/
 /** .
 \n\b Arguments:
 name is the name of the interface (see GPIB_TRANSPORT_FUNCTION, GPIB_CONTROLLER_FUNCTION)
@@ -103,23 +159,18 @@ wait is the wait in uS for this interface (inter-character, inter-command, inter
 dev_path is the path to the device. It can be a device name or IP address.
 \n\b Returns: allocated structure on success, NULL on fail
 ****************************************************************************/
-struct open_gpib_dev *find_and_open(char *if_name, int type, uint32_t debug, uint32_t wait, char *dev_path)
+struct open_gpib_dev *find_and_open(char *if_name, int type, uint32_t debug, uint32_t wait, uint32_t addr, char *dev_path, char *buf, int blen)
 {
-	open_gpib_register reg_func; 
-	struct open_gpib_dev *open_gpibp=NULL;
-	
-	if(NULL == (reg_func=open_gpib_find_interface(if_name, type)))
-		goto err;
-	
-	if(DBG_TRACE<=debug)fprintf(stderr,"reg %s\n",if_name);
-	/**this call allocates the interface's open_gpib_dev  structure
-		and allocates the internal structure. It also sets if_name.
-		see the macro in _open_gpib.h GPIB_TRANSPORT_FUNCTION
-	   */
-	if(NULL == (open_gpibp=reg_func()) )
-		goto err; 
+  struct open_gpib_dev *open_gpibp=NULL;
+	if(NULL ==(open_gpibp=find_and_register_if(if_name,type,debug, buf,blen)) )
+		return NULL;
 	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s set_debug\n",if_name);
 	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_DEBUG,debug);
+	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s set timeout\n",if_name);
+	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_TIMEOUT,wait);
+	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s set addr\n",if_name);
+	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_ADDR,addr);
+	
 	if(DBG_TRACE<=debug)fprintf(stderr,"Call %s open\n",if_name);
 	if(-1==open_gpibp->funcs.og_open(open_gpibp,dev_path))
 		goto err;
@@ -178,6 +229,7 @@ struct open_gpib_mstr *open_gpib_new(uint32_t debug, uint32_t cmd_timeout, uint3
 struct open_gpib_mstr *open_gpib(uint32_t ctype, int gpib_addr, char *dev_path, int buf_size)
 {
 	struct open_gpib_mstr *open_gpibm;
+	char *buf;
 	uint32_t debug=OPTION_EXTRACT_DEBUG(ctype);
 	
 	fprintf(stderr,"OpenGPIB Version %s\n",PACKAGE_VERSION);  
@@ -195,26 +247,31 @@ struct open_gpib_mstr *open_gpib(uint32_t ctype, int gpib_addr, char *dev_path, 
 		buf_size=8096;
   /**make sure it's a 8-byte multiple, so we stop on largest data boundry  */
   buf_size=((buf_size+7)/8)*8;
-	if(NULL == (open_gpibm->buf=malloc(buf_size) ) ){
+	if(NULL == (buf=malloc(buf_size) ) ){
 		fprintf(stderr,"Out of mem on buf size of %d\n",buf_size);
 		free(open_gpibm);
 		return NULL;
 	}
+	open_gpibm->buf=buf;
 	open_gpibm->buf_len=buf_size;
 	/*fprintf(stderr,"Using %d buf size\n",open_gpibp->buf_len); */
 	open_gpibm->type_ctl=ctype;
 	/**set up the controller and interface. FIXME Replace with config file.  */
 	switch(ctype&CONTROLLER_TYPEMASK){
 		case GPIB_CTL_PROLOGIXS:
-			if(NULL == (open_gpibm->ctl=find_and_open("prologixs",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, 5000, dev_path)))
+			if(NULL == (open_gpibm->ctl=find_and_register_if("prologixs",OPEN_GPIB_REG_TYPE_CONTROLLER,debug,buf,buf_size)) )
 				goto err;
+			if(NULL == (open_gpibm->ctl->dev=find_and_register_if("serial",OPEN_GPIB_REG_TYPE_TRANSPORT,debug,buf,buf_size)))
+				goto err;
+			if(setup_interface(open_gpibm->ctl,5000, gpib_addr,dev_path))
+				return NULL;
 			break;
 		case GPIB_CTL_HP16500C:
-			if(NULL == (open_gpibm->ctl=find_and_open("hp16500cip",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, 5000,dev_path)))
+			if(NULL == (open_gpibm->ctl=find_and_open("hp16500cip",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, 5000, gpib_addr,dev_path,open_gpibm->buf,buf_size)))
 				goto err;
 			break;
     case GPIB_CTL_FILEIO:
-    	if(NULL == (open_gpibm->ctl=find_and_open("fileio",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, 5000, dev_path)))
+    	if(NULL == (open_gpibm->ctl=find_and_open("fileio",OPEN_GPIB_REG_TYPE_CONTROLLER, debug, 5000, gpib_addr,dev_path,open_gpibm->buf,buf_size)))
 				goto err1;
 			break;
 		default:
@@ -291,10 +348,10 @@ void show_gpib_supported_controllers(void)
 int init_id( struct open_gpib_mstr *open_gpibp, char *idstr)
 {
 	open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_TIMEOUT,500);
-	while(read_string(open_gpibp));
+	while(read_string(open_gpibp->ctl));
 	open_gpibp->ctl->funcs.og_control(open_gpibp->ctl,CTL_SET_TIMEOUT,50000);
 	/*write_string(open_gpibp,"*CLS"); */
-	if(0 == write_get_data(open_gpibp,idstr))
+	if(0 == write_get_data(open_gpibp->ctl,idstr))
 		return -1;
 	return 0;
 }
