@@ -61,15 +61,44 @@ int test_parameter_lists(void)
 	open_gpib_set_param(head, "int32_","s", x);
 	open_gpib_show_param(head);
 	open_gpib_set_param(head, "int32","s", x);
+	printf("\n");
+	head=open_gpib_del_param(head,"int32_");
+	open_gpib_show_param(head);
+	head=open_gpib_del_param(head,"str");
+	open_gpib_show_param(head);
 	return 0;
 }
 
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns: 0=OK, 1=error
+****************************************************************************/
+int test_config(void)
+{
+	struct og_conf *c=og_conf_open("test.cfg");
+	uint32_t v;
+	if(og_conf_get_group(c,"mygroup")) {
+		printf("Err getting mygroup\n");
+		return 1;
+	}
+	printf("var1='%s'\n",og_conf_get_string(c,"var1"));
+	if(og_conf_get_uint32(c,"var2",&v)){
+		printf("Err getting var2\n");
+		return 1;
+	}
+		
+	else
+		printf("var2=%d\n",v);
+	return 0;
+}
 int main (int argc, char *argv[])
 {
 	int x;
 	if(argc || argv)
 		x=10; /**prevent unused warning  */
-	test_parameter_lists();
+	/*test_parameter_lists(); */
+	test_config();
 	return 0;
 }
 
