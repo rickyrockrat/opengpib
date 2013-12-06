@@ -1,7 +1,7 @@
 # This file is part of OpenGPIB.
 
 # initial information about the project
-AC_INIT([open-gpib], [0.12], [gpib@rickyrockrat.net])
+AC_INIT([open-gpib], [0.13], [gpib@rickyrockrat.net])
 AM_INIT_AUTOMAKE([AC_PACKAGE_NAME()], [AC_PACKAGE_TARNAME()], [AC_PACKAGE_VERSION()])
 
 # check if the source folder is available
