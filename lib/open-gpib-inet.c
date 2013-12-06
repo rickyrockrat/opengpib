@@ -197,6 +197,7 @@ static int close_inet(struct open_gpib_dev *d)
 	int i;
 	struct ip_ctl *in;
 	in=(struct ip_ctl *)d->internal;
+	if(-1!=in->sockfd)
 	if(0!= (i=shutdown(in->sockfd,SHUT_RDWR)) ){
 		fprintf(stderr,"Error closing interface\n");
 		return -1;
@@ -243,11 +244,12 @@ static int control_inet(struct open_gpib_dev *d, int cmd, uint32_t data)
 ****************************************************************************/
 static void *calloc_internal_inet(void)
 {
-	void *p=NULL;
-	printf("inet:calloc_internal\n");
+	struct ip_ctl *p=NULL;
+	/*printf("inet:calloc_internal\n"); */
 	if(-1 == check_calloc(sizeof(struct ip_ctl), &p,__func__,NULL) ) 
 		return NULL;
-	printf("rtncalloc\n");
+	p->sockfd=-1;
+	/*printf("rtncalloc\n"); */
 	return p;
 }
 /***************************************************************************/

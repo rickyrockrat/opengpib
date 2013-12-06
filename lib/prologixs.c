@@ -232,17 +232,18 @@ static int read_prologixs(struct open_gpib_dev *ctl, void *buf, int len)
 ****************************************************************************/
 static int close_prologixs( struct open_gpib_dev *ctl)
 {
-	int i;
-	struct prologixs_ctl *c;
-	if(NULL == ctl->dev)
+	int i=0;
+	if(NULL == ctl || NULL == ctl->dev)
 		return 0;
-	c=(struct prologixs_ctl *)ctl->internal;
-	if((i=ctl->dev->funcs.og_close(ctl->dev)) ){
-		printf("Error closing interface\n");
+	if(NULL != ctl->dev->funcs.og_close ){
+		if((i=ctl->dev->funcs.og_close(ctl->dev)) ){
+			printf("Error closing interface\n");
+		}	
 	}
-	if(NULL != ctl->internal)
-		free(ctl->internal);
-	free (ctl->dev);
+	
+	free(ctl->internal);
+	if(NULL != ctl->dev)
+		free (ctl->dev);
 	ctl->dev = ctl->internal=NULL;
 	return i;
 }

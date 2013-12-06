@@ -225,13 +225,17 @@ int control_hp16500cip( struct open_gpib_dev *ctl, int cmd, uint32_t data)
 ****************************************************************************/
 int close_hp16500cip(struct open_gpib_dev *ctl)
 {
-	int i;
-	
+	int i=0;
+	if(NULL == ctl)
+		return 0;
 	if(NULL == ctl->dev)
 		return 0;
-	if(0!= (i=ctl->dev->funcs.og_close(ctl->dev)) ){
-		fprintf(stderr,"Error closing interface\n");
+	if(NULL != ctl->dev->funcs.og_close){
+		if(0!= (i=ctl->dev->funcs.og_close(ctl->dev)) ){
+			fprintf(stderr,"Error closing interface\n");
+		}	
 	}
+	
 	fprintf(stderr,"hp16500C Close, free iface internal %s\n",ctl->dev->if_name);
 	free (ctl->dev);
 	ctl->dev=NULL;
@@ -250,4 +254,4 @@ static void *calloc_internal_hp16500cip(void)
 }
 
 GPIB_CONTROLLER_FUNCTION(hp16500cip,"HP 16500C LAN Controller")
-
+OPEN_GPIB_ADD_CMD(HPIP_CMD_SET_PORT,"set_port",5025)

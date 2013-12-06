@@ -149,11 +149,14 @@ static int close_new_interface(struct open_gpib_dev *ctl)
 	if(NULL == ctl)
 		return 0;
 	c=(struct new_interface_ctl *)ctl->internal;
+	if(NULL == c)
+		goto done;
 	if(NULL != c){
 		if(NULL != c->name)
 			free(c->name);
 		free(c);
 	}
+done:
 	ctl->internal=NULL;
 	return 0;
 }
