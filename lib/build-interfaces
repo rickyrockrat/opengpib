@@ -21,6 +21,8 @@
 #    along with OpenGPIB.  If not, see <http://www.gnu.org/licenses/>.
 #    
 #		The License should be in the file called COPYING.
+CMDNAMES=""
+
 fail(){
 rm "$OFILE"
 exit 1
@@ -32,13 +34,13 @@ handle_cmds() {
 	#extract our line number(s)
         #lineno=$(echo "$line"|sed 's!\(.*\):.*!\1!')
         #line=$(echo "$line"|sed 's!.*:!!')
-        C=$(echo "$line"|grep -c OPEN_GPIB_ADD_CMD)
+        C=$(echo "$lines"|grep -c OPEN_GPIB_ADD_CMD)
         if [ "$C" = "0" ]; then # No commands in this file
 		return
 	fi
-	echo "$lines"|while read sline; do
-		cmd=$(echo "$sline"|grep OPEN_GPIB_ADD_CMD)
-		substr=$(echo "$cmd"|sed 's!.*:\(.\{17\}\).*!\1!')
+	while read sline; do
+		#cmd=$(echo "$sline"|grep OPEN_GPIB_ADD_CMD)
+		substr=$(echo "$sline"|sed 's!.*:\(.\{17\}\).*!\1!')
 		if [ "$substr" != "OPEN_GPIB_ADD_CMD" ]; then
 			#echo "$sline"
 			#echo "$cmd"
@@ -46,9 +48,19 @@ handle_cmds() {
 			echo "Invalid OPEN_GPIB_ADD_CMD in $1, line $lineno"
 			fail
 		fi
-		cmd=$(echo "$cmd"|sed 's!.*(!!;s!).*!!'|tr -d ' ')
+		cname=$(echo "$sline"|sed 's!.*"\(.*\)".*!\1!')
+		cval=$(echo "$sline"|sed 's!.*".*,!!;s!).*!!')
+#		echo "$sline\n$cname=$cval"
+		cmd=$(echo "$sline"|sed 's!.*(!!;s!,.*!!'|tr -d ' ')
+		fbase=$(echo "$1"|sed 's!\(.*\)\..*!\1!')
+		varn="${fbase}_${cname}"
+#		cmd=$(echo "$cmd"|sed 's!.*(!!;s!).*!!'|tr -d ' ')
 		echo "	$cmd,">> "$OFILE"
-	done
+		CMDNAMES="$CMDNAMES\n{.val=$cval,.define=$cmd,.name=\"$varn\"},"
+#		echo "$CMDNAMES"
+	done << EOF
+$(echo -n "$lines")
+EOF
 
 }
 
@@ -75,7 +87,6 @@ echo "#define _INTERFACE_H_ 1">> "$OFILE"
 echo "enum {" >> "$OFILE"
 echo "	CMD_SET_DEBUG=0," >> "$OFILE"
 echo "	CMD_SET_CMD_TIMEOUT," >> "$OFILE"
-
 
 for f in $@; do
 	# put line numbers at beginning
@@ -113,6 +124,15 @@ echo "$FUNLIST"|while read fun; do
 	echo "$fun">> "$OFILE"
 done
 echo "#ifdef _ALLOC_REGISTER_" >> "$OFILE"
+echo "struct open_gpib_settings og_static_settings[]={" >> "$OFILE"
+echo "{.define=CMD_SET_DEBUG,.val=0,.name=\"_set_debug\"}," >> "$OFILE"
+echo "{.define=CMD_SET_CMD_TIMEOUT,.val=500,.name=\"_cmd_timeout\"}," >> "$OFILE"
+#echo "CMDNAMEs=$CMDNAMES"
+echo "$CMDNAMES"|while read e; do
+	 echo "$e" >> "$OFILE"
+done
+echo "{.name=NULL}," >>  "$OFILE"
+echo "};" >> "$OFILE"
 
 echo "struct open_gpib_interfaces open_gpib_interface_list []={" >> "$OFILE"
 
@@ -121,6 +141,8 @@ echo "$ENTRY"|while read e; do
 done
 echo "{.name=NULL,.type=0, .func=NULL}," >> "$OFILE"
 echo "};" >> "$OFILE"
+echo "#else" >> "$OFILE"
+echo "extern struct open_gpib_settings og_static_settings[];" >> "$OFILE"
 echo "#endif" >> "$OFILE"
 echo "#endif" >> "$OFILE"
 echo "" >> "$OFILE"
