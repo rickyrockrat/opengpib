@@ -54,7 +54,7 @@ int open_gpib_list_interfaces(void)
 	char buf[100];
 	
 	struct open_gpib_dev *d;
-	fprintf(stderr,"Open GPIB List Interfaces\n         'Name', type\n");
+	fprintf(stderr,"Open GPIB List Interfaces\n          'Name', type\n");
 	
 	for (i=0;NULL != IF_LIST[i].name; ++i){
 		fprintf(stderr,"Interface '%s', %d\n",IF_LIST[i].name, IF_LIST[i].type);
