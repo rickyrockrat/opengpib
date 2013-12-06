@@ -41,7 +41,7 @@ static struct supported_dev s_dev[]={\
 	{-1,NULL,NULL},
 };
 
-
+struct open_gpib_dev *find_and_register_if(const char *if_name, int type, uint32_t debug,char *buf, int blen);
 
 /***************************************************************************/
 /** Just print out all interfaces auto-registered.
@@ -51,9 +51,20 @@ static struct supported_dev s_dev[]={\
 int open_gpib_list_interfaces(void)
 {
 	int i;
-	fprintf(stderr,"listif, %s\n",IF_LIST[0].name);
+	char buf[100];
+	
+	struct open_gpib_dev *d;
+	fprintf(stderr,"Open GPIB List Interfaces\n         'Name', type\n");
+	
 	for (i=0;NULL != IF_LIST[i].name; ++i){
-		fprintf(stderr,"%s, %d, %p\n",IF_LIST[i].name, IF_LIST[i].type, IF_LIST[i].func);
+		fprintf(stderr,"Interface '%s', %d\n",IF_LIST[i].name, IF_LIST[i].type);
+		if(NULL != (d=find_and_register_if(IF_LIST[i].name, IF_LIST[i].type, 0,buf, 90))) {
+			if(NULL != d->params) {
+				open_gpib_show_param(d->params);
+				open_gpib_param_free(d->params);
+			}
+			d->funcs.og_close(d);
+		}
 	}
 	return 0;
 }
@@ -66,7 +77,7 @@ type is either controller or transport
                 
 \n\b Returns:	function found or null;
 ****************************************************************************/
-open_gpib_register open_gpib_find_interface(char *name, int type)
+open_gpib_register open_gpib_find_interface(const char *name, int type)
 {
 	int i;
 	char *tname=NULL;
@@ -85,7 +96,7 @@ open_gpib_register open_gpib_find_interface(char *name, int type)
 	}
 	for (i=0;NULL != IF_LIST[i].name; ++i){
 		if(!strcmp(name,IF_LIST[i].name) &&	type == IF_LIST[i].type) {
-			fprintf(stderr,"Found '%s', type %d, @%p\n",IF_LIST[i].name, IF_LIST[i].type, IF_LIST[i].func);
+			/*fprintf(stderr,"Found '%s', type %d, @%p\n",IF_LIST[i].name, IF_LIST[i].type, IF_LIST[i].func); */
 			return IF_LIST[i].func;		
 		}
 	}
@@ -99,7 +110,7 @@ allocate all the data structures. Set our buffer and length and return.
 \n\b Arguments:
 \n\b Returns: Structure or NULL on error.
 ****************************************************************************/
-struct open_gpib_dev *find_and_register_if(char *if_name, int type, uint32_t debug,char *buf, int blen)
+struct open_gpib_dev *find_and_register_if(const char *if_name, int type, uint32_t debug,char *buf, int blen)
 {
 	open_gpib_register reg_func; 
 	struct open_gpib_dev *open_gpibp=NULL;
@@ -201,11 +212,10 @@ struct open_gpib_mstr *open_gpib_new(uint32_t debug, uint32_t cmd_timeout, uint3
 	struct open_gpib_mstr *open_gpibp;
 	
 	fprintf(stderr,"OpenGPIB Version %s\n",PACKAGE_VERSION);  
-	if(NULL == (open_gpibp=malloc(sizeof( struct open_gpib_mstr)) ) ){
+	if(NULL == (open_gpibp=calloc(1,sizeof( struct open_gpib_mstr)) ) ){
 		fprintf(stderr,"Out of mem on gpib alloc\n");
 		return NULL;
 	}
-	memset(open_gpibp,0,sizeof( struct open_gpib_mstr));
 	if(0>= buf_size)
 		buf_size=8096;
   /**make sure it's a 8-byte multiple, so we stop on largest data boundry  */
