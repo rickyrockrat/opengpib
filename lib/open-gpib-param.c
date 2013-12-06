@@ -104,7 +104,7 @@ struct open_gpib_param *open_gpib_get_param_ptr(struct open_gpib_param *head,cha
 		if(!strcmp(name,i->name))
 			return i;
 	}	
-	fprintf(stderr,"%s: Unable to find parameter '%s'\n",__func__,name);
+	/*fprintf(stderr,"%s: Unable to find parameter '%s'\n",__func__,name); */
 	return NULL;
 }
 
@@ -190,7 +190,7 @@ int32_t open_gpib_get_int32_t(struct open_gpib_param *head,char *name)
 /***************************************************************************/
 /** Print the argument names and their values.
 \n\b Arguments:
-\n\b Returns:
+\n\b Returns: number of parameters
 ****************************************************************************/
 int open_gpib_show_param(struct open_gpib_param *head)
 {
@@ -199,10 +199,10 @@ int open_gpib_show_param(struct open_gpib_param *head)
 	struct open_gpib_param *i;
 	if(NULL == head)
 		return 0;
-	printf("paramlist: \n");
+	fprintf(stderr,"  Parameter List\n");
 	for (n=0,i=head;NULL != i; i=i->next,n=n+1){
 		fmt=NULL;
-		printf("%s=",i->name);
+		printf("    '%s'=",i->name);
 		switch(i->type){
 			case OG_PARAM_TYPE_UINT32: printf("%d\n",i->val.u);	break;
 			case OG_PARAM_TYPE_INT32:  printf("%d\n",i->val.s); break;
@@ -306,7 +306,7 @@ struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *n
 		return head;
 	}
 	if(NULL !=head ){/**elements already in list  */
-		if(NULL != (p=open_gpib_get_param_ptr(head, name)) ){
+		if(NULL != (p=open_gpib_get_param_ptr(head, name)) ){ /**see if it already exists.  */
 			if(NULL != ptr && p->type == type){
 				sprintf(buf,"%c",type);
 				_open_gpib_set_param(p,buf,ptr);
@@ -323,7 +323,7 @@ struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *n
 		return NULL;
 	}	
 	
-	if(NULL !=head){
+	if(NULL !=head){ /**add new entry at top of list.  */
 		p->next=head;
 	}
 	p->name=strdup(name);
@@ -344,9 +344,13 @@ struct open_gpib_param *open_gpib_param_init(struct open_gpib_settings s[], char
 	int i;
 	char *f;
 	struct open_gpib_param *p=NULL;
+	/*fprintf(stderr,"build paramter for '%s'\n",name); */
 	for (i=0; NULL != s[i].name; ++i){											/**at beginning of name  */
-		if(NULL == name || '_' == s[i].name[0] || (NULL != (f=strstr(s[i].name,name)) && f==s[i].name) )
+		if(NULL == name || '_' == s[i].name[0] || (NULL != (f=strstr(s[i].name,name)) && f==s[i].name) ){
+			/*fprintf(stderr,"Adding parameter '%s'\n",s[i].name); */
 			p=open_gpib_new_param(p,s[i].name, "du",s[i].define, s[i].val);
+		}
+			
 	}
 	return p;
 }
