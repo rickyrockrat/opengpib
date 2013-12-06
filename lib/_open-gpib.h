@@ -131,6 +131,8 @@ in the union 'val' below.  */
 #define OG_PARAM_TYPE_INT32  's'
 #define OG_PARAM_TYPE_STRING 'c'
 #define OG_PARAM_TYPE_NAME   'n'
+/**used for define.  */
+#define OG_PARAM_TYPE_DEFINE 'd'
 
 union param_val {
 		uint32_t u;
@@ -142,7 +144,14 @@ struct open_gpib_param {
 	char *name;
 	union param_val val;
 	int type; 
+	uint32_t define; /**used in switch cases.  */
 	struct open_gpib_param *next;
+};
+/** og_static_settings */
+struct open_gpib_settings {
+	char *name;
+	int define;
+	uint32_t val;
 };
 
 #define CONTROLLER_TYPEMASK 0xFF
@@ -282,7 +291,8 @@ int register_##x ( void *p) {\
 }		*/
 
 /**This becomes part of the global command set. Appended to  CMD_SET_, see build-interfaces.*/
-#define OPEN_GPIB_ADD_CMD(x)
+/**define,name  */
+#define OPEN_GPIB_ADD_CMD(def,name,defval)
 
 
 
@@ -326,6 +336,8 @@ uint32_t open_gpib_get_uint32_t(struct open_gpib_param *head,char *name);
 int open_gpib_show_param(struct open_gpib_param *head);
 int32_t open_gpib_get_int32_t(struct open_gpib_param *head,char *name);
 struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *name, char *fmt, ...);
+struct open_gpib_param *open_gpib_param_init(struct open_gpib_settings s[], char *name );
+void open_gpib_param_free(struct open_gpib_param *head);
 struct open_gpib_param *open_gpib_new_param_old(struct open_gpib_param *head, int type, char *name, void *val);
 struct open_gpib_param *open_gpib_del_param(struct open_gpib_param *head,char *name);
 
