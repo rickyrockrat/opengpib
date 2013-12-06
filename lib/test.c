@@ -80,6 +80,11 @@ int test_parametr_lists2 ( void )
 	return 0;
 }
 
+int test_show_if (void)
+{
+	return open_gpib_list_interfaces();
+}
+
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -109,8 +114,9 @@ int main (int argc, char *argv[])
 	if(argc || argv)
 		x=10; /**prevent unused warning  */
 	/*test_parameter_lists(); */
-	test_config();
-	test_parametr_lists2();
+	/*test_config(); */
+	/*test_parametr_lists2(); */
+	test_show_if();
 	return 0;
 }
 
