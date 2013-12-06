@@ -27,10 +27,13 @@ fail(){
 rm "$OFILE"
 exit 1
 }
-#fname input, input is output of grep.
+#name fname input, input is output of grep.
+#name is name defined in FUNC macro
 handle_cmds() {
+	name="$1"
+	file="$2"
 	# get just our lines
-	lines=$(echo "$2"|grep OPEN_GPIB_ADD_CMD)
+	lines=$(echo "$3"|grep OPEN_GPIB_ADD_CMD)
 	#extract our line number(s)
         #lineno=$(echo "$line"|sed 's!\(.*\):.*!\1!')
         #line=$(echo "$line"|sed 's!.*:!!')
@@ -52,8 +55,8 @@ handle_cmds() {
 		cval=$(echo "$sline"|sed 's!.*".*,!!;s!).*!!')
 #		echo "$sline\n$cname=$cval"
 		cmd=$(echo "$sline"|sed 's!.*(!!;s!,.*!!'|tr -d ' ')
-		fbase=$(echo "$1"|sed 's!\(.*\)\..*!\1!')
-		varn="${fbase}_${cname}"
+		fbase=$(echo "$file"|sed 's!\(.*\)\..*!\1!')
+		varn="${name}_${cname}"
 #		cmd=$(echo "$cmd"|sed 's!.*(!!;s!).*!!'|tr -d ' ')
 		echo "	$cmd,">> "$OFILE"
 		CMDNAMES="$CMDNAMES\n{.val=$cval,.define=$cmd,.name=\"$varn\"},"
@@ -94,7 +97,6 @@ for f in $@; do
         if [ -z "$line" ]; then
 		continue
 	fi
-	handle_cmds "$f" "$line"
 		
 	T=$(echo "$line"|grep -c GPIB_TRANSPORT_FUNCTION)
 	sname=$(echo "$line"|grep "GPIB_TRANSPORT_FUNCTION\|GPIB_CONTROLLER_FUNCTION")
@@ -110,6 +112,7 @@ for f in $@; do
 	desc=$(echo "$sname"|sed  's!.*, *"!!;s!" *).*!!')
 	sname=$(echo "$sname"|sed 's!.*(!!;s!,.*!!'|tr -d ' ')
 	func="register_$sname"
+	handle_cmds "$sname" "$f" "$line"
 	if [ "0" = "$T" ]; then
 		type="OPEN_GPIB_REG_TYPE_CONTROLLER"
 	else
