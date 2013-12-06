@@ -262,5 +262,5 @@ static int init_inet( struct open_gpib_dev *d)
 	return 0;
 }
 GPIB_TRANSPORT_FUNCTION(inet,"TCP/IP Transport Layer")
-OPEN_GPIB_ADD_CMD(IP_CMD_SET_PORT)
+OPEN_GPIB_ADD_CMD(IP_CMD_SET_PORT,"set_port",5025)
 
