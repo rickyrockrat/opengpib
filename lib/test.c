@@ -68,6 +68,17 @@ int test_parameter_lists(void)
 	open_gpib_show_param(head);
 	return 0;
 }
+int test_parametr_lists2 ( void )
+{
+	struct open_gpib_param *head=NULL;
+	head=open_gpib_param_init(og_static_settings,NULL);
+	open_gpib_show_param(head);
+	open_gpib_param_free(head);
+	head=NULL;
+	head=open_gpib_param_init(og_static_settings,"serial");
+	open_gpib_show_param(head);
+	return 0;
+}
 
 /***************************************************************************/
 /** .
@@ -99,6 +110,7 @@ int main (int argc, char *argv[])
 		x=10; /**prevent unused warning  */
 	/*test_parameter_lists(); */
 	test_config();
+	test_parametr_lists2();
 	return 0;
 }
 

@@ -257,6 +257,8 @@ OG_PARAM_TYPE_UINT32
 OG_PARAM_TYPE_INT32
 OG_PARAM_TYPE_STRING
 
+fmt can be d, u,
+
 \n\b Returns: New top of the list
 ****************************************************************************/
 struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *name, char *fmt, ...)
@@ -266,6 +268,7 @@ struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *n
 	char buf[3];
 	void *ptr=NULL;
 	int type=0;
+	int define=-1;
 	buf[0]=0;
 	if(NULL == name){
 		fprintf(stderr,"%s: Failed to supply name, '%c'\n",__func__,OG_PARAM_TYPE_NAME );
@@ -276,7 +279,7 @@ struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *n
 		return head;
 	}
 	va_start(ap, fmt);
-/*	while (*fmt){ */
+	while (*fmt){ 
 		switch (*fmt) {
 			case OG_PARAM_TYPE_UINT32: 
 			case OG_PARAM_TYPE_INT32:  
@@ -288,12 +291,14 @@ struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *n
 			/** case OG_PARAM_TYPE_NAME:   
 				name=va_arg(ap, char *);	
 				break;*/
+			case OG_PARAM_TYPE_DEFINE:
+				define=va_arg(ap,int);
+				break;
 			default: 
 				fprintf(stderr,"%s: Unknown type '%c'\n",__func__,*fmt);
 		}	
-/**  		++fmt;
-	}*/
-	
+ 		++fmt;
+	}
 	va_end(ap);
 	
 	if(0==type){
@@ -305,6 +310,8 @@ struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *n
 			if(NULL != ptr && p->type == type){
 				sprintf(buf,"%c",type);
 				_open_gpib_set_param(p,buf,ptr);
+				if(-1 != define)
+					p->define=define;
 				return head;
 			}
 		}
@@ -323,6 +330,42 @@ struct open_gpib_param *open_gpib_new_param(struct open_gpib_param *head,char *n
 	p->type=type;
 	_open_gpib_set_param(p,buf,ptr);
 	return p;
+}
+
+/***************************************************************************/
+/** parse the og_static_settings array, and build a parameter list.
+
+\n\b Arguments: If name is specified, only look at entries that have names
+like 'name_'.
+\n\b Returns:	filled out parameter list
+****************************************************************************/
+struct open_gpib_param *open_gpib_param_init(struct open_gpib_settings s[], char *name )
+{
+	int i;
+	char *f;
+	struct open_gpib_param *p=NULL;
+	for (i=0; NULL != s[i].name; ++i){											/**at beginning of name  */
+		if(NULL == name || '_' == s[i].name[0] || (NULL != (f=strstr(s[i].name,name)) && f==s[i].name) )
+			p=open_gpib_new_param(p,s[i].name, "du",s[i].define, s[i].val);
+	}
+	return p;
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void open_gpib_param_free(struct open_gpib_param *head)
+{
+	struct open_gpib_param *p, *n;
+	for (p=head;p != NULL;){
+		if(OG_PARAM_TYPE_STRING==p->type && NULL != p->val.c)
+			free(p->val.c);
+		n=p->next;
+		free(p);
+		p=n;
+	}
 }
 /***************************************************************************/
 /** Create and allocate memory for a new parameter.
