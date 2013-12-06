@@ -147,7 +147,7 @@ struct open_gpib_param {
 	uint32_t define; /**used in switch cases.  */
 	struct open_gpib_param *next;
 };
-/** og_static_settings */
+/** og_static_settings, only used in build-interfaces, and specifically for init. */
 struct open_gpib_settings {
 	char *name;
 	int define;
@@ -190,6 +190,7 @@ struct open_gpib_functions {
 struct open_gpib_dev {  
 	struct open_gpib_dev *dev; 										/**lower level interface  */  
 	struct open_gpib_functions funcs;
+	struct open_gpib_param *params;								/**list of parameters for this interface  */
 	void *internal;            										/**internal structure(s)  */
 	int debug;                                    /**debug level  */
 	char *if_name;                                /**name of this interface  */
@@ -262,19 +263,20 @@ if( -1 == check_calloc(sizeof(struct transport_dev), p, __func__,NULL) == -1) re
 #define GPIB_TRANSPORT_FUNCTION(x,desc) \
 struct open_gpib_dev *register_##x(void) {\
 	struct open_gpib_dev *d=NULL;\
-	if(-1 == check_calloc(sizeof(struct open_gpib_dev), &d,__func__,NULL) ) return NULL;\
+	if(NULL ==(d = calloc(1,sizeof(struct open_gpib_dev)) )) return NULL;\
 	d->funcs.og_read=read_##x;\
 	d->funcs.og_write=write_##x;\
 	d->funcs.og_open=open_##x;\
 	d->funcs.og_close=close_##x;\
 	d->funcs.og_control=control_##x;\
 	d->funcs.og_init=init_##x;\
-	d->dev=calloc_internal_##x();\
+	d->internal=calloc_internal_##x();\
 	d->if_name=strdup(#x);\
 	d->wait=1;\
-	printf("rtn from %s\n",__func__);\
+	d->params=open_gpib_param_init(og_static_settings,#x); \
 	return d; \
 }
+/*fprintf(stderr,"rtn from %s\n",__func__);\ */
 
 #define GPIB_CONTROLLER_FUNCTION GPIB_TRANSPORT_FUNCTION
 /** #define GPIB_CONTROLLER_FUNCTION (x) \
@@ -297,7 +299,7 @@ int register_##x ( void *p) {\
 
 
 int open_gpib_list_interfaces(void);
-open_gpib_register open_gpib_find_interface(char *name, int type);
+open_gpib_register open_gpib_find_interface(const char *name, int type);
 
 struct open_gpib_mstr *open_gpib(uint32_t ctype, int gpib_addr, char *dev_path,int buf_size); /**opens and inits GPIB interface, interface,and controller  */
 int close_gpib ( struct open_gpib_mstr *g);
