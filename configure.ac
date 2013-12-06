@@ -1,4 +1,4 @@
-# this is example-file: configure.ac
+# This file is part of OpenGPIB.
 
 # initial information about the project
 AC_INIT([open-gpib], [0.12], [gpib@rickyrockrat.net])
@@ -71,6 +71,7 @@ if test "x$have_libla2vcd2" = "xyes" ; then
 else
   echo "WARNING: VCD OUTPUT is DISABLED. libla2vcd2 was NOT FOUND"
 fi
+PKG_CHECK_MODULES([LIBCONFIG], [libconfig >= 1.4],,AC_MSG_ERROR([libconfig 1.4 or newer not found.]) )
 
 
 
