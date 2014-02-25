@@ -269,7 +269,7 @@ find_gmaxx (){
 	  return
 	fi
 	let i=0
- for f in "$@"; do
+ for f in $@; do
   #xorg lasttime miny maxy
   while read a b c d; do
       if [ $i -eq 0 ]; then
@@ -365,13 +365,14 @@ if [ "png" = "$plottype" ] && [ -z "$outfile" ]; then
   usage
 fi
 all_args=( $@ );
+echo "args=$args, in=$#"
 rm "$plotfile"
 # set up single/multi plot
 let multi=$#-$args
 do_term "$plottype" "$GSIZE" "$plottitle"
 while [ $args -lt $# ]; do
 	if [ -n "$FILES" ]; then
-		FILES="$CWD/${all_args[$args]} $FILES"
+		FILES="$FILES $CWD/${all_args[$args]}"
 	else
 		FILES="$CWD/${all_args[$args]}"
 	fi
@@ -403,10 +404,10 @@ maxx="-99999"
 maxy="-1000"
 miny="1000"
 gmaxx="0"
-find_gmaxx "$FILES"
+find_gmaxx $FILES
 echo "gmaxx=$gmaxx"
 # read min/max, title, and get first two X data points
-for f in "$FILES"; do
+for f in $FILES; do
   let i=0
   #xorg lasttime miny maxy
   while read a b c d; do
