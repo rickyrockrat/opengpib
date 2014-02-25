@@ -1,0 +1,19 @@
+#!/bin/bash
+if [ $# -lt 1 ]; then
+	echo "Use: fname <ch>"
+	echo " Where fname is the base name of the files created from a trace grab"
+	echo " From the HP scope. We assume channel 1 if more channels are specified,"
+	echo " Then more -c will be added to the scope data command"
+	exit 1
+fi
+fname="$1"
+ch2="$2"
+ch3="$3"
+ch4="$4"
+for c in 1 $ch2 $ch3 $ch4; do
+  CH="$CH -c $c"
+  INF="$INF $fname.$c"
+done
+echo "CH='$CH'"
+src/get_hp_1653xx_scope -a 192.168.0.200 -g -v $CH -o $fname
+scripts/plot-file -f 2 -k png -p $fname.plot -o $fname.1.png $INF
