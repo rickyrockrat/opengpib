@@ -63,6 +63,8 @@
 WDIR=$(dirname $0)
 float_scale=12
 . "$WDIR/bcommon"
+CWD=$(pwd)
+#echo "WDIR=$WDIR"
 # These are intended to match the colors on the HP1653x channels. These do
 # match two 16532 cards tied together above two 16534 cards tied together.
 get_rgb (){
@@ -331,7 +333,7 @@ while  getopts f:g:k:hl:o:p:s:t:x: opt ; do
          *) echo "Unknown type ($OPTARG) for -t"
                  usage;;
        esac;;
-    h) useage;; 
+    h) usage;; 
    # l) for l in $OPTARG; do
    #      if [ "$l" = "x" ]; then
     p) plotfile="$OPTARG";;
@@ -362,38 +364,49 @@ if [ "png" = "$plottype" ] && [ -z "$outfile" ]; then
   echo "must specify out file witn plot type png"
   usage
 fi
+all_args=( $@ );
 rm "$plotfile"
 # set up single/multi plot
-let multi=0
+let multi=$#-$args
 do_term "$plottype" "$GSIZE" "$plottitle"
+while [ $args -lt $# ]; do
+	if [ -n "$FILES" ]; then
+		FILES="$CWD/${all_args[$args]} $FILES"
+	else
+		FILES="$CWD/${all_args[$args]}"
+	fi
+	let args=args+1
+done
+echo "Files=$FILES"
 if [ "ready" = "$MODE" ]; then
 
-if [ $# -gt 1 ]; then
-  let multi=$#
-fi
+#if [ $# -gt 1 ]; then
+#  let multi=
+  echo "Have $# args after getopt,args=$args"
+#fi
 do_header  "$multi"
 set_ylabel "Volts"
-for f in "$@"; do
+for f in "$FILES"; do
   plot_file "$f" "" "CH$fileno"
 done
 plot_all "$plottype" "$outfile"
 exit
 fi
-echo "$#: $@"
-shift $args
-echo "$args: $@"
-if [ $# -gt 1 ]; then
-  let multi=$#
-fi
+#echo "$#: $@"
+#shift $args
+#echo "$args: $@"
+#if [ $# -gt 1 ]; then
+#  let multi=$#
+#fi
 delay1=""
 maxx="-99999"
 maxy="-1000"
 miny="1000"
 gmaxx="0"
-find_gmaxx "$@"
+find_gmaxx "$FILES"
 echo "gmaxx=$gmaxx"
 # read min/max, title, and get first two X data points
-for f in "$@"; do
+for f in "$FILES"; do
   let i=0
   #xorg lasttime miny maxy
   while read a b c d; do
