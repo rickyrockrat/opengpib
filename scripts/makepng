@@ -90,6 +90,6 @@ fi
 DIR=$(dirname $0)
 add_ifexist ch1
 add_ifexist ch2
-echo "$DIR/tek2gplot \"$DESC\" -m -o $OUTF $INPUT $CURSORS $FUNC $IN -t png  "
-$DIR/tek2gplot "$DESC" -m -o $OUTF $INPUT $CURSORS $FUNC $IN -t png  
+echo "$DIR/../src/tek2gplot \"$DESC\" -m -o $OUTF $INPUT $CURSORS $FUNC $IN -t png  "
+$DIR/../src/tek2gplot "$DESC" -m -o $OUTF $INPUT $CURSORS $FUNC $IN -t png  
 gnuplot $OUTF.plot > $OUTF.png
