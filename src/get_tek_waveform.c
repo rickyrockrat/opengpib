@@ -98,19 +98,6 @@ int init_instrument(struct open_gpib_mstr *g)
 }
 
 /***************************************************************************/
-/** .
-\n\b Arguments:
-\n\b Returns:
-****************************************************************************/
-int get_data(struct open_gpib_dev *g)
-{
-	int i;
-	write_string(g,"WAV?");
-	i=read_string(g);
-	return i;
-}
-
-/***************************************************************************/
 /** read the cursors data.
 To get the cursor info, just type
 cursor?
@@ -227,7 +214,7 @@ void usage(void)
 {
 	printf("get_tek_waveform <options>\n"
 	" -a addr set instrument address to addr (2)\n"
-	" -c n Use channel n for data (ch1). ch1, ch2, ref1-4, and cursors\n"
+	" -c ch Use channel ch for data (ch1). ch1, ch2, ref1-4, and cursors\n"
 	"    The -c option can be used multiple times. In this case, the fname\n"
 	"    is a base name, and the filename will have a .1 or .2, etc appended\n"
 	" -d path set path to device name\n"
@@ -338,14 +325,17 @@ int main(int argc, char * argv[])
 			if(-1 == (i=read_cursors(g->ctl)) )
 				goto closem;
 		} else {
-			set_channel(g->ctl,channel[c]);
+			set_channel(g->ctl,channel[c]);	/**sets DATA SOURCE  */
 			printf("Reading Channel %s\n",channel[c]);
-			if(-1 == (i=get_data(g->ctl)) ){
+			write_string(g->ctl,"WAV?");
+			usleep(500000);	/**serial is SLOW  */
+			if(-1 == (i=read_string(g->ctl)) ){
 				printf("Unable to get waveform??\n");
 				goto closem;
-			}	
+			}	else printf("Got %d bytes\n",i);
 			while(i>0){	/**suck out all data from cmd above  */
 				fwrite(g->ctl->buf,1,i,ofd);
+				usleep(500000);
 				i=read_string(g->ctl);
 			}
 		}
