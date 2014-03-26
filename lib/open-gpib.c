@@ -142,15 +142,15 @@ int setup_interface (struct open_gpib_dev *open_gpibp, uint32_t wait, uint32_t a
 	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_DEBUG,open_gpibp->debug);
 	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s set timeout\n",open_gpibp->if_name);
 	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_TIMEOUT,wait);
-	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s set addr\n",open_gpibp->if_name);
-	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_ADDR,addr);
-	
 	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s open\n",open_gpibp->if_name);
 	if(-1==open_gpibp->funcs.og_open(open_gpibp,dev_path))
 		goto err;
+  if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s set addr\n",open_gpibp->if_name);
+	open_gpibp->funcs.og_control(open_gpibp,CTL_SET_ADDR,addr);
 	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"Call %s init\n",open_gpibp->if_name);
 	if(-1==open_gpibp->funcs.og_init(open_gpibp))
 		goto err;
+  
 	if(DBG_TRACE<=open_gpibp->debug)fprintf(stderr,"%s Ready\n",open_gpibp->if_name);
 	open_gpibp->dev_path=strdup(dev_path);
 	return 0;
@@ -315,7 +315,7 @@ int close_gpib ( struct open_gpib_mstr *open_gpibp)
 	fprintf(stderr,"Free %s\n",open_gpibp->ctl->dev_path);
 	if(NULL != open_gpibp->ctl->dev_path)
 		free(open_gpibp->ctl->dev_path);
-	fprintf(stderr,"Now freeing ctl\n");
+	/*fprintf(stderr,"Now freeing ctl\n"); */
 	free(open_gpibp->ctl);
 	open_gpibp->ctl=NULL;
 	return 0;
