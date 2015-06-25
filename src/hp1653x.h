@@ -40,11 +40,11 @@ struct hp_scope_preamble {
   int xinc_thou;  /**number of powers of 1000  to get xinc to >=1*/
   double xincmult;  /**multiplier to remove -e exponet, i.e. 2e-6*1000000=2  */
   char xunits[3]; /**units, i.e. ms,us,ns,ps  */
-	int points;
-	int type;
-	int fmt;    /**ascii, byte, word  */
+	int points;		/**number of data points  */
+	int type;     /**type of aquisition 1=normal, 2=average (averaged by count # of aquisitions, below)  */
+	int fmt;    	/**ascii, byte, word  */
   int data_size; /**related to fmt, above.  */
-  int count;
+  int count;    /**number of aquisitions always 1 for type 1. */
   long point_len; /**number of bytes that follow on data stream  */
   int point_start; /**location in buffer where points start.  */
 };
