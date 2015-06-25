@@ -90,7 +90,9 @@ int set_channel(struct open_gpib_dev *g,char *ch)
 	for (i=0;0 != c[i];++i)
 		c[i]=toupper(c[i]);
 	sprintf(g->buf,"%s%s",inst_ids[found].source,ch);
+	usleep(5000);	/** Make sure instrument is ready. */
 	i=write_string(g,g->buf);	
+	usleep(50000);	/** Make sure instrument got it. */
 	if(NULL != inst_ids[found].start){
 		i=write_string(g,inst_ids[found].start);
 	}
@@ -129,7 +131,7 @@ int init_instrument(struct open_gpib_mstr *g)
 		return -1;
 	}
 	printf("\nTalking to addr %d: '%s', encoding '%s'\n",g->addr,inst_ids[found].id, inst_ids[found].encoding);
-	return write_string(g,inst_ids[found].encoding);
+	return write_string(g->ctl,inst_ids[found].encoding);
 }
 
 /***************************************************************************/
@@ -328,6 +330,8 @@ int main(int argc, char * argv[])
 		printf("Unable to initialize instrument\n");
 		goto closem;
 	}
+	fprintf(stderr,"Allocating bufs\n");
+	fflush(NULL);
 	if(NULL != ofname){
 		/**find max strlen of channel name.  */
 		for (i=c=0;c<ch_idx;++c){
@@ -361,8 +365,9 @@ int main(int argc, char * argv[])
 				goto closem;
 		} else {
 			set_channel(g->ctl,channel[c]);/**sets DATA SOURCE  */
-			set_channel(g->ctl,channel[c]);
+/*			set_channel(g->ctl,channel[c]); */
 			write_string(g->ctl,"DATA:SOU?");
+			usleep(500000);	/**serial is SLOW  */
 			read_string(g->ctl);
 			printf("Reading Channel %s (%s)\n",channel[c],g->ctl->buf);
 			usleep(500000);	/**serial is SLOW  */
