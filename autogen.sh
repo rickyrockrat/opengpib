@@ -1,4 +1,5 @@
 #!/bin/sh
+ACLOCAL_PATH=/usr/share/aclocal
 mkdir -p po m4
 
 echo "gettextize..."
@@ -10,7 +11,7 @@ intltoolize --copy --force --automake
 echo "libtoolize"
 libtoolize
 echo "aclocal..."
-aclocal -I m4
+aclocal -I m4 -I /usr/share/aclocal 
 
 echo "autoconf..."
 

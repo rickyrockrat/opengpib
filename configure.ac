@@ -12,7 +12,7 @@ AC_CONFIG_MACRO_DIR([m4])
 AM_CONFIG_HEADER([config.h])
 AC_PROG_INTLTOOL([0.23])
 
-Check for tools:
+#Check for tools:
 AC_PROG_CC
 #AC_PROG_CXX
 AC_PROG_INSTALL
@@ -71,7 +71,7 @@ if test "x$have_libla2vcd2" = "xyes" ; then
 else
   echo "WARNING: VCD OUTPUT is DISABLED. libla2vcd2 was NOT FOUND"
 fi
-PKG_CHECK_MODULES([LIBCONFIG], [libconfig >= 1.4],,AC_MSG_ERROR([libconfig 1.4 or newer not found.]) )
+#PKG_CHECK_MODULES([LIBCONFIG], [libconfig >= 1.4],,AC_MSG_ERROR([libconfig 1.4 or newer not found.]) )
 
 
 
