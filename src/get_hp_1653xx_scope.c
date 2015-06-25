@@ -374,7 +374,7 @@ int main(int argc, char * argv[])
 					/*time=((time_inc*(double)(point))); */
           volts=((double)(rawdat)-h.yref)*h.yinc + h.yorg;
 					if(0==point){
-            fprintf(stderr,"%e %e %e %e v%e\n",h.xinc,time, time_inc,h.xorg,volts); 
+            fprintf(stderr,"%e %e %e %e y%e v%e\n",h.xinc,time, time_inc,h.xorg,h.yinc,volts); 
           }
 						
 					
