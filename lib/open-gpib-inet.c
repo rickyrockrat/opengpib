@@ -106,7 +106,7 @@ static int read_inet(struct open_gpib_dev *d, void *buf, int len)
 	char *m;
 	m=(char *)buf;
 	in=(struct ip_ctl *)d->internal;
-	fprintf(stderr,"%s read\n",d->if_name);
+	/*fprintf(stderr,"%s read\n",d->if_name); */
 	/*fprintf(stderr,"Looking for %d bytes\n",len); */
 	for (i=wait=0; i<len;){
 		int r;
@@ -146,7 +146,7 @@ static int write_inet(struct open_gpib_dev *d, void *buf, int len)
 	struct ip_ctl *in;
 	int i;
 	char *m;
-	printf("%s: %s\n",__func__,d->if_name);
+	/*printf("%s: %s\n",__func__,d->if_name); */
 	in=(struct ip_ctl *)d->internal;
 	m=(char *)buf;
 	
