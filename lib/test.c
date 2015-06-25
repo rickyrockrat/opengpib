@@ -28,6 +28,7 @@
 		The License should be in the file called COPYING.
 */
 
+#define _ALLOC_REGISTER_
 #include <open-gpib.h>
 
 /***************************************************************************/
@@ -84,7 +85,7 @@ int test_show_if (void)
 {
 	return open_gpib_list_interfaces();
 }
-
+#ifdef HAVE_LIBCONFIG
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -108,6 +109,7 @@ int test_config(void)
 		printf("var2=%d\n",v);
 	return 0;
 }
+#endif
 int main (int argc, char *argv[])
 {
 	int x;

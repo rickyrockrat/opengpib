@@ -379,19 +379,34 @@ double og_get_value( char *f, char *buf)
 }
 
 /***************************************************************************/
-/** Get the string following the title.
+/** \details See if character is a delimiter.
+\param 
+\returns 
+****************************************************************************/
+int og_is_delim(int ch, char *delims)
+{
+	int i;
+	for (i=0;0!=delims[i];++i){
+		if(ch==delims[i])
+			return 1;
+	}	
+	return 0;
+}
+/***************************************************************************/
+/** Get the string following the title. delims used to be ,;
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-char * og_get_string( char *f, char *buf)
+char * og_get_string( char *f, char *buf, char *delims)
 {
-	char tbuf[50], *find;
+	char tbuf[200], *find;
 	int i,k;
-	
+	if(NULL == delims)
+		return NULL;
 	find=strstr(buf,f);
 	if(NULL==find)
 		return "NOTFOUND";
-	for (k=0,i=strlen(f)+1; k<30 && find[i] != ',' && find[i] != ';';++i,++k)
+	for (k=0,i=strlen(f)+1; k<190 && !og_is_delim(find[i],delims);++i,++k)
 		tbuf[k]=find[i];
 	tbuf[k]=0;
 	/*printf("Found %s->%s\n",f,tbuf); */

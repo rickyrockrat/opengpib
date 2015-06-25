@@ -32,9 +32,11 @@ Change Log: \n
 /*#define _XOPEN_SOURCE=600   */
 #include <fcntl.h>
 #include <sys/stat.h>
+
+
 #include <math.h>
 #include <inttypes.h>
-#include <open-gpib.h>
+#include "open-gpib.h"
 
 #define CURSOR_XPERCENT 17
 #define RMARGIN 19
@@ -71,7 +73,7 @@ struct func_list func_names[]={
 };
 
 #define BUF_LEN 		1024
-#define MAX_POINTS 	2048
+#define MAX_POINTS 	20000
 
 #define WR_SINGLE_PLOT 0
 #define WR_MULTI_PLOT  2
@@ -125,6 +127,8 @@ struct trace_data {
 	double points;
 	double trigger;
 	double yoff;
+	double yzero; /**adders to vertical  */
+	double xzero; /**adders to horizontal  */
 	int sgn; /**signed or unsigned  */
 	char *fmt;
 	char *enc;
@@ -184,13 +188,73 @@ enum {
 	_MODE
 };
 
+struct personality {
+	char *yzero;  /**  */
+	char *xzero;
+	int pre_yoff; /**take the offset off the value before using multipliers  */
+	int title_delim; /**Delimiter when parsing the title (stuff between "")  */
+	char *pre_delim;	/**list of delimiters (in a string) for parsing the preamble  */
+	int value_delim;	/**delimiter for the value delimiter  */
+	char *name;	/**instrument name  */
+	char *yoff;	/** these are strings for the names to search the preamble for  */
+	char *ymult;
+	char *xincr;
+	char *points;
+	char *fmt;
+	char *enc;
+	char *trigger;
+	char *title;
+	char *curve;
+	char *delim_list;
+	char *enc_supported;
+};
+
+static struct personality inst[]={
+	{.yzero=NULL,.xzero=NULL,.pre_yoff=0,.title_delim=' ',.pre_delim=":",.value_delim=',',.name="2440",.yoff="YOFF",.ymult="YMULT",.xincr="XINCR",.points="NR.PT",.fmt="BN.FMT",.enc="ENCDG",.trigger="PT.OFF",.title="WFID",.curve="CURVE",.delim_list=",;",.enc_supported="ASCII"},
+	{.yzero="YZE",.xzero="XZE",.pre_yoff=1,.title_delim=',',.pre_delim=",",.value_delim=',',.name="TDS",.yoff="YOF",.ymult="YMU",.xincr="XIN",.points="NR_P",.fmt="BN_F",.enc="ENC",.trigger="PT_O",.title="WFI",.curve="CURV",.delim_list=";",.enc_supported="ASC"},
+	{.yzero=NULL,.xzero=NULL,.pre_yoff=0,.title_delim=0,.pre_delim="",.value_delim=',',.name=NULL,.yoff="",.ymult="",.xincr="",.points="",.fmt="",.enc="",.trigger="",.title="",.curve="",.delim_list="",.enc_supported=""},
+};
+static int inst_no=0;
+
+
+
+/***************************************************************************/
+/** \details Find the instrument, so we know how to parse. Defaults to 2440.
+\param 
+\returns 
+****************************************************************************/
+int find_instrument(char *name, int mode)
+{
+	int i;
+	if( mode )
+		printf("Known instruments:\n");
+	for (i=0; NULL != inst[i].name; ++i){
+		if(mode)
+			printf("%s\n",inst[i].name);
+		else{	
+			if(!strcmp(name,inst[i].name))
+				return i;
+		}	
+	}
+	return -1;
+}
 /**build with 
 gcc -Wall -lm -o tek2plot tek2gplot.c
   */
 /**
-WFMPRE WFID:"CH1 DC   5mV 500ms NORMAL",NR.PT:1024,PT.OFF:128,PT.FMT:Y,XUNIT:SEC
-,XINCR:1.000E-2,YMULT:2.000E-4,YOFF:-2.625E+1,YUNIT:V,BN.FMT:RI,ENCDG:ASCII;CURV
-E  */
+2440 = 
+WFMPRE WFID:"CH1 DC   5mV 500ms NORMAL",
+NR.PT:1024,PT.OFF:128,PT.FMT:Y,XUNIT:SEC,XINCR:1.000E-2,YMULT:2.000E-4,YOFF:-2.625E+1,YUNIT:V,BN.FMT:RI,ENCDG:ASCII;CURVE  
+TDS 684 =
+:WFMP:BYT_N 1;BIT_N 8;ENC ASC;BN_F RP;BYT_O MSB;CH1:WFI 
+"Ch1, DC coupling, 2.000 Volts/div, 5.000us/div, 15000 points, Sample mode";
+
+NR_P 500;PT_F Y;XUN "s";XIN 100.0E-9;XZE 46.7E-9;PT_O 1500;YUN "Volts";YMU 80.000E-3;YOF 53.50E+0;YZE 0.0E+0;:CURV 
+From the TDS programmers manual:
+Xn = XZEro + XINcr * (n­PT_Off)
+Yn = YZEro + YMUlt * (Yn - YOFf)
+
+*/
 
 /***************************************************************************/
 /** Load everything before curve into a buffer and set offset to first data
@@ -201,8 +265,8 @@ point.
 char *load_tek_preamble(int fd, int *offset)
 {
 	char buf[256], *end;
-	int i,x,k;
-	i=read(fd,buf,200);
+	int i,x,k,l;
+	i=read(fd,buf,250);
 	for (x=k=0; k<i;++k){
 		while(buf[x]== '\n' || buf[x] == '\r'){
 			++x;
@@ -211,16 +275,17 @@ char *load_tek_preamble(int fd, int *offset)
 		buf[k]=buf[x++];
 	}
 	
-	end=strstr(buf,"CURVE");
+	end=strstr(buf,inst[inst_no].curve);
 	if(NULL == end)	{
 		*offset=-1;
 		buf[i]=0;
 		printf("preamble=%s\n",buf);
 		return NULL;
 	}
+	l=strlen(inst[inst_no].curve)+1;
 	i=end-buf;
 	buf[i]=0;
-	*offset=i+6+(x-k);
+	*offset=i+l+(x-k);
 	lseek(fd,*offset,SEEK_SET);
 	return (strdup(buf));
 	
@@ -259,7 +324,7 @@ int get_next_value (int fd, char *dst)
     return(0);
   }
   /*printf("Looking at line (buf %d long).\n",len-pos); */
-  for (i=0;buf[pos] != ',' && len;){
+  for (i=0;buf[pos] != inst[inst_no].value_delim && len;){
 		if(buf[pos] != '\n' && buf[pos] != '\r')
     	dst[i++]=buf[pos++];
 		else ++pos;
@@ -271,7 +336,7 @@ int get_next_value (int fd, char *dst)
 
   }
   /**get rid of \n or \r  */
-  while( ('\n' == buf[pos] || buf[pos] == '\r' ||',' == buf[pos]) && len) {
+  while( ('\n' == buf[pos] || buf[pos] == '\r' ||inst[inst_no].value_delim == buf[pos]) && len) {
     ++pos;
     if(pos >= len) {
       /*printf("Ran out of input looking at term, reading again.\n"); */
@@ -308,24 +373,24 @@ double get_multiplier (char *s)
 	return 1;					
 }
 /***************************************************************************/
-/** .
+/** Process the title "CH1 DC   5mV 500ms NORMAL"
 \n\b Arguments:
-\n\b Returns:   CH1 DC   5mV 500ms NORMAL"
+\n\b Returns:   
 ****************************************************************************/
 int break_extended(char *data, struct extended *x)
 {
-	int k,i,state;
+	int k,i,state,j;
 	char buf[10];
 	state=_SRC;
 	/*printf("%s\n",data); */
 	/*memset(x,0,sizeof(struct extended)); can't do this- we have persistent data*/
 	x->src=x->coupling=x->vert_units=x->time_units=NULL;
 	for (i=k=0;data[i];){
-		if(data[i] != '"' && data[i] != ' ')
+		if(data[i] != '"' && !og_is_delim(data[i], inst[inst_no].pre_delim))
 			buf[k++]=data[i++];
-		else if(data[i] == ' '){
+		else if(og_is_delim(data[i],inst[inst_no].pre_delim)){
 			buf[k]=0;
-			while (data[i] == ' ') ++i;
+			while (og_is_delim(data[i],inst[inst_no].pre_delim)) ++i;
 			/*printf("%s\n",buf); */
 			switch(state){
 				case _SRC:
@@ -339,26 +404,42 @@ int break_extended(char *data, struct extended *x)
 				case _VERT:
 					x->vert_div=strtol(buf,NULL,10);
 					for (k=0;buf[k];++k){
-						if(buf[k] >'9' || buf[k] < '0')
+						if('.'  != buf[k] && ' ' != buf[k] && (buf[k] >'9' || buf[k] < '0') )
 							break;
 					}
+					for (j=k;buf[j];++j){
+						if('/' == buf[j])
+							break;
+					}
+					buf[j]=0;
 					x->vert_units=strdup(&buf[k]);
 					if(!strcmp(x->vert_units,"mV"))
 							x->vert_mult=1000;
 					else 
 						x->vert_mult=1;
-					/*printf("Vert:%d%s %E\n",x->vert_div,x->vert_units,x->vert_mult); */
+					printf("Vert:%d'%s' %E\n",x->vert_div,x->vert_units,x->vert_mult); 
 					++state;
 					break;
 				case _HORIZ:
-					x->time_div=strtof(buf,NULL);
+					/*printf("buf='%s'\n",buf); */
 					for (k=0;buf[k];++k){
-						if(buf[k] >'9' || buf[k] < '0')
+						if(' ' != buf[k])
 							break;
 					}
+						
+					x->time_div=strtod(buf,NULL);
+					for (;buf[k];++k){
+						if('.'  != buf[k] && (buf[k] >'9' || buf[k] < '0') )
+							break;
+					}
+					for (j=k;buf[j];++j){
+						if('/' == buf[j])
+							break;
+					}
+					buf[j]=0;
 					x->time_units=strdup(&buf[k]);
 					x->time_mult=get_multiplier(x->time_units);
-					/*printf("time:%d%s %E\n",x->time_div,x->time_units,x->time_mult); */
+					printf("time:%g'%s' %E\n",x->time_div,x->time_units,x->time_mult); 
 					++state;
 					break;
 				default:
@@ -428,7 +509,6 @@ int write_file ( int fd, char *buf, int len, char *fname)
 			fprintf(stderr,"Failed to write all bytes (%d of %d) to %s\n",i,len,fname);
 	return i;
 }
-
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -660,6 +740,7 @@ void usage( void)
 	" -o fname use fname for output file. if multiple -i are used, this name\n"
 	"    becomes a base filename with the -i names appended like ofname.ifname\n"
 	"    In all cases the script file becomes fname.plot\n"
+	" -p name Set personality to name (2440)\n"
 	" -s val Use smoothing with value val. \n"
 	
 	" -t term, set terminal to png, ascii, or x11 (default is x11)\n"
@@ -668,7 +749,7 @@ void usage( void)
 	" -x pixels Set out (png for now) X size in pixels\n"
 	" -y pixels Set out (png for now) Y size in pixels\n"
 	);
-	
+	find_instrument(NULL,1);
 	
 }
 
@@ -832,12 +913,12 @@ int read_cursor_file(char *name, struct cursors *c)
 		fprintf(stderr,"Error reading or 0 bytes read from %s\n",name);
 		return 1;
 	}
-	c->func=og_get_string("CURSOR",buf);
+	c->func=og_get_string("CURSOR",buf,inst[inst_no].delim_list);
 	c->max=og_get_value("MAX",buf);
 	c->min=og_get_value("MIN",buf);
 	c->diff=og_get_value("DIFF",buf);
-	c->target=og_get_string("TARGET",buf);
-	c->trigger=og_get_string("TRIGGER", buf);
+	c->target=og_get_string("TARGET",buf,inst[inst_no].delim_list);
+	c->trigger=og_get_string("TRIGGER", buf,inst[inst_no].delim_list);
 	close (id);
 	return 0;
 }
@@ -887,17 +968,30 @@ int load_data(struct plot_data *p)
 			goto closeid;
 		}
 		p->trace[c].info.terminal=p->terminal;
-		p->trace[c].yoff=og_get_value("YOFF", preamble);
+		p->trace[c].yoff=og_get_value(inst[inst_no].yoff, preamble);
 		/**PT.OFF  */
-		p->trace[c].ymult=og_get_value("YMULT",preamble);
-		p->trace[c].xincr=og_get_value("XINCR", preamble);
-		p->trace[c].points=og_get_value("NR.PT", preamble);
-		p->trace[c].fmt=og_get_string("BN.FMT",preamble);
-		p->trace[c].enc=og_get_string("ENCDG",preamble);
-		p->trace[c].trigger=og_get_value("PT.OFF",preamble);
-		p->trace[c].title=og_get_string("WFID",preamble);
+		if(NULL != inst[inst_no].xzero)
+			p->trace[c].xzero=og_get_value(inst[inst_no].xzero,preamble);
+		else
+			p->trace[c].xzero=0;
+		if(NULL != inst[inst_no].yzero)
+			p->trace[c].yzero=og_get_value(inst[inst_no].yzero,preamble);
+		else
+			p->trace[c].yzero=0;
+		printf("Xzero=%g Yzero= %g ",p->trace[c].xzero,p->trace[c].yzero);
+		p->trace[c].ymult=og_get_value(inst[inst_no].ymult,preamble);
+		p->trace[c].xincr=og_get_value(inst[inst_no].xincr, preamble);
+		p->trace[c].points=og_get_value(inst[inst_no].points, preamble);
+		if(p->trace[c].points> MAX_POINTS){
+			printf("Points from waveform = %f. Max is %d. We will truncate.\n",p->trace[c].points,MAX_POINTS);
+			p->trace[c].points=(double)MAX_POINTS;
+		}
+		p->trace[c].fmt=og_get_string(inst[inst_no].fmt,preamble,inst[inst_no].delim_list);
+		p->trace[c].enc=og_get_string(inst[inst_no].enc,preamble,inst[inst_no].delim_list);
+		p->trace[c].trigger=og_get_value(inst[inst_no].trigger,preamble);
+		p->trace[c].title=og_get_string(inst[inst_no].title,preamble,inst[inst_no].delim_list);
 		strip_quotes(p->trace[c].title);
-
+		printf("yoff=%g ymult=%g xincr=%g points=%f\n",p->trace[c].yoff,p->trace[c].ymult,p->trace[c].xincr,p->trace[c].points);
 		if(!strcmp("RI",p->trace[c].fmt))
 			p->trace[c].sgn=1;
 		else if(!strcmp("RP",p->trace[c].fmt))
@@ -907,7 +1001,7 @@ int load_data(struct plot_data *p)
 			goto closeid;
 		}
 		
-		if(strcmp(p->trace[c].enc,"ASCII")){
+		if(strcmp(p->trace[c].enc,inst[inst_no].enc_supported)){
 			printf("Encoding %s not supportd\n",p->trace[c].enc);
 			goto closeid;
 		}
@@ -935,11 +1029,22 @@ int load_data(struct plot_data *p)
 		
 		
 		/*yrange=( ((int)round(p->trace[c].info.vert_div*8))+p->trace[c].yoff<0?(int)(p->trace[c].yoff*-1):(int)p->trace[c].yoff)>>1; */
-		p->trace[c].info.yrange_plus=p->trace[c].info.yrange_minus=((int)round(p->trace[c].info.vert_div*8))>>1;
-		if(p->trace[c].yoff >=0)
-			p->trace[c].info.yrange_minus+=round(p->trace[c].yoff);
-		else
-			p->trace[c].info.yrange_plus+=round(-p->trace[c].yoff);
+		if(0 == inst_no)/**what is this????  */
+			p->trace[c].info.yrange_plus=p->trace[c].info.yrange_minus=((int)round(p->trace[c].info.vert_div*8))>>1;
+		else 
+			p->trace[c].info.yrange_plus=p->trace[c].info.yrange_minus=((int)round(p->trace[c].info.vert_div*4));
+		if( inst[inst_no].pre_yoff ){
+			if(p->trace[c].yoff >=0)
+				p->trace[c].info.yrange_minus+=round(p->trace[c].yoff*p->trace[c].ymult*p->trace[c].info.vert_mult);
+			else
+				p->trace[c].info.yrange_plus+=round(-p->trace[c].yoff*p->trace[c].ymult*p->trace[c].info.vert_mult);
+		}else {
+			if(p->trace[c].yoff >=0)
+				p->trace[c].info.yrange_minus+=round(p->trace[c].yoff);
+			else
+				p->trace[c].info.yrange_plus+=round(-p->trace[c].yoff);
+		}
+		
 		
 		/**now take it to the closest volt.  */
 		/** if(p->trace[c].info.yrange_minus%1000)
@@ -953,10 +1058,10 @@ int load_data(struct plot_data *p)
 			p->max_yrange_plus =p->trace[c].info.yrange_plus;
 		if(p->max_yrange_minus <p->trace[c].info.yrange_minus)
 			p->max_yrange_minus =p->trace[c].info.yrange_minus;
-		/*printf("yrange=[-%d:%d] in %s ",p->trace[c].info.yrange_minus,p->trace[c].info.yrange_plus,p->trace[c].info.vert_units); */
+		printf("yrange=[-%d:%d] in %s ",p->trace[c].info.yrange_minus,p->trace[c].info.yrange_plus,p->trace[c].info.vert_units); 
 		p->trace[c].info.xrange=(int)round(p->trace[c].xincr*p->trace[c].points*p->trace[c].info.time_mult);
 		trig=(int)round(p->trace[c].trigger);
-		/*printf("Xrange=[0:%d] in %s\n",p->trace[c].info.xrange,p->trace[c].info.time_units); */
+		printf("Xrange=[0:%d] in %s\n",p->trace[c].info.xrange,p->trace[c].info.time_units); 
 		/*printf("set xtics 0,%f\n",p->trace[c].info.time_div); */
 		p->trace[c].info.x=0;
 		buf[0]=1;
@@ -964,11 +1069,19 @@ int load_data(struct plot_data *p)
 			if(1> get_next_value(id,buf))	
 				break;
 			p->trace[c].info.y=strtof(buf, NULL);
-			if(0 == p->trace[c].sgn)
-				p->trace[c].info.y=p->trace[c].info.y-128;
-			p->trace[c].info.y=(p->trace[c].info.y*p->trace[c].ymult*p->trace[c].info.vert_mult) - p->trace[c].yoff;
+			
+			if( inst[inst_no].pre_yoff ){
+				p->trace[c].info.y=(p->trace[c].yzero + (p->trace[c].info.y-p->trace[c].yoff)*(p->trace[c].ymult*p->trace[c].info.vert_mult));
+				if(  0 == p->trace[c].sgn)
+					p->trace[c].info.y-=p->trace[c].ymult*p->trace[c].yoff;
+			}else{
+				if(  0 == p->trace[c].sgn)
+					p->trace[c].info.y=p->trace[c].info.y-128;
+				p->trace[c].info.y=p->trace[c].yzero + (p->trace[c].info.y*p->trace[c].ymult*p->trace[c].info.vert_mult) - p->trace[c].yoff;
+			}
+				
 			save_data_point(&p->trace[c],
-					p->trace[c].info.time_mult*p->trace[c].info.x,
+					p->trace[c].xzero + p->trace[c].info.time_mult*p->trace[c].info.x,
 					p->trace[c].info.y);
 			p->trace[c].info.x+=p->trace[c].xincr;
 			/**we are on trigger channel, plot it, save it  */
@@ -1227,6 +1340,7 @@ int write_datafiles(struct plot_data *p)
 			double x,y;
 			x=p->trace[c].data_pt.data[dp].x;
 			y=p->trace[c].data_pt.data[dp].y;
+/*			printf("%d: %E %E\n",dp,x,y); */
 			if(p->flags & FLAGS_GNUPLOT){/**write data  */
 				p->trace[c].info.x=x;
 				p->trace[c].info.y=y;
@@ -1289,7 +1403,7 @@ int main (int argc, char *argv[])
 	f_load=0;
 	last_idx=0;
 	desc=NULL;
-	while( -1 != (c = getopt(argc, argv, "a:c:d:f:gi:ml:o:s:t:x:y:")) ) {
+	while( -1 != (c = getopt(argc, argv, "a:c:d:f:ghi:ml:o:p:s:t:x:y:")) ) {
 		switch(c){
 			case 'a':
 				desc=strdup(optarg);
@@ -1354,6 +1468,12 @@ int main (int argc, char *argv[])
 			case 'o':
 				plot.basename=strdup(optarg);
 				break;	
+			case 'p':
+				inst_no=find_instrument(optarg,0);
+				if(-1 == inst_no){
+					printf("Unable to find instrument '%s'\n",optarg);
+					return -1;
+				}
 			case 's':
 				plot.trace[last_idx].info.smoothing=strtol(optarg,NULL,10);
 				break;

@@ -35,6 +35,27 @@ Change Log: \n
 #define FUNC_VOLT 1
 #define FUNC_TIME 2
 #define FUNC_FREQ 3
+struct instruments {
+	char *id;
+	char *waveform;	/**Waveform command that includes the preamble  */
+	char *encoding;	/**Encoding setting  */
+	char *source;	/**Source command  */
+	char *delims;	/**Delimiters for og_get_string  */
+	char *stop;		/**Data Stop command  */
+	char *start;	/**Data Start command  */
+	char *reclen;	/**Record Length command.  */
+};
+			/** Query("HORizontal:RECOrdlength?");
+            RecLength = Int32.Parse(result);
+            mbSession.Write("DATA:STOP " + RecLength);
+            RecLength += 25;*/
+            
+static struct instruments inst_ids[]={
+	{.id="TEK/TDS 684C", .waveform="WAVF?",.encoding="DATA:ENC ASCII", .source="DAT:SOU ",.delims=",;",.stop="DAT:STOP 15000",.start="DAT:STAR 1",.reclen="HOR:RECO?"},
+	{.id="TEK/2440", .waveform="WAV",.encoding="DATA ENCDG:ASCI",.source="DATA SOURCE:",.delims=",;",.stop=NULL,.start=NULL,.reclen=NULL},
+	{.id=NULL, .waveform=NULL,},
+};
+static int found=-1;
 
 /***************************************************************************/
 /** .
@@ -68,8 +89,15 @@ int set_channel(struct open_gpib_dev *g,char *ch)
 	c=strdup(ch);
 	for (i=0;0 != c[i];++i)
 		c[i]=toupper(c[i]);
-	sprintf(g->buf,"DATA SOURCE:%s\r",ch);
-	return write_string(g,g->buf);	
+	sprintf(g->buf,"%s%s",inst_ids[found].source,ch);
+	i=write_string(g,g->buf);	
+	if(NULL != inst_ids[found].start){
+		i=write_string(g,inst_ids[found].start);
+	}
+	if(NULL != inst_ids[found].stop){
+		i=write_string(g,inst_ids[found].stop);
+	}
+	return i;
 }
 /***************************************************************************/
 /** .
@@ -79,6 +107,7 @@ int set_channel(struct open_gpib_dev *g,char *ch)
 int init_instrument(struct open_gpib_mstr *g)	 
 {
 	int i;
+	found=-1;
 	printf("Initializing Instrument\n");
 	g->ctl->funcs.og_control(g->ctl,CTL_SET_TIMEOUT,1000);
 	while(read_string(g->ctl));
@@ -88,13 +117,19 @@ int init_instrument(struct open_gpib_mstr *g)
 		printf("%s:Unable to read from port on id\n",__func__);
 		return -1;
 	}
+	for (i=0;NULL!=inst_ids[i].id;++i){
+		printf("Looking for '%s'",inst_ids[i].id);
+		if(strstr(g->ctl->buf,inst_ids[i].id)){
+			found=i;
+		}	
+	}
 	/*printf("Got %d bytes\n",i); */
-	if(NULL == strstr(g->ctl->buf,"TEK/2440")){
-		printf("Unable to find 'TEK/2440' in id string '%s'\n",g->ctl->buf);
+	if(-1 == found){
+		printf("Unable to find a tek scope in id string '%s'\n",g->ctl->buf);
 		return -1;
 	}
-	printf("Talking to addr %d: '%s'\n",g->addr,g->ctl->buf);
-	return write_string(g->ctl,"DATA ENCDG:ASCI");
+	printf("\nTalking to addr %d: '%s', encoding '%s'\n",g->addr,inst_ids[found].id, inst_ids[found].encoding);
+	return write_string(g,inst_ids[found].encoding);
 }
 
 /***************************************************************************/
@@ -145,7 +180,7 @@ int read_cursors(struct open_gpib_dev *g)
 	write_string(g,"CURSOR?");
 	read_string(g);
 	
-	function=og_get_string("FUNCTION",g->buf);
+	function=og_get_string("FUNCTION",g->buf,inst_ids[found].delims);
 	if( !strcmp(function,"TIME"))
 		f=FUNC_TIME;
 	else if (!strcmp(function,"ONE/TIME") )
@@ -154,7 +189,7 @@ int read_cursors(struct open_gpib_dev *g)
 		f=FUNC_VOLT;
 		min=og_get_value("YPOS:ONE",g->buf);
 		max=og_get_value("YPOS:TWO",g->buf);	
-		target=og_get_string("TARGET",g->buf); /**reference to  */
+		target=og_get_string("TARGET",g->buf,inst_ids[found].delims); /**reference to  */
 		
 		/**get channel for cursor ref  */
 	  i=sprintf(lbuf,"%s?\r",target);
@@ -193,7 +228,7 @@ int read_cursors(struct open_gpib_dev *g)
 		i=sprintf(lbuf,"ATRIGGER?\r");
 		write_string(g,lbuf);
 		read_string(g);
-		trigsrc=og_get_string("SOURCE",g->buf);
+		trigsrc=og_get_string("SOURCE",g->buf,inst_ids[found].delims);
 	
 	if(FUNC_VOLT ==f)
 		printf("volts");
@@ -284,7 +319,7 @@ int main(int argc, char * argv[])
 			}
 		}
 	}
-	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS,inst_addr,name,-1))){
+	if(NULL == (g=open_gpib(GPIB_CTL_PROLOGIXS|OPTION_DEBUG,inst_addr,name,-1))){
 		printf("Can't open %s. Fatal\n",name);
 		return 1;
 	}
@@ -325,14 +360,17 @@ int main(int argc, char * argv[])
 			if(-1 == (i=read_cursors(g->ctl)) )
 				goto closem;
 		} else {
-			set_channel(g->ctl,channel[c]);	/**sets DATA SOURCE  */
-			printf("Reading Channel %s\n",channel[c]);
-			write_string(g->ctl,"WAV?");
+			set_channel(g->ctl,channel[c]);/**sets DATA SOURCE  */
+			set_channel(g->ctl,channel[c]);
+			write_string(g->ctl,"DATA:SOU?");
+			read_string(g->ctl);
+			printf("Reading Channel %s (%s)\n",channel[c],g->ctl->buf);
 			usleep(500000);	/**serial is SLOW  */
+			write_string(g->ctl,inst_ids[found].waveform);
 			if(-1 == (i=read_string(g->ctl)) ){
 				printf("Unable to get waveform??\n");
 				goto closem;
-			}	else printf("Got %d bytes\n",i);
+			}else printf("Got %d bytes\n",i);	
 			while(i>0){	/**suck out all data from cmd above  */
 				fwrite(g->ctl->buf,1,i,ofd);
 				usleep(500000);

@@ -52,6 +52,9 @@ other controllers.
 	#ifdef HAVE_LIBLA2VCD2
 		#include <libla2vcd2.h>
 	#endif
+	#ifdef HAVE_LIBCONFIG
+		#include <libconfig.h>
+	#endif
 #else
 	#define PACKAGE_VERSION 0.12-unknown
 #endif
@@ -68,12 +71,12 @@ other controllers.
 #include <sys/types.h>
 #include <stdarg.h>
 
-
+#ifdef HAVE_LIBCONFIG
 struct og_conf {
 	char *fname;
 	void *dat;
 };
-
+#endif
 
 #define MAX_CHANNELS 8
 
@@ -323,7 +326,8 @@ int og_get_col(struct c_opts *o, float *f);
 double format_eng_units(double val, int *m);
 double og_get_value( char *f, char *buf);
 double og_get_value_col( int col, char *buf);
-char * og_get_string( char *f, char *buf);
+int og_is_delim(int ch, char *delims);
+char * og_get_string( char *f, char *buf, char *delims);
 char * og_get_string_col( int col, char *buf); /**make sure resulting char * is has free() called on it  */
 void _usleep(int usec);
 /*it is critial the line below stays here - it is used by build-interfaces */
@@ -343,14 +347,14 @@ void open_gpib_param_free(struct open_gpib_param *head);
 struct open_gpib_param *open_gpib_new_param_old(struct open_gpib_param *head, int type, char *name, void *val);
 struct open_gpib_param *open_gpib_del_param(struct open_gpib_param *head,char *name);
 
+#ifdef HAVE_LIBCONFIG
 /**in config.h  */
-
 struct og_conf *og_conf_open(char *path);
 void og_conf_close(struct og_conf *ogc);
 int og_conf_get_group(struct og_conf *ogc, char *name);
 int og_conf_get_uint32(struct og_conf *ogc, char *name, uint32_t *val);
-const char *og_conf_get_string(struct og_conf *ogc, char *name);
-
+const char *og_conf_get_string(struct og_conf *ogc, char *name, char *delims);
+#endif
 /**note: The comment below, 'REMOVE_ME' MUST stay here so build-interfaces will correctly build the header file. */
 #endif /*REMOVE_ME/
 

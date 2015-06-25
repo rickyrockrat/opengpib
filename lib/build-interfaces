@@ -59,7 +59,7 @@ handle_cmds() {
 		varn="${name}_${cname}"
 #		cmd=$(echo "$cmd"|sed 's!.*(!!;s!).*!!'|tr -d ' ')
 		echo "	$cmd,">> "$OFILE"
-		CMDNAMES="$CMDNAMES\n{.val=$cval,.define=$cmd,.name=\"$varn\"},"
+		CMDNAMES="{.val=$cval,.define=$cmd,.name=\"$varn\"},\n$CMDNAMES"
 #		echo "$CMDNAMES"
 	done << EOF
 $(echo -n "$lines")
@@ -90,6 +90,7 @@ echo "#define _INTERFACE_H_ 1">> "$OFILE"
 echo "enum {" >> "$OFILE"
 echo "	CMD_SET_DEBUG=0," >> "$OFILE"
 echo "	CMD_SET_CMD_TIMEOUT," >> "$OFILE"
+echo "  CMD_SET_CHAR_TIMEOUT," >> "$OFILE"
 
 for f in $@; do
 	# put line numbers at beginning
@@ -119,29 +120,24 @@ for f in $@; do
 		type="OPEN_GPIB_REG_TYPE_TRANSPORT"
 	fi
 	ENTRY="{.name=\"$sname\",.type=$type,.func=$func,.desc=\"$desc\"},\n$ENTRY"
-	FUNLIST="extern struct open_gpib_dev *$func(void);${NL}$FUNLIST"
+	FUNLIST="extern struct open_gpib_dev *$func(void);\n$FUNLIST"
 done
 echo "	CMD_LAST," >> "$OFILE"
 echo "};" >>"$OFILE"
-echo "$FUNLIST"|while read fun; do
-	echo "$fun">> "$OFILE"
-done
+#echo "FUNLIST $FUNLIST"
+echo -e "$FUNLIST" >>"$OFILE"
 echo "#ifdef _ALLOC_REGISTER_" >> "$OFILE"
 echo "struct open_gpib_settings og_static_settings[]={" >> "$OFILE"
 echo "{.define=CMD_SET_DEBUG,.val=0,.name=\"_set_debug\"}," >> "$OFILE"
 echo "{.define=CMD_SET_CMD_TIMEOUT,.val=500,.name=\"_cmd_timeout\"}," >> "$OFILE"
-#echo "CMDNAMEs=$CMDNAMES"
-echo "$CMDNAMES"|while read e; do
-	 echo "$e" >> "$OFILE"
-done
+echo "{.define=CMD_SET_CHAR_TIMEOUT,.val=501,.name=\"_char_timeout\"}," >> "$OFILE"
+echo "CMDNAMEs=$CMDNAMES"
+echo -e "$CMDNAMES" >> "$OFILE"
 echo "{.name=NULL}," >>  "$OFILE"
 echo "};" >> "$OFILE"
 
 echo "struct open_gpib_interfaces open_gpib_interface_list []={" >> "$OFILE"
-
-echo "$ENTRY"|while read e; do
-	echo "$e" >> "$OFILE"
-done
+echo -e  "$ENTRY" >>"$OFILE"
 echo "{.name=NULL,.type=0, .func=NULL}," >> "$OFILE"
 echo "};" >> "$OFILE"
 echo "#else" >> "$OFILE"
