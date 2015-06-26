@@ -41,7 +41,7 @@ struct instruments {
 	char *encoding;	/**Encoding setting  */
 	char *source;	/**Source command  */
 	char *delims;	/**Delimiters for og_get_string  */
-	char *stop;		/**Data Stop command  */
+	char *stop;		/**Data Stop command - must have a %d where the length goes */
 	char *start;	/**Data Start command  */
 	char *reclen;	/**Record Length command.  */
 };
@@ -51,7 +51,7 @@ struct instruments {
             RecLength += 25;*/
             
 static struct instruments inst_ids[]={
-	{.id="TEK/TDS 684C", .waveform="WAVF?",.encoding="DATA:ENC ASCII", .source="DAT:SOU ",.delims=",;",.stop="DAT:STOP 15000",.start="DAT:STAR 1",.reclen="HOR:RECO?"},
+	{.id="TEK/TDS 684C", .waveform="WAVF?",.encoding="DATA:ENC ASCII", .source="DAT:SOU ",.delims=",;",.stop="DAT:STOP %d",.start="DAT:STAR 1",.reclen="HOR:RECO?"},
 	{.id="TEK/2440", .waveform="WAV",.encoding="DATA ENCDG:ASCI",.source="DATA SOURCE:",.delims=",;",.stop=NULL,.start=NULL,.reclen=NULL},
 	{.id=NULL, .waveform=NULL,},
 };
@@ -82,7 +82,7 @@ int check_channel(char *ch)
 ****************************************************************************/
 int set_channel(struct open_gpib_dev *g,char *ch)
 {
-	int i;
+	int i, record_len=15000;
 	char *c;
 	if(NULL == ch)
 		return -1;
@@ -93,8 +93,16 @@ int set_channel(struct open_gpib_dev *g,char *ch)
 	usleep(5000);	/** Make sure instrument is ready. */
 	i=write_string(g,g->buf);	
 	usleep(50000);	/** Make sure instrument got it. */
+	if(NULL != inst_ids[found].reclen){ /**ask instrument how long record is */
+		i=write_string(g,inst_ids[found].reclen);
+		usleep(50000);
+		i=read_string(g);
+		printf("Record Len= %s\n",g->buf);
+		record_len=atoi(g->buf);
+	}
 	if(NULL != inst_ids[found].start){
-		i=write_string(g,inst_ids[found].start);
+		sprintf(g->buf,inst_ids[found].start,record_len);
+		i=write_string(g,g->buf);
 	}
 	if(NULL != inst_ids[found].stop){
 		i=write_string(g,inst_ids[found].stop);
