@@ -78,15 +78,17 @@ struct og_conf {
 };
 #endif
 
-#define MAX_CHANNELS 8
+#define MAX_CHANNELS 10
 
 #ifdef _GLOBAL_TEK_2440_
 /**We use the below for figuring out which channel the target is on.  */
-#define CURSORS      6 /**offset into CH_LIST where cursors keyword is */
+#define CURSORS      8 /**offset into CH_LIST where cursors keyword is */
 char *CH_LIST[MAX_CHANNELS]=\
 {
 	"ch1",
 	"ch2",
+	"ch3",
+	"ch4",
 	"ref1",
 	"ref2",
 	"ref3",
