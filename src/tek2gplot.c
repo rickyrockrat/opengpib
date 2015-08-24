@@ -3,7 +3,8 @@
 \n\b Author:      Doug Springer
 \n\b Company:     DNK Designs Inc.
 \n\b Date:        10/05/2007  1:12 am
-\n\b Description: 
+\n\b Description: Convert data to a gnuplot file. NOTE: to scale the plot, 
+just set the x-range.
 */ /************************************************************************
 Change Log: \n
  This file is part of OpenGPIB.
@@ -45,9 +46,10 @@ Change Log: \n
 
 #define MAX_INPUTFILES 10
 
-#define TERM_X 		1
-#define TERM_PNG 	2
-#define TERM_DUMB 3
+#define TERM_X 		0
+#define TERM_PNG 	1
+#define TERM_DUMB 	2
+#define TERM_WXT	3
 
 #define FUNCTION_BAD 	 -1
 #define FUNCTION_NONE 	0
@@ -104,6 +106,7 @@ struct extended {
 	double ytrig;
 	double x;
 	double y;
+	int xrange_min;
 	int xrange;
 	int yrange_minus;
 	int yrange_plus;
@@ -150,7 +153,19 @@ struct func {
 	int main_idx[MAX_FUNC_INPUT+1]; /**numerical offset to trace data corresponding to input, above  */
 };
 
+struct xy_user_range {
+	int x_min;			/**indicators if we auto-calculate user-specified  */
+	int x_max;
+	int y_min;
+	int y_max;
+	double xmin;
+	double xmax;
+	double ymin;
+	double ymax;
+};
+
 struct plot_data {
+	struct xy_user_range xy_range;
 	int max_yrange_plus;	/**positive value, represents max value above 0  */
 	int max_yrange_minus;	/**positive value, represents max value below 0  */
 	int idx;		/**location of data idx.  */
@@ -216,7 +231,18 @@ static struct personality inst[]={
 };
 static int inst_no=0;
 
+struct terminals {
+	int term_num;
+	char *term_name;
+};
 
+struct terminals term_list[]={
+	{.term_num=TERM_X,.term_name="x11",},
+	{.term_num=TERM_PNG,.term_name="png",},
+	{.term_num=TERM_DUMB,.term_name="ascii",},
+	{.term_num=TERM_WXT,.term_name="wxt",},
+	{.term_num=0,.term_name=NULL,},
+};
 
 /***************************************************************************/
 /** \details Find the instrument, so we know how to parse. Defaults to 2440.
@@ -523,7 +549,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	static int od=0, first=1,labelno=1;
 	static int offset, x, y, rmargin=RMARGIN;
 	static char *fname;
-	int ilinecolor=0;
+	static int ilinecolor=0;
 
 	if( WR_SETFILENAME == plotno){
 		sprintf(buf,"%s.plot",dfile);
@@ -600,6 +626,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	}
 
 	if(plotno <WR_MULTI_PLOT ){
+		float
 		c=sprintf(buf,"set xlabel \"%s\"\n",ext->time_units);
 		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set lmargin %d\nset bmargin %d\nset rmargin %d\n",LMARGIN,BMARGIN,rmargin);
@@ -608,7 +635,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set yrange[%d:%d]\n",-ext->yrange_minus,ext->yrange_plus);
 		write_file(od,buf,c,fname);
-		c=sprintf(buf,"set xrange[0:%d]\n",ext->xrange);
+		c=sprintf(buf,"set xrange[%d:%d]\n",ext->xrange_min, ext->xrange);
 		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set xtics 0,%f\n",ext->time_div);
 		write_file(od,buf,c,fname);
@@ -651,7 +678,8 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		  gnuplot*line8Color:  coral
 				*/
 			case TERM_X:
-				c=sprintf(buf,"set terminal x11 title \"%s\" persist\n",xtitle);
+			case TERM_WXT:
+				c=sprintf(buf,"set terminal %s title \"%s\" persist\n",term_list[ext->terminal].term_name,xtitle);
 				write_file(od,buf,c,fname);
 				break;
 			case TERM_DUMB:
@@ -686,7 +714,12 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		write_file(od,buf,c,fname);			
 	}
 	else{
-		c=sprintf(buf,"%s'%s' title \"%s\" ls %d with lines%s",plotno>0?first?"\nplot ":",\\\n":"\nplot ",dfile,ext->src,ilinecolor,plotno>0?"":"\n");
+		char *plot;
+		if(first || 0 == plotno)
+			plot="\nplot ";
+		else
+			plot=",\\\n";
+		c=sprintf(buf,"%s'%s' title \"%s\" ls %d with lines%s",plot,dfile,ext->src,ilinecolor,plotno>0?"":"\n");
 		write_file(od,buf,c,fname);			
 	}
 	++ilinecolor;
@@ -743,11 +776,14 @@ void usage( void)
 	" -p name Set personality to name (2440)\n"
 	" -s val Use smoothing with value val. \n"
 	
-	" -t term, set terminal to png, ascii, or x11 (default is x11)\n"
+	" -t term, set terminal to png, ascii, x11, or wxt (default is x11)\n"
 	"    if you use -t png, gnuplot usage is:\n"
 	"    gnuplot fname > image.png\n" \
 	" -x pixels Set out (png for now) X size in pixels\n"
 	" -y pixels Set out (png for now) Y size in pixels\n"
+	" -z Tval Perform zooming: First option is start, second is end\n"
+	"     -z xval Set start/end of x plotting\n"
+	"     -z yval Set start/end of y plotting\n"
 	);
 	find_instrument(NULL,1);
 	
@@ -1392,7 +1428,7 @@ write_script_file is used for all writing.
 int main (int argc, char *argv[])
 {
 	char buf[BUF_LEN+1], *desc;
-	int ret=1, c;
+	int ret=1, c,i;
 	int  f_load, last_idx;
 	struct plot_data plot;
 	struct extended e;
@@ -1403,7 +1439,7 @@ int main (int argc, char *argv[])
 	f_load=0;
 	last_idx=0;
 	desc=NULL;
-	while( -1 != (c = getopt(argc, argv, "a:c:d:f:ghi:ml:o:p:s:t:x:y:")) ) {
+	while( -1 != (c = getopt(argc, argv, "a:c:d:f:ghi:ml:o:p:s:t:x:y:z:")) ) {
 		switch(c){
 			case 'a':
 				desc=strdup(optarg);
@@ -1478,15 +1514,18 @@ int main (int argc, char *argv[])
 				plot.trace[last_idx].info.smoothing=strtol(optarg,NULL,10);
 				break;
 			case 't':
-				if(!strcmp(optarg,"png"))
-					plot.terminal=TERM_PNG;
-				else if(!strcmp(optarg,"x11"))
-					plot.terminal=TERM_X;
-				else if(!strcmp(optarg,"ascii"))
-					plot.terminal=TERM_DUMB;				
-				else {
-					printf("Must specify X or png for -t option\n");
+				for (i=0;NULL != term_list[i].term_name; ++i){
+					if(!strcmp(optarg,term_list[i].term_name)){
+						plot.terminal=term_list[i].term_num;
+						break;
+					}
+				}
+				if(NULL == term_list[i].term_name) {
 					usage();
+					printf("Invalid -t option - use one of these:\n");
+					for (i=0;NULL != term_list[i].term_name; ++i)
+						printf("'%s' ",term_list[i].term_name);
+					printf("\n");
 					return 1;
 				}
 				break;
@@ -1496,6 +1535,25 @@ int main (int argc, char *argv[])
 			case 'y':
 				plot.graphy=atoi(optarg);
 				break;			
+			case 'z':
+				if('x' == optarg[0]) {
+					if( plot.xy_range.x_min){
+						plot.xy_range.xmax=strtod(&optarg[1],NULL);
+						plot.xy_range.x_max=1;
+					} else{
+						plot.xy_range.xmin=strtod(&optarg[1],NULL);
+						plot.xy_range.x_min=1;
+					}
+				}else if('y' == optarg[0]){
+					if( plot.xy_range.y_min){
+						plot.xy_range.ymax=strtod(&optarg[1],NULL);
+						plot.xy_range.y_max=1;
+					} else{
+						plot.xy_range.ymin=strtod(&optarg[1],NULL);
+						plot.xy_range.y_min=1;
+					}
+				}
+				break;
 		}
 	}
 	if(plot.flags &FLAGS_GNUPLOT){
@@ -1566,8 +1624,11 @@ int main (int argc, char *argv[])
 	}
 	/*printf("plot.idx=%d\n",plot.idx); */
 	if(plot.flags &FLAGS_GNUPLOT){
-		plot.trace[0].info.yrange_plus=plot.max_yrange_plus;
-		plot.trace[0].info.yrange_minus=plot.max_yrange_minus;
+		plot.trace[0].info.xrange_min=plot.xy_range.x_min?(int)(plot.xy_range.xmin):0;
+		if(plot.xy_range.x_max)
+			plot.trace[0].info.xrange=plot.xy_range.xmax;
+		plot.trace[0].info.yrange_plus=plot.xy_range.y_max?(int)(plot.xy_range.ymax):plot.max_yrange_plus;
+		plot.trace[0].info.yrange_minus=plot.xy_range.y_min?(int)(plot.xy_range.ymin):plot.max_yrange_minus;
 	}	
 	/**write the data  */
 	if(write_datafiles(&plot))
@@ -1580,8 +1641,12 @@ int main (int argc, char *argv[])
 	/**the offset to the trigger is set when c=0  */
 	for (c=0; c<plot.idx;++c){
 		memcpy(&e,&plot.trace[c].info, sizeof(struct extended));
-		e.yrange_plus=plot.max_yrange_plus;
-		e.yrange_minus=plot.max_yrange_minus;
+		e.xrange_min=plot.xy_range.x_min?(int)(plot.xy_range.xmin):0;
+		if(plot.xy_range.x_max)
+			e.xrange=plot.xy_range.xmax;
+		e.yrange_plus=plot.xy_range.y_max?(int)(plot.xy_range.ymax):plot.max_yrange_plus;
+		e.yrange_minus=plot.xy_range.y_min?(int)(plot.xy_range.ymin):plot.max_yrange_minus;
+		
 		e.src=plot.trace[c].label;
 		if(0 == c && (e.xrange/e.time_div)>10){
 			int r;
