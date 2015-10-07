@@ -45,6 +45,16 @@ la2vcd -td 2ns -r 16 -b 32 -sf 31 CLK -sf 29-24 RED -sf 11 STVD -sf 10 STVU -sf 
 Extract a Tek 2440 waveform (extracts to base.ch1 base.ch2 base.cursors):
 ./get_tek_waveform -a 9 -c ch1 -c ch2 -c cursors -d /dev/ttyUSB1 -o base
 
+Extract a Tek TDS waveform:
+./get_tek_waveform -d /dev/ttyUSB0 -c ch1 -c ch2 -c ch3 -o MyMeasure
+
+Generate a GNU plot for X11 for TDS:
+./tek2gplot -p TDS -m -o MyMeasureP -t wxt -i MyMeasure.ch1 -i MyMeasure.ch2 -i MyMeasure.ch3
+
+Perform zoom on the plot for X11:
+./tek2gplot -p TDS -m -o MyMeasureP -t wxt -i MyMeasure.ch1 -i MyMeasure.ch2 -i MyMeasure.ch3 -z x1119 -z x1430 -z y3 -z y3
+
+Zoom takes the form -z axis
 
 Manipulate and display the tek data:
 
