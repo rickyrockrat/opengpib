@@ -152,10 +152,27 @@ if [ "$1" = "x11" ]; then
   echo "set terminal x11 $XTITLE persist" >>"$plotfile"
 fi
 if [ "$1" = "png" ]; then
-  echo "set terminal png medium size $2 \\" >>"$plotfile"
-  echo "xffffff x000000 x404040 \\">>"$plotfile"
-	echo "xff0000 x00ff00 x66cdaa xcdb5cd \\">>"$plotfile"
-	echo "xadd8e6 x0000ff xdda0dd x9500d3 ">>"$plotfile"
+	ver=$(gnuplot --version|sed 's![^0-9]*\([0-9]*\.[0-9]*\).*!\1!'|tr -d '.')
+	let x=ver # make sure it's an integer
+	if [ $x -ge 46 ]; then
+		echo "set terminal png medium size $2 " >>"$plotfile"
+		echo "set term png background \"#FFFFFF\"" >>"$plotfile"
+		echo "set linetype 1 lc rgb \"#000000\"" >>"$plotfile"
+		echo "set linetype 2 lc rgb \"#404040\"" >>"$plotfile"
+		echo "set linetype 3 lc rgb \"#ff0000\"" >>"$plotfile"
+		echo "set linetype 4 lc rgb \"#00ff00\"" >>"$plotfile"
+		echo "set linetype 5 lc rgb \"#66cdaa\"" >>"$plotfile"
+		echo "set linetype 6 lc rgb \"#cdb5cd\"" >>"$plotfile"
+		echo "set linetype 7 lc rgb \"#add8e6\"" >>"$plotfile"
+		echo "set linetype 8 lc rgb \"#0000ff\"" >>"$plotfile"
+		echo "set linetype 9 lc rgb \"#dda0dd\"" >>"$plotfile"
+		echo "set linetype 10 lc rgb \"#9500d3\"" >>"$plotfile"
+	else
+		echo "set terminal png medium size $2 \\" >>"$plotfile"
+		echo "xffffff x000000 x404040 \\">>"$plotfile"
+		echo "xff0000 x00ff00 x66cdaa xcdb5cd \\">>"$plotfile"
+		echo "xadd8e6 x0000ff xdda0dd x9500d3 ">>"$plotfile"
+	fi
 fi
 }
 # srcfile every title xtitle xmin xmax plottitle

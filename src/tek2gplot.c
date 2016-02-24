@@ -244,6 +244,40 @@ struct terminals term_list[]={
 	{.term_num=0,.term_name=NULL,},
 };
 
+#define GNUPLOT_VERSION_NEW 0x46
+
+uint32_t gnuplot_ver=0;
+/***************************************************************************/
+/** \details Return a version number like so:
+4.6=0x46
+\param 
+\returns 0 on error or version on success. Version is hex-shifted
+****************************************************************************/
+int get_gnuplot_ver( void )
+{
+	char buf[1024], *curr;
+	int len, i;
+	uint32_t ver=0;
+	if(-1 == (len=open_gpib_get_stdout("gnuplot --version|sed 's![^0-9]*\\([0-9]*\\.[0-9]*\\).*!\\1!'",buf,1023)) ){
+		printf("gnuplot version command failed\n");
+		return 0;
+	}
+	curr=buf;
+	i=0;
+	while(1){
+		uint32_t digit;
+		char *end;
+		digit=strtoul(curr,&end,0);
+		ver|=(digit<<i);
+		if(end == curr)
+			break;
+		++end;
+		curr=end;
+		i+=4;
+	}
+	return ver;
+}
+
 /***************************************************************************/
 /** \details Find the instrument, so we know how to parse. Defaults to 2440.
 \param 
@@ -281,6 +315,8 @@ Xn = XZEro + XINcr * (n­PT_Off)
 Yn = YZEro + YMUlt * (Yn - YOFf)
 
 */
+
+
 
 /***************************************************************************/
 /** Load everything before curve into a buffer and set offset to first data
@@ -491,7 +527,7 @@ int get_linecolor( char *rgb)
 	char buf[256];
 	if(NULL == rgb)
 		return 2;
-	sprintf(buf,"0%s",rgb);
+	sprintf(buf,"0x%s",rgb);
 	ilinecolor=strtol(buf,NULL,16);
 	switch(ilinecolor){
 		case 0xff0000: /**red  */
@@ -545,7 +581,7 @@ if plotno is -1, we close the file
 int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitle, int plotno)
 {
 	char buf[BUF_LEN];
-	int c,data;
+	int c,data,i;
 	static int od=0, first=1,labelno=1;
 	static int offset, x, y, rmargin=RMARGIN;
 	static char *fname;
@@ -626,7 +662,6 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 	}
 
 	if(plotno <WR_MULTI_PLOT ){
-		float
 		c=sprintf(buf,"set xlabel \"%s\"\n",ext->time_units);
 		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set lmargin %d\nset bmargin %d\nset rmargin %d\n",LMARGIN,BMARGIN,rmargin);
@@ -657,10 +692,25 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 			light blue, blue, plum and dark violet for eight plotting colors
 			*/
 			case TERM_PNG:
-				c=sprintf(buf,"set terminal png medium size %d,%d \\\n"
-	                     "xffffff x000000 x404040 \\\n"
-	                     "xff0000 %s x66cdaa xcdb5cd \\\n"
-	                     "xadd8e6 x0000ff xdda0dd x9500d3\n",x, y,ext->line_color );
+				c=sprintf(buf,"set terminal png medium size %d,%d",x,y);
+				if(gnuplot_ver >= GNUPLOT_VERSION_NEW){
+					   i=sprintf(&buf[c],"\nset term png background \"#FFFFFF\"\n"
+										"set linetype 1 lc rgb \"#000000\"\n"
+										"set linetype 2 lc rgb \"#404040\"\n"
+										"set linetype 3 lc rgb \"#ff0000\"\n"
+										"set linetype 4 lc rgb \"#%s\"\n"
+										"set linetype 5 lc rgb \"#66cdaa\"\n"
+										"set linetype 6 lc rgb \"#cdb5cd\"\n"
+										"set linetype 7 lc rgb \"#add8e6\"\n"
+										"set linetype 8 lc rgb \"#0000ff\"\n"
+										"set linetype 9 lc rgb \"#dda0dd\"\n"
+										"set linetype 10 lc rgb \"#9500d3\"\n",ext->line_color );
+				}  else {
+				    i=sprintf(&buf[c],"\\\nxffffff x000000 x404040 \\\n"
+                     "xff0000 x%s x66cdaa xcdb5cd \\\n"
+                     "xadd8e6 x0000ff xdda0dd x9500d3\n",ext->line_color );
+				}
+	            c+=i;
 				write_file(od,buf,c,fname);
 				break;
 			/**  
@@ -768,7 +818,7 @@ void usage( void)
 	" -g generate a gnuplot script file with data (default just data).\n"	
 	"    -g can only be used for one input file.\n"
 	" -i fname use fname for input file(s)\n"
-	" -l color set line color in 0xRRGGBB format \n"
+	" -l color set line color in 0xRRGGBB format, i.e. 00FF00 is Bright Green.\n"
 	" -m Set multi-plot mode. -o will have .plot appended to it\n"
 	" -o fname use fname for output file. if multiple -i are used, this name\n"
 	"    becomes a base filename with the -i names appended like ofname.ifname\n"
@@ -1439,6 +1489,7 @@ int main (int argc, char *argv[])
 	f_load=0;
 	last_idx=0;
 	desc=NULL;
+	gnuplot_ver=get_gnuplot_ver();
 	while( -1 != (c = getopt(argc, argv, "a:c:d:f:ghi:ml:o:p:s:t:x:y:z:")) ) {
 		switch(c){
 			case 'a':
@@ -1489,7 +1540,7 @@ int main (int argc, char *argv[])
 					}
 					plot.trace[plot.idx].info.smoothing=0;
 					plot.trace[plot.idx].info.terminal=TERM_X;
-					plot.trace[plot.idx].info.line_color="x00ff00";	
+					plot.trace[plot.idx].info.line_color="00ff00";	
 					last_idx=plot.idx;
 					plot.trace[plot.idx++].iname=strdup(optarg);	
 				}
