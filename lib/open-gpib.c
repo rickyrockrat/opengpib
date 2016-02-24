@@ -43,6 +43,32 @@ static struct supported_dev s_dev[]={\
 
 struct open_gpib_dev *find_and_register_if(const char *if_name, int type, uint32_t debug,char *buf, int blen);
 
+
+/***************************************************************************/
+/** \details Run a system command, dump results in buf. Nul-term buf.
+\param cmd - cmd to run
+\param buf - buffer to store output
+\param len - max len of buffer
+\returns -1 on err, len of bytes on success.
+****************************************************************************/
+int open_gpib_get_stdout (char *cmd, char *buf, int len)
+{
+	FILE *ex;
+	int rd;
+	if(NULL == cmd || NULL == buf || len <= 0){
+		fprintf(stderr,"%s: Invalid parameters: NULLs or 0/neg len\n",__FUNCTION__);
+		return -1;
+	}
+	if(NULL == (ex=popen(cmd,"r")) ){
+		fprintf(stderr,"%s: '%s' command failed\n",__FUNCTION__,cmd);
+		return -1;
+	}
+	rd=fread(buf,1,len,ex);
+	pclose(ex);
+	buf[rd]=0;
+	return rd;
+}
+
 /***************************************************************************/
 /** Just print out all interfaces auto-registered.
 \n\b Arguments:

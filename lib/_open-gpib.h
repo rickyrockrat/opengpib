@@ -302,7 +302,7 @@ int register_##x ( void *p) {\
 #define OPEN_GPIB_ADD_CMD(def,name,defval)
 
 
-
+int open_gpib_get_stdout (char *cmd, char *buf, int len);
 int open_gpib_list_interfaces(void);
 open_gpib_register open_gpib_find_interface(const char *name, int type);
 
