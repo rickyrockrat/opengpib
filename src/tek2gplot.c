@@ -673,7 +673,7 @@ int write_script_file(struct extended *ext, char *dfile, char *title,char *xtitl
 		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set label %d \"%s\" at graph -0.15, graph .5\n",labelno++,ext->vert_units);
 		write_file(od,buf,c,fname);
-		c=sprintf(buf,"set yrange[%d:%d]\n",-ext->yrange_minus,ext->yrange_plus);
+		c=sprintf(buf,"set yrange[%d:%d]\n",ext->yrange_minus,ext->yrange_plus);
 		write_file(od,buf,c,fname);
 		c=sprintf(buf,"set xrange[%d:%d]\n",ext->xrange_min, ext->xrange);
 		write_file(od,buf,c,fname);
