@@ -315,7 +315,10 @@ NR_P 500;PT_F Y;XUN "s";XIN 100.0E-9;XZE 46.7E-9;PT_O 1500;YUN "Volts";YMU 80.00
 From the TDS programmers manual:
 Xn = XZEro + XINcr * (n­PT_Off)
 Yn = YZEro + YMUlt * (Yn - YOFf)
-
+3 - YMU 80.000E-3;YOF -63.00E+0;YZE 40.00E-3
+2 - YMU 80.000E-3;YOF -24.50E+0;YZE 0.0E+0
+1 - YMU 80.000E-3;YOF 25.50E+0;YZE 0.0E+0
+* 
 */
 
 
@@ -1043,6 +1046,7 @@ int load_data(struct plot_data *p)
 	double _xincr;
 	char buf[BUF_LEN], *preamble;
 	p->yoff_max=0;
+
 	for (c=0; c<p->idx;++c){
 		int trigfile, trig, dp;
 		trigfile=check_for_trigger_file(p,c);
@@ -1158,8 +1162,8 @@ int load_data(struct plot_data *p)
 				break;
 			p->trace[c].info.y=strtof(buf, NULL);
 			
-			if( inst[inst_no].pre_yoff ){
-				p->trace[c].info.y=(p->trace[c].yzero + (p->trace[c].info.y-p->trace[c].yoff)*(p->trace[c].ymult*p->trace[c].info.vert_mult));
+			if( inst[inst_no].pre_yoff ){ /*TDS*/
+				p->trace[c].info.y=(p->trace[c].yzero + ((p->trace[c].info.y*(p->trace[c].ymult*p->trace[c].info.vert_mult)))-p->trace[c].yoff);
 				if(  0 == p->trace[c].sgn)
 					p->trace[c].info.y-=p->trace[c].ymult*p->trace[c].yoff;
 			}else{
