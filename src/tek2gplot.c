@@ -308,6 +308,8 @@ NR.PT:1024,PT.OFF:128,PT.FMT:Y,XUNIT:SEC,XINCR:1.000E-2,YMULT:2.000E-4,YOFF:-2.6
 TDS 684 =
 :WFMP:BYT_N 1;BIT_N 8;ENC ASC;BN_F RP;BYT_O MSB;CH1:WFI 
 "Ch1, DC coupling, 2.000 Volts/div, 5.000us/div, 15000 points, Sample mode";
+:WFMP:BYT_N 1;BIT_N 8;ENC ASC;BN_F RP;BYT_O MSB;CH3:WFI "Ch3, DC coupling, 2.000 Volts/div, 1.000us/div, 15000 points, 
+ Sample mode";NR_P 15000;PT_F Y;XUN "s";XIN 20.00E-9;XZE 15.53E-9;PT_O 8400;YUN "Volts";YMU 80.000E-3;YOF -63.00E+0;YZE 40.00E-3;:
 
 NR_P 500;PT_F Y;XUN "s";XIN 100.0E-9;XZE 46.7E-9;PT_O 1500;YUN "Volts";YMU 80.000E-3;YOF 53.50E+0;YZE 0.0E+0;:CURV 
 From the TDS programmers manual:
@@ -326,9 +328,9 @@ point.
 ****************************************************************************/
 char *load_tek_preamble(int fd, int *offset)
 {
-	char buf[256], *end;
+	char buf[1024], *end;
 	int i,x,k,l;
-	i=read(fd,buf,250);
+	i=read(fd,buf,1020);
 	for (x=k=0; k<i;++k){
 		while(buf[x]== '\n' || buf[x] == '\r'){
 			++x;
