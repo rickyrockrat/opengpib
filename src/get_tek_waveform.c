@@ -40,6 +40,7 @@ struct instruments {
 	char *waveform;	/**Waveform command that includes the preamble  */
 	char *encoding;	/**Encoding setting  */
 	char *source;	/**Source command  */
+	char *sourceq; /** source query  */
 	char *delims;	/**Delimiters for og_get_string  */
 	char *stop;		/**Data Stop command - must have a %d where the length goes */
 	char *start;	/**Data Start command  */
@@ -51,8 +52,8 @@ struct instruments {
             RecLength += 25;*/
             
 static struct instruments inst_ids[]={
-	{.id="TEK/TDS 684C", .waveform="WAVF?",.encoding="DATA:ENC ASCII", .source="DAT:SOU ",.delims=",;",.stop="DAT:STOP %d",.start="DAT:STAR 1",.reclen="HOR:RECO?"},
-	{.id="TEK/2440", .waveform="WAV",.encoding="DATA ENCDG:ASCI",.source="DATA SOURCE:",.delims=",;",.stop=NULL,.start=NULL,.reclen=NULL},
+	{.id="TEK/TDS 684C", .waveform="WAVF?",.encoding="DATA:ENC ASCII", .sourceq="DATA:SOU?", .source="DAT:SOU ",.delims=",;",.stop="DAT:STOP %d",.start="DAT:STAR 1",.reclen="HOR:RECO?"},
+	{.id="TEK/2440", .waveform="WAV?",.encoding="DATA ENCDG:ASCI",.sourceq="DAT?", .source="DATA SOURCE:",.delims=",;",.stop=NULL,.start=NULL,.reclen=NULL},
 	{.id=NULL, .waveform=NULL,},
 };
 static int found=-1;
@@ -90,9 +91,10 @@ int set_channel(struct open_gpib_dev *g,char *ch)
 	for (i=0;0 != c[i];++i)
 		c[i]=toupper(c[i]);
 	sprintf(g->buf,"%s%s",inst_ids[found].source,ch);
+	printf("Sending '%s'\n",g->buf);
 	usleep(5000);	/** Make sure instrument is ready. */
 	i=write_string(g,g->buf);	
-	usleep(50000);	/** Make sure instrument got it. */
+	usleep(100000);	/** Make sure instrument got it. */
 	if(NULL != inst_ids[found].reclen){ /**ask instrument how long record is */
 		i=write_string(g,inst_ids[found].reclen);
 		usleep(50000);
@@ -121,7 +123,7 @@ int init_instrument(struct open_gpib_mstr *g)
 	printf("Initializing Instrument\n");
 	g->ctl->funcs.og_control(g->ctl,CTL_SET_TIMEOUT,1000);
 	while(read_string(g->ctl));
-	g->ctl->funcs.og_control(g->ctl,CTL_SET_TIMEOUT,500000);
+	g->ctl->funcs.og_control(g->ctl,CTL_SET_TIMEOUT,1000000);
 	write_string(g->ctl,"id?");
 	if(-1 == (i=read_string(g->ctl)) ){
 		printf("%s:Unable to read from port on id\n",__func__);
@@ -139,6 +141,7 @@ int init_instrument(struct open_gpib_mstr *g)
 		return -1;
 	}
 	printf("\nTalking to addr %d: '%s', encoding '%s'\n",g->addr,inst_ids[found].id, inst_ids[found].encoding);
+	
 	return write_string(g->ctl,inst_ids[found].encoding);
 }
 
@@ -372,14 +375,25 @@ int main(int argc, char * argv[])
 			if(-1 == (i=read_cursors(g->ctl)) )
 				goto closem;
 		} else {
+			char *src="NA";
 			set_channel(g->ctl,channel[c]);/**sets DATA SOURCE  */
-/*			set_channel(g->ctl,channel[c]); */
-			write_string(g->ctl,"DATA:SOU?");
-			usleep(500000);	/**serial is SLOW  */
-			read_string(g->ctl);
-			printf("Reading Channel %s (%s)\n",channel[c],g->ctl->buf);
-			usleep(500000);	/**serial is SLOW  */
+			usleep(100000);	/** Make sure instrument got it. */
+			if(NULL != inst_ids[found].sourceq){ /**ask what is selected */
+				i=write_string(g->ctl,inst_ids[found].sourceq);
+				usleep(50000);
+				i=read_string(g->ctl);
+				if(i>0)
+					src=g->ctl->buf;
+			}	
+			printf("Reading Channel %s (%s)\n",channel[c],src);
+			/** if(channel[c],g->ctl->buf[0] < ' '){
+				int i;
+				for (i=0; 0 != channel[c],g->ctl->buf[i]; ++i)
+					printf("%02x ",0 != channel[c],g->ctl->buf[i]);
+				printf("\n");
+			}		*/
 			write_string(g->ctl,inst_ids[found].waveform);
+		  usleep(500000);	/**serial is SLOW  */
 			if(-1 == (i=read_string(g->ctl)) ){
 				printf("Unable to get waveform??\n");
 				goto closem;
