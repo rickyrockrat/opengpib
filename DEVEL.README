@@ -1,0 +1,6 @@
+Make like so:
+make install DESTDIR=$(pwd)/install
+
+Then use it like this:
+LD_LIBRARY_PATH=/src/opengpib/install/usr/local/lib:LD_LIBRARY_PATH /src/opengpib/install/usr/local/bin/get_tek_waveform -d /dev/ttyUSB0 -o induct2 -c ch1 -c ch2 
+
