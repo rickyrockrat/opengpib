@@ -207,7 +207,7 @@ struct personality {
 	char *yzero;  /**  */
 	char *xzero;
 	int pre_yoff; /**take the offset off the value before using multipliers  */
-	int title_delim; /**Delimiter when parsing the title (stuff between "")  */
+	char *title_delim; /**Delimiter when parsing the title (stuff between "")  */
 	char *pre_delim;	/**list of delimiters (in a string) for parsing the preamble  */
 	int value_delim;	/**delimiter for the value delimiter  */
 	char *name;	/**instrument name  */
@@ -225,9 +225,9 @@ struct personality {
 };
 
 static struct personality inst[]={
-	{.yzero=NULL,.xzero=NULL,.pre_yoff=0,.title_delim=' ',.pre_delim=":",.value_delim=',',.name="2440",.yoff="YOFF",.ymult="YMULT",.xincr="XINCR",.points="NR.PT",.fmt="BN.FMT",.enc="ENCDG",.trigger="PT.OFF",.title="WFID",.curve="CURVE",.delim_list=",;",.enc_supported="ASCII"},
-	{.yzero="YZE",.xzero="XZE",.pre_yoff=1,.title_delim=',',.pre_delim=",",.value_delim=',',.name="TDS",.yoff="YOF",.ymult="YMU",.xincr="XIN",.points="NR_P",.fmt="BN_F",.enc="ENC",.trigger="PT_O",.title="WFI",.curve="CURV",.delim_list=";",.enc_supported="ASC"},
-	{.yzero=NULL,.xzero=NULL,.pre_yoff=0,.title_delim=0,.pre_delim="",.value_delim=',',.name=NULL,.yoff="",.ymult="",.xincr="",.points="",.fmt="",.enc="",.trigger="",.title="",.curve="",.delim_list="",.enc_supported=""},
+	{.yzero=NULL,.xzero=NULL,.pre_yoff=0,.title_delim=" ",.pre_delim=":",.value_delim=',',.name="2440",.yoff="YOFF",.ymult="YMULT",.xincr="XINCR",.points="NR.PT",.fmt="BN.FMT",.enc="ENCDG",.trigger="PT.OFF",.title="WFID",.curve="CURVE",.delim_list=",;",.enc_supported="ASCII"},
+	{.yzero="YZE",.xzero="XZE",.pre_yoff=1,.title_delim=",",.pre_delim=",",.value_delim=',',.name="TDS",.yoff="YOF",.ymult="YMU",.xincr="XIN",.points="NR_P",.fmt="BN_F",.enc="ENC",.trigger="PT_O",.title="WFI",.curve="CURV",.delim_list=";",.enc_supported="ASC"},
+	{.yzero=NULL,.xzero=NULL,.pre_yoff=0,.title_delim=NULL,.pre_delim="",.value_delim=',',.name=NULL,.yoff="",.ymult="",.xincr="",.points="",.fmt="",.enc="",.trigger="",.title="",.curve="",.delim_list="",.enc_supported=""},
 };
 static int inst_no=0;
 
@@ -447,18 +447,19 @@ double get_multiplier (char *s)
 int break_extended(char *data, struct extended *x)
 {
 	int k,i,state,j;
-	char buf[10];
+	char buf[100];
 	state=_SRC;
-	/*printf("%s\n",data); */
+	/*printf("%s\n",data);  */
 	/*memset(x,0,sizeof(struct extended)); can't do this- we have persistent data*/
 	x->src=x->coupling=x->vert_units=x->time_units=NULL;
 	for (i=k=0;data[i];){
-		if(data[i] != '"' && !og_is_delim(data[i], inst[inst_no].pre_delim))
+		while(data[i] && data[i] != '"' && !og_is_delim(data[i], inst[inst_no].title_delim) && k<100)
 			buf[k++]=data[i++];
-		else if(og_is_delim(data[i],inst[inst_no].pre_delim)){
+		if(og_is_delim(data[i],inst[inst_no].title_delim)){
 			buf[k]=0;
-			while (og_is_delim(data[i],inst[inst_no].pre_delim)) ++i;
-			/*printf("%s\n",buf); */
+			while (data[i] && og_is_delim(data[i],inst[inst_no].title_delim)) 
+				++i;
+			/*printf("%s\n",buf);  */
 			switch(state){
 				case _SRC:
 					x->src=strdup(buf);
@@ -469,6 +470,7 @@ int break_extended(char *data, struct extended *x)
 					++state;
 					break;
 				case _VERT:
+					/*printf("VERT:%s\n",buf); */
 					x->vert_div=strtol(buf,NULL,10);
 					for (k=0;buf[k];++k){
 						if('.'  != buf[k] && ' ' != buf[k] && (buf[k] >'9' || buf[k] < '0') )
@@ -484,11 +486,11 @@ int break_extended(char *data, struct extended *x)
 							x->vert_mult=1000;
 					else 
 						x->vert_mult=1;
-					printf("Vert:%d'%s' %E\n",x->vert_div,x->vert_units,x->vert_mult); 
+					/*printf("Vert:%d'%s' %E\n",x->vert_div,x->vert_units,x->vert_mult);  */
 					++state;
 					break;
 				case _HORIZ:
-					/*printf("buf='%s'\n",buf); */
+					/*printf("buf='%s'\n",buf);  */
 					for (k=0;buf[k];++k){
 						if(' ' != buf[k])
 							break;
@@ -506,7 +508,7 @@ int break_extended(char *data, struct extended *x)
 					buf[j]=0;
 					x->time_units=strdup(&buf[k]);
 					x->time_mult=get_multiplier(x->time_units);
-					printf("time:%g'%s' %E\n",x->time_div,x->time_units,x->time_mult); 
+					/*printf("time:%g'%s' %E\n",x->time_div,x->time_units,x->time_mult);  */
 					++state;
 					break;
 				default:
@@ -1099,7 +1101,10 @@ int load_data(struct plot_data *p)
 		}
 		
 		break_extended(p->trace[c].title,&p->trace[c].info);
-		p->trace[c].label=strdup(p->trace[c].info.src);
+		if(NULL == p->trace[c].info.src){
+			printf("label is null\n");
+		}else
+			p->trace[c].label=strdup(p->trace[c].info.src);
 		p->trace[c].yoff=p->trace[c].yoff*p->trace[c].ymult*p->trace[c].info.vert_mult;
 		if(p->yoff_max > p->trace[c].yoff)
 			p->yoff_max=p->trace[c].yoff;
