@@ -224,12 +224,14 @@ struct personality {
 	char *enc_supported;
 };
 
+#define INST_NO_2440 0
+#define INST_NO_TDS  1
 static struct personality inst[]={
-	{.yzero=NULL,.xzero=NULL,.pre_yoff=0,.title_delim=" ",.pre_delim=":",.value_delim=',',.name="2440",.yoff="YOFF",.ymult="YMULT",.xincr="XINCR",.points="NR.PT",.fmt="BN.FMT",.enc="ENCDG",.trigger="PT.OFF",.title="WFID",.curve="CURVE",.delim_list=",;",.enc_supported="ASCII"},
-	{.yzero="YZE",.xzero="XZE",.pre_yoff=1,.title_delim=",",.pre_delim=",",.value_delim=',',.name="TDS",.yoff="YOF",.ymult="YMU",.xincr="XIN",.points="NR_P",.fmt="BN_F",.enc="ENC",.trigger="PT_O",.title="WFI",.curve="CURV",.delim_list=";",.enc_supported="ASC"},
+	[INST_NO_2440]{.yzero=NULL,.xzero=NULL,.pre_yoff=0,.title_delim=" ",.pre_delim=":",.value_delim=',',.name="2440",.yoff="YOFF",.ymult="YMULT",.xincr="XINCR",.points="NR.PT",.fmt="BN.FMT",.enc="ENCDG",.trigger="PT.OFF",.title="WFID",.curve="CURVE",.delim_list=",;",.enc_supported="ASCII"},
+	[INST_NO_TDS]{.yzero="YZE",.xzero="XZE",.pre_yoff=1,.title_delim=",",.pre_delim=",",.value_delim=',',.name="TDS",.yoff="YOF",.ymult="YMU",.xincr="XIN",.points="NR_P",.fmt="BN_F",.enc="ENC",.trigger="PT_O",.title="WFI",.curve="CURV",.delim_list=";",.enc_supported="ASC"},
 	{.yzero=NULL,.xzero=NULL,.pre_yoff=0,.title_delim=NULL,.pre_delim="",.value_delim=',',.name=NULL,.yoff="",.ymult="",.xincr="",.points="",.fmt="",.enc="",.trigger="",.title="",.curve="",.delim_list="",.enc_supported=""},
 };
-static int inst_no=0;
+static int inst_no=INST_NO_2440;
 
 struct terminals {
 	int term_num;
@@ -1038,7 +1040,7 @@ int check_for_trigger_file(struct plot_data *p, int c)
 
 
 /***************************************************************************/
-/** .
+/** Load a Waveform file - process header then the data points.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
@@ -1105,12 +1107,16 @@ int load_data(struct plot_data *p)
 			printf("label is null\n");
 		}else
 			p->trace[c].label=strdup(p->trace[c].info.src);
+		
+		/**Adjust y offset to reflect actual value.  */
 		p->trace[c].yoff=p->trace[c].yoff*p->trace[c].ymult*p->trace[c].info.vert_mult;
+		/** keep track of max Y value.  */
 		if(p->yoff_max > p->trace[c].yoff)
 			p->yoff_max=p->trace[c].yoff;
 		if(0 == _xincr){
 			_xincr=p->trace[c].xincr;
 		}
+		/*printf("Adj yoff to %g with vmult %g\n",p->trace[c].yoff,p->trace[c].info.vert_mult); */
 		/**change range if over 3 digits  */
 		if(check_xrange(p->trace[c].title,&p->trace[c].info))
 			goto closeid;
@@ -1124,12 +1130,14 @@ int load_data(struct plot_data *p)
 		i=strlen(p->xtitle);
 		sprintf(&p->xtitle[i],"%s ",p->trace[c].label);
 		
-		
+		/**This section tries to mimic a scope, which sometimes does not fit the data on the plot well.  */
+#if 0
 		/*yrange=( ((int)round(p->trace[c].info.vert_div*8))+p->trace[c].yoff<0?(int)(p->trace[c].yoff*-1):(int)p->trace[c].yoff)>>1; */
-		if(0 == inst_no)/**what is this????  */
+		if(INST_NO_2440 == inst_no)
 			p->trace[c].info.yrange_plus=p->trace[c].info.yrange_minus=((int)round(p->trace[c].info.vert_div*8))>>1;
 		else 
 			p->trace[c].info.yrange_plus=p->trace[c].info.yrange_minus=((int)round(p->trace[c].info.vert_div*4));
+		printf("yplus=%d yminus=%d ver_div=%d\n",p->trace[c].info.yrange_plus,p->trace[c].info.yrange_minus,p->trace[c].info.vert_div);
 		if( inst[inst_no].pre_yoff ){
 			if(p->trace[c].yoff >=0)
 				p->trace[c].info.yrange_minus+=round(p->trace[c].yoff*p->trace[c].ymult*p->trace[c].info.vert_mult);
@@ -1141,8 +1149,8 @@ int load_data(struct plot_data *p)
 			else
 				p->trace[c].info.yrange_plus+=round(-p->trace[c].yoff);
 		}
-		
-		
+		printf("yplus=%d yminus=%d ver_div=%d\n",p->trace[c].info.yrange_plus,p->trace[c].info.yrange_minus,p->trace[c].info.vert_div);
+#endif		
 		/**now take it to the closest volt.  */
 		/** if(p->trace[c].info.yrange_minus%1000)
 			p->trace[c].info.yrange_minus+=1000;
@@ -1151,21 +1159,25 @@ int load_data(struct plot_data *p)
 		/**now add a volt  
 		p->trace[c].info.yrange_plus+=1000;
 		p->trace[c].info.yrange_minus+=1000;*/
-		if(p->max_yrange_plus <p->trace[c].info.yrange_plus)
+		
+		/** if(p->max_yrange_plus <p->trace[c].info.yrange_plus)
 			p->max_yrange_plus =p->trace[c].info.yrange_plus;
 		if(p->max_yrange_minus <p->trace[c].info.yrange_minus)
-			p->max_yrange_minus =p->trace[c].info.yrange_minus;
-		printf("yrange=[-%d:%d] in %s ",p->trace[c].info.yrange_minus,p->trace[c].info.yrange_plus,p->trace[c].info.vert_units); 
+			p->max_yrange_minus =p->trace[c].info.yrange_minus;*/
+		
+		printf("yrange=[%d:%d] in %s ",p->trace[c].info.yrange_minus,p->trace[c].info.yrange_plus,p->trace[c].info.vert_units); 
 		p->trace[c].info.xrange=(int)round(p->trace[c].xincr*p->trace[c].points*p->trace[c].info.time_mult);
 		trig=(int)round(p->trace[c].trigger);
 		printf("Xrange=[0:%d] in %s\n",p->trace[c].info.xrange,p->trace[c].info.time_units); 
 		/*printf("set xtics 0,%f\n",p->trace[c].info.time_div); */
 		p->trace[c].info.x=0;
 		buf[0]=1;
+		/**Data point loop.  */
 		for (dp=0; dp<p->trace[c].points && buf[0];++dp) {
 			if(1> get_next_value(id,buf))	
 				break;
 			p->trace[c].info.y=strtof(buf, NULL);
+			
 			
 			if( inst[inst_no].pre_yoff ){ /*TDS*/
 				p->trace[c].info.y=(p->trace[c].yzero + ((p->trace[c].info.y*(p->trace[c].ymult*p->trace[c].info.vert_mult)))-p->trace[c].yoff);
@@ -1176,7 +1188,11 @@ int load_data(struct plot_data *p)
 					p->trace[c].info.y=p->trace[c].info.y-128;
 				p->trace[c].info.y=p->trace[c].yzero + (p->trace[c].info.y*p->trace[c].ymult*p->trace[c].info.vert_mult) - p->trace[c].yoff;
 			}
-				
+			/**keep track of max ranges  */
+			if(p->trace[c].info.y > p->max_yrange_plus)
+				p->max_yrange_plus=p->trace[c].info.y;
+			if(p->trace[c].info.y < p->max_yrange_minus)
+				p->max_yrange_minus=p->trace[c].info.y;	
 			save_data_point(&p->trace[c],
 					p->trace[c].xzero + p->trace[c].info.time_mult*p->trace[c].info.x,
 					p->trace[c].info.y);
@@ -1644,9 +1660,11 @@ int main (int argc, char *argv[])
 			}
 		}
 	}
+	plot.max_yrange_minus =plot.max_yrange_plus=0;
 	/*preload data, find our max offset*/
 	if(load_data(&plot))
 		return 1;
+	/*printf("ymax %d ymin %d\n",plot.max_yrange_plus, plot.max_yrange_minus); */
 	/**build function data & write the data file.  */
 	if(handle_functions(&plot))
 		return 1;
@@ -1654,8 +1672,9 @@ int main (int argc, char *argv[])
 	c=(plot.max_yrange_plus+plot.max_yrange_minus)*5/100;
 	c*=(plot.idx+plot.f_idx);
 	plot.max_yrange_plus+=c;
-	/*printf("ymin %d , ymax %d\n",plot.max_yrange_plus, plot.max_yrange_minus); */
+	plot.max_yrange_minus-=c;
 	
+	/*printf("ymax %d ymin %d\n",plot.max_yrange_plus, plot.max_yrange_minus); */
 	/**set the output script name  &size*/
 	plot.trace[plot.idx].info.x=plot.graphx;
 	plot.trace[plot.idx].info.y=plot.graphy;
