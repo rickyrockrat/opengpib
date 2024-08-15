@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
 	char *cfname, *dfname, *mfname,*outfname,*vname;
 	struct section *s;
 	int c,v;
+	uint8_t id;
 	v=SHOW_PRINT;
 	s=NULL;
 	outfname=dfname=mfname=cfname=vname=NULL;
@@ -99,20 +100,23 @@ int main(int argc, char *argv[])
 	}	
 	if(NULL != mfname && NULL != cfname ){
 		
-		if(NULL !=(s=parse_config(cfname,"CONFIG    ",JUST_LOAD) ) ){
+		if(NULL !=(s=parse_config(cfname,"CONFIG    ",JUST_LOAD, &id) ) ){
 			FILE *cfd=NULL;
-	
-			if(NULL == (cfd=fopen(mfname,"w+"))) {
-				fprintf(stderr,"Unable to open '%s' for writing\n",mfname);
-				goto closem;
+			if(CARDTYPE_16554E == id || CARDTYPE_16554M == id ) {
+				if(NULL == (cfd=fopen(mfname,"w+"))) {
+					fprintf(stderr,"Unable to open '%s' for writing\n",mfname);
+					goto closem;
+				}
+				
+				config_show_labelmaps(s, cfd);
+				if(NULL != cfd)
+					fclose(cfd);
+			}else {
+				config_print_labels_hp16550(s, NULL);
 			}
-			
-			config_show_labelmaps(s, cfd);
-			if(NULL != cfd)
-				fclose(cfd);
 		}
 	}	else	if(NULL != cfname ){
-		s=parse_config(cfname,"CONFIG    ",v);
+		s=parse_config(cfname,"CONFIG    ",v, &id);
 	}
 	if(NULL != dfname ){
 		struct data_preamble *p;

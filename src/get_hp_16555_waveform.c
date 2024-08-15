@@ -150,6 +150,7 @@ void usage(void)
 	/**common options are -a, -d, -n, -m, and -t */
 	fprintf(stderr,"\n"
 	" -c fname put config data to fname\n"
+	" -i set verbose info\n"
 	" -o fname put config lfDATAlf data to file called fname\n"
 	" -p set packed mode to packed for config only (unpacked)\n"
 	" -r sample if !0, set sample period to sample ns and send run before getting data\n"
@@ -239,8 +240,9 @@ int main(int argc, char * argv[])
 	FILE *ofd,*cfd,*tfd,*vfd;
 	char *ofname;
 	char *sname,*cname,*vname;
-	int i, c, rtn, raw,trigger,slot, speriod=0;
+	int i, c, rtn, raw,trigger,slot, speriod=0, verbose=0;
 	long int total;
+	uint8_t id;
 	rtn=1;
 	trigger=0;
 	ofname=sname=cname=vname=NULL;
@@ -248,7 +250,7 @@ int main(int argc, char * argv[])
 	raw=0;
 	handle_common_opts(0,NULL,&copt);
 	copt.cardtype=CARDTYPE_16554M;
-	while( -1 != (c = getopt(argc, argv, "c:ho:pr:s:v:"HP_COMMON_GETOPS)) ) {
+	while( -1 != (c = getopt(argc, argv, "c:hio:pr:s:v:"HP_COMMON_GETOPS)) ) {
 		switch(c){
 			case 'a':
 			case 'd':
@@ -269,6 +271,7 @@ int main(int argc, char * argv[])
 			case 'h':
 				usage();
 				return 1;
+			case 'i': verbose=1; break;
 			case 'o':
 				ofname=strdup(optarg);
 				break;
@@ -297,7 +300,7 @@ int main(int argc, char * argv[])
 			case 'v':
 #ifdef HAVE_LIBLA2VCD2 
 				if(NULL != sname || NULL != cname){
-					fprintf(stderr,"-v and -c/-tare mutually exclusive.\n");
+					fprintf(stderr,"-v and -c/-t are mutually exclusive.\n");
 					usage();
 					return 1;
 				}				
@@ -422,7 +425,10 @@ int main(int argc, char * argv[])
 		
 		fprintf(stderr,"Retreiving Data\n");
 	/*	goto closem; */
-		sprintf(g->ctl->buf,":DBLOCK %s;:SYSTEM:DATA?",raw?"PACKED":"UNPACKED");
+		if( CARDTYPE_16554M == copt.cardtype )
+			sprintf(g->ctl->buf,":DBLOCK %s;:SYSTEM:DATA?",raw?"PACKED":"UNPACKED");
+		else
+			sprintf(g->ctl->buf,":SYSTEM:DATA?");
 		i=write_string(g->ctl,g->ctl->buf);	
 		total=write_data_to_file(g->ctl,ofd?ofd:tfd);	
 	}	
@@ -436,60 +442,78 @@ closem:
 	if(NULL != tfd)
 		fclose(tfd);
 	close_gpib(g);
+	
 #ifdef HAVE_LIBLA2VCD2	
 /*	if(total != sz+10) */
 /*		goto endvcd; */
 	if(NULL !=vname){ /**generate a vcd file from the config and data  */
-		struct section *s;
-		struct data_preamble *p;
-		struct la2vcd *l;
-		struct signal_data *d,*x;
-		char buf[500];
-		if(NULL ==(s=parse_config(cname,"CONFIG    ",JUST_LOAD) ) ){
-			fprintf(stderr,"Unable to re-open '%s'\n",cname);
-			goto endvcd;
-		}	
-		if(NULL == (p=parse_data(sname,NULL,JUST_LOAD))){
-			fprintf(stderr,"Unable to re-open data file '%s'\n",sname);
-			goto endvcd;
-		}	
-		if(NULL ==(d=show_la2vcd(p,s,JUST_LOAD))){
-			fprintf(stderr,"Error loading labels\n");
-			goto endvcd;
-		}	
-		if(NULL==(l=open_la2vcd(vname,NULL,p->a1.sampleperiod*1e-12,0,NULL==s?NULL:s->data))){ 
-			fprintf(stderr,"Unable to open la2vcd lib\n");
-			goto endvcd;
-		}	
-    if(vcd_add_file(l,NULL,16,d->bits, V_WIRE)){
-			fprintf(stderr,"Failed to add input file\n");
-			goto endvcd;
+		if( CARDTYPE_16554M == copt.cardtype ){
+			struct section *s;
+			struct data_preamble *p;
+			struct la2vcd *l;
+			struct signal_data *d,*x;
+			char buf[500];
+			if(NULL ==(s=parse_config(cname,"CONFIG    ",verbose?SHOW_PRINT:JUST_LOAD, &id) ) ){
+				fprintf(stderr,"Unable to re-open '%s'\n",cname);
+				goto endvcd;
+			}	
+			if(NULL == (p=parse_data(sname,NULL,verbose?SHOW_PRINT:JUST_LOAD))){
+				fprintf(stderr,"Unable to re-open data file '%s'\n",sname);
+				goto endvcd;
+			}	
+			if(NULL ==(d=show_la2vcd(p,s,verbose?SHOW_PRINT:JUST_LOAD))){
+				fprintf(stderr,"Error loading labels\n");
+				goto endvcd;
+			}	
+			if(NULL==(l=open_la2vcd(vname,NULL,p->a1.sampleperiod*1e-12,0,NULL==s?NULL:s->data))){ 
+				fprintf(stderr,"Unable to open la2vcd lib sampleperiod=%lu\n",p->a1.sampleperiod); 
+				goto endvcd;
+			}	
+			if(vcd_add_file(l,NULL,16,d->bits, V_WIRE)){
+				fprintf(stderr,"Failed to add input file\n");
+				goto endvcd;
+			}
+			fprintf(stderr,"samp=%dns Bits=%d\n",(int)(p->a1.sampleperiod/1000),d->bits);
+			/**Add our signal descriptions in  */
+	/*		vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0); */
+			for (x=d;x;x=x->next){
+				vcd_add_signal (l,V_WIRE, x->msb, x->lsb,x->name);
+				/*fprintf(stderr,"Added '%s' %d %d\n",x->name,x->msb,x->lsb); */
+			}
+				if(-1 == write_vcd_header (l)){
+				fprintf(stderr,"VCD Header write failed\n");
+				goto endvcd;
+			}
+			fprintf(stderr,"Wrote VCD Hdr\n");
+			/**rewind our data  */
+			get_next_datarow(NULL,NULL);
+			l->first_input_file->buf=buf;
+			fprintf(stderr,"r,bit=%d %d\n",l->first_input_file->radix,l->first_input_file->bit_count);
+			while (1) {
+				if(get_next_datarow(p,buf)){
+					vcd_read_sample(l); 
+					write_vcd_data (l);
+					advance_time (l);
+				} else
+					break;
+			}
+			close_la2vcd(l);
+		
+		}else{
+			struct section *s;
+			struct data_preamble_hp16550 *p;
+			struct la2vcd *l;
+			struct signal_data *d,*x;
+			char buf[500];
+			if(NULL ==(s=parse_config(cname,"CONFIG    ",verbose?SHOW_PRINT:JUST_LOAD, &id) ) ){
+				fprintf(stderr,"Unable to re-open '%s'\n",cname);
+				goto endvcd;
+			}	
+			if(NULL == (p=parse_data(sname,NULL,verbose?SHOW_PRINT:JUST_LOAD))){
+				fprintf(stderr,"Unable to re-open data file '%s'\n",sname);
+				goto endvcd;
+			}	
 		}
-		fprintf(stderr,"samp=%dns Bits=%d\n",(int)(p->a1.sampleperiod/1000),d->bits);
-		/**Add our signal descriptions in  */
-/*		vcd_add_signal (&l->first_signal,&l->last_signal, l->last_input_file,"zilch", 0, 0); */
-		for (x=d;x;x=x->next){
-			vcd_add_signal (l,V_WIRE, x->msb, x->lsb,x->name);
-			/*fprintf(stderr,"Added '%s' %d %d\n",x->name,x->msb,x->lsb); */
-		}
-			if(-1 == write_vcd_header (l)){
-			fprintf(stderr,"VCD Header write failed\n");
-			goto endvcd;
-		}
-		fprintf(stderr,"Wrote VCD Hdr\n");
-		/**rewind our data  */
-    get_next_datarow(NULL,NULL);
-		l->first_input_file->buf=buf;
-		fprintf(stderr,"r,bit=%d %d\n",l->first_input_file->radix,l->first_input_file->bit_count);
-		while (1) {
-			if(get_next_datarow(p,buf)){
-				vcd_read_sample(l); 
-				write_vcd_data (l);
-				advance_time (l);
-			} else
-				break;
-		}
-		close_la2vcd(l);
 	}	
 	
 endvcd:

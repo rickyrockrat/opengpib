@@ -77,6 +77,31 @@ struct rtc_data {
 	uint8_t min;
 	uint8_t sec;
 }__attribute__((__packed__));	
+
+struct rtc_data_hp16550 { /*Header name is 'RTC_INFO  '*/
+	uint8_t year; /**RTC=year-1990 (add 1990 to this number)  */
+	uint8_t month; /**manual says 2 bytes, but it appears to be a misprint  */
+	uint8_t day;
+	uint8_t dow;
+	uint8_t hour;
+	uint8_t min;
+	uint8_t sec;
+}__attribute__((__packed__));
+
+/*This is the data section for the hp16550 card */
+struct data_hp16550 {
+	uint16_t clk;
+	uint16_t pods[6]; /*pod 6 is@ position 0*/
+}__attribute__((__packed__));
+
+/*This is the data section for two hp16550 card */
+struct data_hp16550_x2 {
+	uint16_t clk;
+	uint16_t pods[12]; /*pod 12 is@ position 0*/
+}__attribute__((__packed__));
+
+/* time tag follows data, pod1, pod2, etc. each tag is uint64_t */
+
 struct analyzer_data_hp16550 { /**40 bytes   */
 	uint8_t data_mode; /**According to HP16550A manual (Not HP16555) this is 1 byte and:
 	-1=off,
@@ -95,7 +120,7 @@ struct analyzer_data_hp16550 { /**40 bytes   */
 	uint8_t chipno; /**which chip is master when a pod is unassigned  */
 	uint8_t masterchip;  /**Master chip for this analyzer 5=master-pod1&2,4=master-pod3&4,3=master-pod5&6,2-expansion-pod1&2,1=exp-pod3&4,0-ex-pod5&5,-1=none  */
 	uint8_t unused1[6];	/**6 bytes unused  */
-	uint64_t sampleperiod; /**in nano seconds  */
+	uint64_t sampleperiod; /**in pico seconds, in timing mode only  */
 	uint64_t unused2;
 	uint8_t tag_type; /**0-off,1=time, 2=state tags.  */
 	uint8_t unused3;
@@ -157,7 +182,10 @@ struct analyzer_data {
 	uint32_t trig_pod2_master;
 	uint32_t trig_pod1_master;
 */
-/** use same struct section_header... - this starts on byte 17.*/
+/** this is for the hp16550 card.
+ use same struct section_header... - this starts on byte 17.
+ struct section_hdr, then this:
+ */
 struct data_preamble_hp16550 {
 	uint16_t instid;   /**16550 says this is 2 bytes and is always 16500 decimal for HP16550A  */
 	uint8_t rev_code; /**1 byte  */
@@ -167,11 +195,11 @@ struct data_preamble_hp16550 {
 	uint8_t unused1[2];/**offset 101  */
 	
 	/** 103 */
-	uint16_t valid_erows[6];/**5=pod6,0=pod1 number of valid rows of data expansion card data */
-	uint16_t valid_mrows[6];/**5=pod6,0=pod1 number of valid rows of data master card data */
+	uint16_t valid_erows[6];/**5=pod1,0=pod6 number of valid rows of data expansion card data */
+	uint16_t valid_mrows[6];/**5=pod1,0=pod6 number of valid rows of data master card data */
 	/**this is the offset into the data where the triger point is. Data prior to this point is pre-trigger data.  */
-	uint16_t valid_trig_erows[6];/**5=pod6,0=pod1 number of valid rows of trigger point data expansion card data */
-	uint16_t valid_trig_mrows[6];/**5=pod6,0=pod1 number of valid rows of trigger point data master card data */
+	uint16_t valid_trig_erows[6];/**5=pod1,0=pod6 row number having the trigger point data for the expansion card  */
+	uint16_t valid_trig_mrows[6];/**5=pod1,0=pod6 row number having the trigger point data for the master card */
 	uint8_t unused2[24];
 	/**data grouped in 14-byte rows (single) or 26-byte rows for 2-card analyzer.  */
 	/**clock data is xxxx xxxx xxPN MLKJ  */
@@ -180,6 +208,8 @@ struct data_preamble_hp16550 {
 	char *data;	 /**origial section data  */
 	uint32_t data_sz;	/**and section data size  */
 }__attribute__((__packed__));	
+
+/* This is for the HP16555 */
 struct data_preamble {
 	uint32_t instid;   /**16550 says this is 2 bytes and is always 16500 decimal for HP16550A  */
 	uint32_t rev_code; /**1 byte  */
@@ -211,6 +241,12 @@ struct block_spec {
 	char blocklen_data[8];	 /**decimal len of block, stored in ascii  */
 	uint32_t blocklen;
 }__attribute__((__packed__));	
+
+/* This structure is enough to map between data_preamble and data_preamble_hp16550 */
+struct hp_generic_hdr {
+	struct block_spec bs;
+	struct section_hdr hdr;
+}__attribute__((__packed__));
 
 struct hp_data_block {
 	struct block_spec bs;
@@ -245,6 +281,7 @@ struct pod_assignment {
 	uint8_t unknown3;
 	uint8_t pod_info2; /**this is 0x06 with no pods assigned to either analyzer, 0x66 if pod1/2, 0x78 if pod 3/4, 0x1E if pod1,2,3,4.  */
 }__attribute__((__packed__));	
+
 /**defines for the mode byte below  */
 #define MACHINE_MODE_OFF 		0
 #define MACHINE_MODE_TIMING 1
@@ -266,6 +303,31 @@ struct machine_config {
 	uint8_t un[22];
 }__attribute__((__packed__));	
 
+#define HAVE_POD1 0x6
+#define HAVE_POD2 0x18
+#define HAVE_POD3 0x60;
+struct pod_assignment_hp16650 {
+	uint8_t pod_info2; /*0, no pods, 0x06 pod1, 0x1E Pod1+2, 0x7E pod1,2,3*/
+	uint8_t unknown;
+	uint8_t pod_info0;
+	uint8_t unknown2;
+	uint8_t pod_info1;
+}__attribute__((__packed__));
+
+struct machine_config_hp16550 {
+	char name[11];
+	uint8_t unknown1[2];
+	uint8_t mode2;	 /*0=fullchannel, 1=half channel*/
+	uint8_t mode;	/**0=off,1=timing,2=state,3=statecompare or SPA  */
+	uint8_t unknown2[2];
+	struct pod_assignment_hp16650 assign;
+	uint8_t unknown3[10];
+}__attribute__((__packed__));
+
+struct config_data_hp16550 {
+	struct machine_config_hp16550 m[2];
+}__attribute__((__packed__));
+
 struct config_data {
 	struct machine_config m[2];
 }__attribute__((__packed__));	
@@ -279,13 +341,48 @@ struct label_map {
 	uint8_t unknown[2];
 }__attribute__((__packed__));	
 
+/*for format below */
+#define HP_FORMAT_BINARY 0
+#define HP_FORMAT_OCTAL 1
+#define HP_FORMAT_DECIMAL 2
+#define HP_FORMAT_HEX 3
+#define HP_FORMAT_ASCII 4
+#define HP_FORMAT_SYMBOL 5
+#define HP_FORMAT_TWOS 6
+struct label_map_hp16650 {
+	uint8_t clk;
+	uint16_t pods[6]; //pods[0]=6, pods[6]=pod1
+}__attribute__((__packed__));
+
+struct labels_hp16550 { /* at config offset 0xF8*/
+	char name[7]; //unknown is 2 bits, so zero one
+	uint8_t unknown1; //usually 0
+	uint8_t format; //binary=0/octal=1/decimal=2/hex=3/ascii=4/symbol=5/twos=6
+	uint8_t polarity; // 1=pos/0=neg 
+	uint8_t unknown2; //0?
+	uint8_t strange_offset;
+	uint16_t strange_offsetlo; //subtract 0x9885 to get to map offset
+	uint8_t unknown3[4];
+	uint8_t bits;
+	uint8_t enable;
+	uint8_t sequence;
+	uint8_t unknown4;/*has 0x37??*/
+}__attribute__((__packed__));
+	
+/* this is to tie the above two structs together*/
+struct label_for_hp16550 {
+	struct labels_hp16550 *l;
+	struct label_map_hp16650 *map;// use offsetlo to get this.
+};
+
 struct labels {
 	char name[6];
-	uint8_t unknown1[3];
-	uint8_t polarity;
-	uint8_t unknown2;
+	uint8_t unknown1[2]; //usually 0
+	uint8_t format; //binary=0/octal=1/decimal=2/hex=3/ascii=4/symbol=5/twos=6
+	uint8_t polarity; // 1=pos/0=neg 
+	uint8_t unknown2; //0?
 	uint8_t strange_offset;
-	uint16_t strange_offsetlo;
+	uint16_t strange_offsetlo;// subtract 0x6E90 to get to map offset
 	uint8_t unknown3[4];
 	uint8_t bits;
 	uint8_t enable;
@@ -296,7 +393,7 @@ struct labels {
 
 struct one_card_data {
 	uint16_t clkunused;
-	uint8_t pdata[POD_ARRAYSIZE]; /**clkhi is 0, clklo is 1, pod 4 is 2  */
+	uint8_t pdata[POD_ARRAYSIZE]; /**10 bytes - clkhi is 0, clklo is 1, pod 4 is 2  */
 }__attribute__((__packed__));	
 struct two_card_data {
 	uint32_t clk;
@@ -336,8 +433,10 @@ struct section *find_section(char *name, struct hp_block_hdr *blk );
 void show_sections(struct hp_block_hdr *blk );
 void config_show_label(char *a,struct labels *l, FILE *out);
 void config_show_labelmaps(struct section *sec, FILE *out);
-struct hp_block_hdr *read_block(char *cfname);
-struct section *parse_config( char *cfname, char *name, int mode);
+struct hp_block_hdr *read_block(char *cfname, uint8_t *id);
+void hexprint(uint8_t *p, int len);
+void config_print_labels_hp16550(struct section *sec, FILE *out);
+struct section *parse_config( char *cfname, char *name, int mode, uint8_t *id);
 void swap_analyzer_bytes(struct analyzer_data *a);
 void swapbytes(struct data_preamble *p);
 void show_analyzer(struct analyzer_data *a);
@@ -350,6 +449,7 @@ int get_next_datarow(struct data_preamble *p, char *buf);
 uint32_t put_data_to_file(struct data_preamble *p, char *fname);
 void print_data(struct data_preamble *p);
 struct data_preamble *parse_data( char *cfname, char *out, int mode);
+struct data_preamble_hp16550 *parse_data_hp16550( char *cfname, char *out, int mode);
 struct signal_data *add_signal(struct signal_data *d, int pol, int ena, int bits, int lsb, int msb, char *name);
 struct signal_data *show_vcd_label(char *a, struct labels *l);
 struct signal_data *show_la2vcd(struct data_preamble *pre, struct section *sec, int mode);

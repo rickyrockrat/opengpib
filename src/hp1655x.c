@@ -225,6 +225,7 @@ void config_show_label(char *a, struct labels *l, FILE *out)
 }
 /***************************************************************************/
 /** FIXME: This does not handle having both analyzers on.
+ *  FIXME: Only works with hp16555 cards.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
@@ -273,7 +274,8 @@ void config_show_labelmaps(struct section *sec, FILE *out)
 		memcpy(&l,sec->data+k,LABEL_RECORD_LEN);
 		l.actual_offset=swap16(l.strange_offsetlo);
 		//fprintf(stderr,"Actual map offset=0x%x ",l.actual_offset); 
-		l.actual_offset-=0x6E90;
+		if(l.actual_offset> 0x6E90)
+			l.actual_offset-=0x6E90;
 		/*fprintf(stderr,"Adjusted = 0x%x ",l.actual_offset); */
 		memcpy(&l.map,sec->data+0x27A+l.actual_offset,LABEL_MAP_LEN);
 		config_show_label(active,&l, out);
@@ -287,13 +289,14 @@ void config_show_labelmaps(struct section *sec, FILE *out)
 }
 
 /***************************************************************************/
-/** .
+/** This reads the first bits of both config and data. 
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
-struct hp_block_hdr *read_block(char *cfname)
+struct hp_block_hdr *read_block(char *cfname, uint8_t *id)
 {
 	struct hp_block_hdr *blk=NULL;
+	
 	FILE *cfd=NULL;
 	
 	if(NULL == (cfd=fopen(cfname,"r"))) {
@@ -311,21 +314,151 @@ struct hp_block_hdr *read_block(char *cfname)
 	}
 	sscanf(blk->bs.blocklen_data,"%d",&blk->bs.blocklen);
 	fprintf(stderr,"Blocksize is %d\n",blk->bs.blocklen);
+	if(blk->bs.blocklen > 2000000000) {
+		fprintf(stderr,"Block size may be invalid. > 2G\n");
+		free (blk);
+		blk=NULL;
+		goto closem;
+	}
 	/**allocate room for data  */
 	if(NULL == (blk->data=malloc(blk->bs.blocklen))){
 		fprintf(stderr,"Unable to malloc %d bytes\n",blk->bs.blocklen);
 		goto closem;
 	}
 	/**read data in  */
-  if(fread(blk->data,1,blk->bs.blocklen,cfd)<blk->bs.blocklen)
-  	fprintf(stderr,"Short read of '%s'\n",cfname);
+	if(fread(blk->data,1,blk->bs.blocklen,cfd)<blk->bs.blocklen)
+		fprintf(stderr,"Short read of '%s'\n",cfname);
+	if(NULL != id) {
+		struct section_hdr *hdr;
+		hdr=(struct section_hdr *)blk->data;
+		*id=hdr->module_id;
+	}
 closem:
 	if(NULL != cfd)
 		fclose(cfd);
+	
 	return blk;
 }
+void hexprint(uint8_t *p, int len) 
+{
+	int i;
+	int off=(int)((uint64_t)p&0xFFFF);
+	//printf("HP:%04X\n",off);
+	printf("\n     ");
+	for (i=0; i<16; ++i) {
+		printf("%02X ",i);
+		if (7==i) printf(" ");
+	}
+	printf("\n");
+	for (i=0; i<len; ++i) {
+		if(i && 0 == i%16) {
+			int k,x;
+			printf(" ");
+			for(x=0,k=i-16; x<16; ++x){
+				if(p[k] <' ' || p[k] >126 )
+					printf(".");
+				else printf("%c",p[k]);
+				++k;
+			}
+			printf("\n%04X",i+off);
+		}
+		if(!i%16)printf("%04X ",i+off);
+		if(i && 0 == i%8) printf(" ");
+		printf("%02X ",p[i]);
+		
+	}
+	printf("\n");
+}
+/***************************************************************************/
+void config_print_labels_hp16550(struct section *sec, FILE *out)
+{
+	int i, k, increment=sizeof(struct labels_hp16550);
+	struct label_for_hp16550 label;
+	uint32_t off;
+	void *lab=(sec->data+0xDE);
+	//hexprint((uint8_t *)(sec->data+0xDE), 512);
+	/*Labels start at F8, and the header for config is 18 and data starts 
+	 * at the end of the header, F8-18=E0*/
+	 
+	printf("labels %d, sec.off %X in block\n", increment,sec->off);
+	for(i=0, k=0xDE; i<127; ++i) {
+		void *p=(sec->data+k);
+		//printf("@%04lX-k %d ",(uint64_t)p&0xFFFF,k);
+		label.l=(struct labels_hp16550 *)(p);
 
+		if(label.l->name[6] != 0 || 0 == label.l->enable ) {
+			k+=increment;
+			continue;
+		}
+		
+		off=swap16(label.l->strange_offsetlo);
+		if(off>0x997D){// First label is at F8 abs, podinfo@3ABB abs, F8-A
+			int delta=off-0x997D;
+			p=(lab+delta);
+			//printf("@%04lX-SO %04X Offset 0x%X\n",(uint64_t)p&0xFFFF,off,delta);
+			
+			//hexprint((uint8_t *)(p), 64);
+			label.map=p;
+			//memcpy(&label.l->map,p,sizeof(struct label_map_hp16650));
 
+		}else {
+			fprintf(stderr,"EEEK so %04X ",label.l->strange_offsetlo);
+			label.map=NULL;
+		}
+		fprintf(stderr,"'%s' pol %d #bits %d ena %d seq %d ",label.l->name,label.l->polarity,label.l->bits,label.l->enable, label.l->sequence);
+		if (NULL != label.map){
+			int pod;
+			fprintf(stderr,"CK %02X ",label.map->clk);
+			for (pod=0; pod<6; ++pod)
+				fprintf(stderr,"P%d %04X ",6-pod,swap16(label.map->pods[pod]));
+		}
+		fprintf(stderr,"\n");
+		k+=increment;
+	}
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+If a the file pointer is not null, output the data in this format:
+Label  Ch Cl P4h l P3h l P2h l P1h l
+POL    00 00 00 00 00 00 00 00 00 08
+
+Where h= hi, l= lo, C=CLK and P=POD. In the above example, POL is bit 3, on
+Pod 1
+a[0] is clk, a[1] is pod 4
+\n\b Returns:
+****************************************************************************/
+void config_show_label_hp16550(char *a, struct labels_hp16550 *l, FILE *out)
+{
+	if(NULL != out){
+		fprintf(out,"%s ",l->name);
+		fprintf(out,"%02x ",2);
+		/*for (m=0;m<10;++m){
+			if(a[m/2])
+				fprintf(out,"%02x ",l->map.clk_pods[m]);
+		}*/
+		fprintf(out,"\n");
+	}else{
+		fprintf(stderr,"%s map is clk ",l->name);
+		/*for (m=0;m<10;++m){
+			if(a[m/2]){
+				if(m>1 && !(m%2))
+					fprintf(stderr,"P%d ",6-((m+2)/2));
+				fprintf(stderr,"%02x ",l->map.clk_pods[m]);	
+			}
+		}*/
+			
+		fprintf(stderr," pol %d #bits %d ena %d seq %d ",l->polarity,l->bits,l->enable, l->sequence);	
+		/** for (m=0;m<3;++m)
+			fprintf(stderr,"%02x ",l->unknown1[m]);
+		fprintf(stderr,"*3* ");
+		for (m=0;m<4;++m)
+			fprintf(stderr,"%02x ",l->unknown3[m]);*/
+		fprintf(stderr,"\n");
+	}
+}
+	
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -333,30 +466,36 @@ cfname is config file input name, name is name of section to return, mode
 indicates if we want info or quiet.
 \n\b Returns:
 ****************************************************************************/
-struct section *parse_config( char *cfname, char *name, int mode)
+struct section *parse_config( char *cfname, char *name, int mode, uint8_t *id)
 {
 	struct hp_block_hdr *blk;
 	struct section *sec;
 	
-	if(NULL == (blk=read_block(cfname))) {
+	if(NULL == cfname) return NULL;
+	if(NULL == (blk=read_block(cfname, id))) {
 		fprintf(stderr,"Unable to read block from '%s'\n",cfname);
 		return NULL;
 	}
-	
+
 	if(NULL == (sec=find_section(name,blk))){
 		fprintf(stderr,"Unable to find section '%s'\n",name);
 		return NULL;
 	}
 	if(SHOW_PRINT == mode){
 		show_sections(blk);
-		/*fprintf(stderr,"First Machine is '%s', second is '%s'\n",sec->data,(char *)(sec->data+0x40)); */
-		config_show_labelmaps(sec, NULL);
+		if ( CARDTYPE_16554E == *id || CARDTYPE_16554M == *id ) {
+			
+			/*fprintf(stderr,"First Machine is '%s', second is '%s'\n",sec->data,(char *)(sec->data+0x40)); */
+			config_show_labelmaps(sec, NULL);
+		} else { /*assume 16550, yes we should check*/
+			config_print_labels_hp16550(sec,NULL);
+		}
 	}
 	return sec;
 }
 
 /***************************************************************************/
-/** .
+/** 16555 card.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
@@ -371,7 +510,7 @@ void swap_analyzer_bytes(struct analyzer_data *a)
 	a->trig_off=swap64(a->trig_off);	
 }
 /***************************************************************************/
-/** .
+/** 16555 card.
 \n\b Arguments:
 \n\b Returns:
 ****************************************************************************/
@@ -398,6 +537,37 @@ void swapbytes(struct data_preamble *p)
 	
 }
 
+/***************************************************************************/
+/** 16550 card.
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void swap_analyzer_bytes_hp16550(struct analyzer_data_hp16550 *a)
+{
+	a->pods=swap16(a->pods);
+	a->sampleperiod=swap64(a->sampleperiod);
+	a->trig_off=swap64(a->trig_off);	
+}
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+void swapbytes_hp16550(struct data_preamble_hp16550 *p)
+{
+	int i;
+	p->instid=swap16(p->instid);
+
+	swap_analyzer_bytes_hp16550(&p->a1);
+    swap_analyzer_bytes_hp16550(&p->a2);
+	for (i=0; i<6; ++i){
+		p->valid_erows[i]=swap32(p->valid_erows[i]);
+		p->valid_mrows[i]=swap32(p->valid_mrows[i]);
+		p->valid_trig_erows[i]=swap32(p->valid_trig_erows[i]);
+		p->valid_trig_mrows[i]=swap32(p->valid_trig_mrows[i]);
+	}
+}
 /***************************************************************************/
 /** .
 \n\b Arguments:
@@ -616,7 +786,7 @@ int get_next_datarow(struct data_preamble *p, char *buf)
 	static char *dstart;
 	static int state=0;
 	struct one_card_data *d;
-	static unsigned long off;
+
 	int i,k;
 	if(NULL == p || NULL ==buf){
 		state=0;
@@ -626,7 +796,6 @@ int get_next_datarow(struct data_preamble *p, char *buf)
 	if(0 == state){
 		dstart=hp1655x_get_trace_start(p);
 		state=1;
-		off=dstart-p->data;
 	}
 	if(dstart < p->data + p->data_sz){
 		d=(struct one_card_data *)dstart;
@@ -736,8 +905,7 @@ void print_data(struct data_preamble *p)
 	char *dstart;
 	long int ps;
 	int inc,c;
-	uint32_t count;
-	count=0;
+
 	c=0;
 	ps=0;
 	inc = ONE_CARD_ROWSIZE;
@@ -780,24 +948,29 @@ struct data_preamble *parse_data( char *cfname, char *out, int mode)
 {
 	struct hp_block_hdr *blk;
 	struct section *sec;
-	struct data_preamble *pre;
+	struct data_preamble *pre=NULL;
+	uint8_t id;
 	
-	if(NULL == (pre=malloc(sizeof(struct data_preamble)))){
-		fprintf(stderr,"Unable to allocate for data_preamble struct\n");
-		return NULL;
-	}
-	
-	if(NULL == (blk=read_block(cfname))) {
+
+	if(NULL == (blk=read_block(cfname, &id))) {
 		fprintf(stderr,"Unable to read '%s' for writing\n",cfname);
 		goto err;
 	}
+	if ( id != CARDTYPE_16554E && id != CARDTYPE_16554M ) {
+		fprintf(stderr," Card id %d not supported by this data parser\n",id);
+		goto err;
+	}
+		
 	if(mode != JUST_LOAD)
 		show_sections(blk);
 	if(NULL == (sec=find_section("DATA      ",blk))){
 		fprintf(stderr,"Unable to find section 'DATA      '\n");
 		goto err;
 	}
-	
+	if(NULL == (pre=malloc(sizeof(struct data_preamble)))){
+		fprintf(stderr,"Unable to allocate for data_preamble struct\n");
+		return NULL;
+	}
 	memcpy(pre,sec->data,sizeof(struct data_preamble));
 	swapbytes(pre);
 	pre->data=sec->data;
@@ -812,7 +985,60 @@ struct data_preamble *parse_data( char *cfname, char *out, int mode)
 		put_data_to_file(pre,out);
 	return pre;
 err:
-	free(pre);
+	if(NULL != pre)
+		free(pre);
+	return NULL;
+}
+/***************************************************************************/
+/** .\n\b Arguments:
+mode=JUST_LOAD, loads & swaps bytes in pre, then returns.
+\n\b Returns:
+****************************************************************************/
+struct data_preamble_hp16550 *parse_data_hp16550( char *cfname, char *out, int mode)
+{
+	struct hp_block_hdr *blk;
+	struct section *sec;
+	struct data_preamble_hp16550 *pre=NULL;
+	uint8_t id;
+	
+
+	if(NULL == (blk=read_block(cfname, &id))) {
+		fprintf(stderr,"Unable to read '%s' for writing\n",cfname);
+		goto err;
+	}
+	if ( id != CARDTYPE_16550AM && id != CARDTYPE_16550AE ) {
+		fprintf(stderr," Card id %d not supported by this parser\n",id);
+		goto err;
+	}
+		
+	if(mode != JUST_LOAD)
+		show_sections(blk);
+	if(NULL == (sec=find_section("DATA      ",blk))){
+		fprintf(stderr,"Unable to find section 'DATA      '\n");
+		goto err;
+	}
+	if(NULL == (pre=malloc(sizeof(struct data_preamble_hp16550)))){
+		fprintf(stderr,"Unable to allocate for data_preamble struct\n");
+		return NULL;
+	}
+	memcpy(pre,sec->data,sizeof(struct data_preamble_hp16550));
+	swapbytes_hp16550(pre);
+	pre->data=sec->data;
+	pre->data_sz=sec->sz;
+	if(mode == JUST_LOAD)
+		return pre;
+/*	
+	show_pre(pre);
+	
+	print_data(pre);
+	search_state(1,0,0,0x800,0x800,MODE_EDGES,pre);
+	if(NULL != out)
+		put_data_to_file(pre,out);
+	return pre;
+	*/
+err:
+	if(NULL != pre)
+		free(pre);
 	return NULL;
 }
 
@@ -890,16 +1116,13 @@ struct signal_data *show_vcd_label(char *a, struct labels *l)
 	/**now load the data array  */
 	p=bytes-1;
 	for (i=0;i<POD_ARRAYSIZE;++i){
-		int x;
+
 		if(a[i/2]){
 			if(p<0){
 				fprintf(stderr,"Fatal Err.p -1");
 				return NULL;
 			}
-			if(i>=POD_START)
-				x=POD_ARRAYSIZE-i;
-			else
-				x=i;
+
 			pod[p--]=l->map.clk_pods[i];	
 			/*fprintf(stderr,"%02x ",l->map.clk_pods[i]);   */
 		}/*	else
@@ -985,9 +1208,10 @@ struct signal_data *show_la2vcd(struct data_preamble *pre, struct section *sec, 
 	for (i=0,k=0x27A; i<0xFF; ++i){
 		memcpy(&l,sec->data+k,LABEL_RECORD_LEN);
 		l.actual_offset=swap16(l.strange_offsetlo);
-		//fprintf(stderr,"Actual map offset=0x%x ",l.actual_offset); 
-		l.actual_offset-=0x6E90;
-		/*fprintf(stderr,"Adjusted = 0x%x ",l.actual_offset); */
+		fprintf(stderr,"Actual map offset=0x%x ",l.actual_offset); 
+		if (l.actual_offset >= 0x6E90)
+			l.actual_offset-=0x6E90;
+		fprintf(stderr,"Adjusted = 0x%x ",l.actual_offset);
 		memcpy(&l.map,sec->data+0x27A+l.actual_offset,LABEL_MAP_LEN);
 			
 		k+=LABEL_RECORD_LEN;
