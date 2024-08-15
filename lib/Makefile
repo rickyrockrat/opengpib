@@ -51,11 +51,15 @@ test : test.c $(OBJ)
 pkgconfigdir=$(libdir)/pkgconfig
 PKGCFG=libopen-gpib.pc
 
-install: $(LIBS)
-	mkdir -p $(DESTDIR/$(prefix)/lib/pkgconfig $(DESTDIR/$(prefix)/include/open-gpib
-	cp $(LIBS) $(DESTDIR/$(prefix)/lib
-	cp $(PKGCFG) $(DESTDIR/$(prefix)/lib/pkgconfig
-	cp open-gpib.h $(DESTDIR/$(prefix)/include/open-gpib
+$(PKGCFG):
+	sed 's!^prefix=.*!prefix=$(prefix)!' $@.in >$@
+
+install: $(LIBS) $(PKGCFG)
+	mkdir -p $(DESTDIR)/$(prefix)/lib/pkgconfig $(DESTDIR)/$(prefix)/include/open-gpib
+	cp $(LIBS) $(DESTDIR)/$(prefix)/lib
+	cd $(DESTDIR)/$(prefix)/lib; mv libopen-gpib.so libopen-gpib.so.0.0.0; ln -s libopen-gpib.so.0.0.0 libopen-gpib.so; ln -s libopen-gpib.so.0.0.0 libopen-gpib.so.0
+	cp $(PKGCFG) $(DESTDIR)/$(prefix)/lib/pkgconfig
+	cp open-gpib.h $(DESTDIR)/$(prefix)/include/open-gpib
 
 clean:
 	-rm *.o $(LIBS) test open-gpib.h interfaces.h
