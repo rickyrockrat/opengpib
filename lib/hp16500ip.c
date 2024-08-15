@@ -152,11 +152,10 @@ end:
 ****************************************************************************/
 int read_hp16500cip(struct open_gpib_dev *ctl, void *buf, int len)
 {
-	struct hp16500c_ctl *c;
 	int i;
 	char *m;
 	m=(char *)buf;
-	c=(struct hp16500c_ctl *)ctl->dev;
+
 	/*fprintf(stderr,"Looking for %d bytes\n",len); */
 	/*fprintf(stderr,"calling %s read\n",ctl->dev->if_name); */
 	i=ctl->dev->funcs.og_read(ctl->dev,buf,len);

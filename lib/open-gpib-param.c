@@ -195,13 +195,12 @@ int32_t open_gpib_get_int32_t(struct open_gpib_param *head,char *name)
 int open_gpib_show_param(struct open_gpib_param *head)
 {
 	int n;
-	char *fmt;
 	struct open_gpib_param *i;
 	if(NULL == head)
 		return 0;
 	fprintf(stderr,"  Parameter List\n");
 	for (n=0,i=head;NULL != i; i=i->next,n=n+1){
-		fmt=NULL;
+		
 		printf("    '%s'=",i->name);
 		switch(i->type){
 			case OG_PARAM_TYPE_UINT32: printf("%d\n",i->val.u);	break;

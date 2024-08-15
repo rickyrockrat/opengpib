@@ -470,7 +470,7 @@ void og_usleep(int usec)
 	r.tv_sec=usec/1000;
 	usec-=r.tv_sec*1000;
 	r.tv_nsec=usec*1000;
-	nanosleep(&t,&r);	
+	nanosleep(&r,&t);	
 	/** do{
 		memcpy(&t,&r, sizeof(struct timespec));
 	

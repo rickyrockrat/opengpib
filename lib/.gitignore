@@ -1,0 +1,7 @@
+*.o
+config.h
+interfaces.h
+open-gpib.h
+libopen-gpib.a
+libopen-gpib.so
+libopen-gpib.pc
