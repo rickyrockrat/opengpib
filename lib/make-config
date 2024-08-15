@@ -1,0 +1,15 @@
+#!/bin/bash
+L=$(pkg-config --libs libla2vcd2)
+F="config.h"
+echo '#ifndef _OPEN_GPIB_CONFIG_H_ 
+#define _OPEN_GPIB_CONFIG_H_ 1
+#define PACKAGE_VERSION "0.13"' > $F
+
+if [ -n "$L" ]; then
+	echo '#define HAVE_LIBLA2VCD2 1
+#endif' >> $F
+
+else
+	echo '#endif' >> $F
+fi
+
