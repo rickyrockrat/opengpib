@@ -1,0 +1,7 @@
+#!/bin/bash
+TAG=$(git describe --exact-match --tags)
+if [ -z "$TAG" ]; then
+	TAG=$(git log -n1 --pretty=format:%h)
+	TAG="git-$TAG"
+fi
+echo "$TAG"
