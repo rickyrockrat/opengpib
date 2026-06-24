@@ -283,24 +283,24 @@ do_trailer () {
 }
 find_gmaxx (){
 	if [ "minmax" != "$MODE" ]; then
-	  return
+		return
 	fi
 	let i=0
- for f in $@; do
-  #xorg lasttime miny maxy
-  while read a b c d; do
-      if [ $i -eq 0 ]; then
-        MAXT="$b"
-      fi
-      let i=i+1
-  done << EOF
+	for f in $@; do
+		  #xorg lasttime miny maxy
+		  while read a b c d; do
+			if [ $i -eq 0 ]; then
+				MAXT="$b"
+			fi
+			let i=i+1
+		  done << EOF
 $(head -n 2 "$f")
 EOF
-  if float_cond "$gmaxx < $MAXT"; then
-   gmaxx="$MAXT"
-    #keep track of maxx of all files.
-  fi
- done
+		if float_cond "$gmaxx < $MAXT"; then
+			gmaxx="$MAXT"
+			#keep track of maxx of all files.
+		fi
+	done
 }
 #smoothing types: bezier  csplines acsplines 
 
