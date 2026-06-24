@@ -9,6 +9,7 @@ hdr_HEADERS = open-gpib.h
 
 noinst_LTLIBRARIES = liba.la 
 liba_la_SOURCES = prologixs.c open-gpib-inet.c serial.c hp16500ip.c fileio.c open-gpib-param.c support.c #config.c
+liba_la_DEPENDENCIES = interfaces.h open-gpib.h
 liba_la_CFLAGS = $(AM_CFLAGS) 
 #LDADD = -fPIC
 
@@ -22,7 +23,7 @@ lib_LTLIBRARIES = libopen-gpib.la
 libopen_gpib_la_SOURCES =  open-gpib.c
 libopen_gpib_la_LDFLAGS=-version-info 0:0:0 $(LIBCONFIG_LIBS)
 libopen_gpib_la_LIBADD = liba.la
-libopen_gpib_la_DEPENDENCIES = liba.la 
+libopen_gpib_la_DEPENDENCIES = liba.la interfaces.h open-gpib.h
 libopen_gpib_la_CFLAGS = $(AM_CFLAGS) -D_ALLOC_REGISTER_
 
 

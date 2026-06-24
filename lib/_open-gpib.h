@@ -47,21 +47,10 @@ other controllers.
 	#endif 
 #endif 
 
-#ifdef HAVE_CONFIG_H
-	#include <config.h>
-	#ifdef HAVE_LIBLA2VCD2
-		#include <libla2vcd2.h>
-	#endif
-	#ifdef HAVE_LIBCONFIG
-		#include <libconfig.h>
-	#endif
-#else
-	#define PACKAGE_VERSION 0.12-unknown
-#endif
-
 /*#include <sys/time.h>*/
 #include <stdint.h> /**for types uint32_t  */
 #include <string.h>
+#include <stddef.h> /*for NULL */
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h> /**getopt, select, usleep  */
@@ -70,13 +59,7 @@ other controllers.
 #include <ctype.h>
 #include <sys/types.h>
 #include <stdarg.h>
-
-#ifdef HAVE_LIBCONFIG
-struct og_conf {
-	char *fname;
-	void *dat;
-};
-#endif
+INCLUDE_LA2VCD
 
 #define MAX_CHANNELS 10
 

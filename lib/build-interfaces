@@ -75,9 +75,18 @@ if [ "$1" = "header" ]; then
 		echo "interfaces.h Does not exist."
 		exit 1
 	fi
+
 #	echo "#ifndef _GPIB_H_" >> "$OFILE"
 #	echo "#define _GPIB_H_ 1" >> "$OFILE"
 	grep -v REMOVE_ME _open-gpib.h >"$OFILE"
+	pkg-config --exists libla2vcd2
+	if [ $? -ne 0 ]; then 
+		echo "Libla2vcd2 is not installed. Will not use the value change library"
+		sed -i 's!.*INCLUDE_LA2VCD.*!!' "$OFILE"
+	else
+		sed -i 's!INCLUDE_LA2VCD!#include <libla2vcd2.h>!' "$OFILE"
+	fi
+
 	cat interfaces.h >> "$OFILE"
 	echo "#endif" >> "$OFILE"
 #	grep -v _GPIB_H_ _open-gpib.h >>"$OFILE"

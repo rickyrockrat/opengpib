@@ -1,8 +1,31 @@
-LSRCS =  open-gpib.c fileio.c prologixs.c open-gpib-ip.c serial.c
+LSRCS = prologixs.c open-gpib-inet.c serial.c hp16500ip.c fileio.c open-gpib-param.c support.c
+L2SRCS = $(LSRCS) open-gpib.c
+LOBJS = $(patsubst %.c,%.o,$(L2SRCS))
 LHDRS = open-gpib.h prologixs.h open-gpib-ip.h serial.h fileio.h 
-all: open-gpib.lib
+LIB=libopen-gpib.a
+
+CFLAGS+=-I .
+all: $(LIB)
+
+$(LOBJS): interface.h open-gpib.h
+
+interface.h:
+	./build-interfaces $(LSRCS)
+
+open-gpib.h: interface.h
+	./build-interfaces "header"
+
+open-gpib.o: CFLAGS+=-D_ALLOC_REGISTER_
 
 %.o: %.c %.h
+	gcc -Wall $(CFLAGS) -c -o $@ $<
 
-open-gpib.lib: open-gpib.o prologixs.o open-gpib-ip.o serial.o hp16500ip.o fileio.o
-	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
+#libopen-gpib.a: open-gpib.a
+
+$(LIB): $(LOBJS)
+	ar -cr $@ $^
+
+clean:
+	-rm $(LOBJS) $(LIB) interface.h open-gpib.h
+#libopen-gpib.a: open-gpib.o open-gpib.a
+

@@ -251,10 +251,10 @@ static int close_fileio(struct open_gpib_dev *ctl)
 	if(NULL == c)
 		return 0;
 	if(c->last_cmd)
-    free(c->last_cmd);
-  c->last_cmd=NULL;	
-  if(NULL != c->f)
-	fclose(c->f);
+   		free(c->last_cmd);
+	c->last_cmd=NULL;	
+	if(NULL != c->f)
+		fclose(c->f);
 	free (ctl->internal);
 	ctl->internal=NULL;
 	return 0;
