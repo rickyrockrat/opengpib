@@ -405,7 +405,7 @@ void config_print_labels_hp16550(struct section *sec, FILE *out)
 			fprintf(stderr,"EEEK so %04X ",label.l->strange_offsetlo);
 			label.map=NULL;
 		}
-		fprintf(stderr,"'%s' pol %d #bits %d ena %d seq %d ",label.l->name,label.l->polarity,label.l->bits,label.l->enable, label.l->sequence);
+		fprintf(stderr,"'%s' pol %d #bits %02d ena %d seq %d ",label.l->name,label.l->polarity,label.l->bits,label.l->enable, label.l->sequence);
 		if (NULL != label.map){
 			int pod;
 			fprintf(stderr,"CK %02X ",label.map->clk);
@@ -1080,7 +1080,7 @@ struct signal_data *add_signal(struct signal_data *d,int pol,int ena, int bits, 
 \n\b Returns:
 ****************************************************************************/
 /***************************************************************************/
-/** pods[0] is pod4, hi byte..
+/** pods[0] is pod4, hi byte.. Adds a signal description to a linked list.
 active[0] is clk, pod 4 is [1]
 \n\b Arguments:
 \n\b Returns:
@@ -1150,7 +1150,7 @@ struct signal_data *show_vcd_label(char *a, struct labels *l)
 				}
 					
 			}else if(bsset && !beset) {
-        beset=1;
+				beset=1;
 				be=p;
 				if(p)
 					--be;
