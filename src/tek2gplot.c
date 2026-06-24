@@ -33,7 +33,7 @@ Change Log: \n
 /*#define _XOPEN_SOURCE=600   */
 #include <fcntl.h>
 #include <sys/stat.h>
-
+#include <libgen.h>
 
 #include <math.h>
 #include <inttypes.h>
