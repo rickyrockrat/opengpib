@@ -30,7 +30,7 @@
 
 #-std=c99
 
-VERSION = 0.12
+VERSION ?= 0.12
 
 PACKAGE = opengpib
 
@@ -41,22 +41,18 @@ CSRCS = get_hp_1653xx_scope.c get_tek_waveform.c  networkanalyzer.c \
  tek2gplot.c calc_area_under_curve.c parse_16500_config.c  get_hp_16555_waveform.c 
 
 HDRS = hp16500.h 
-
-OG_LIB=../lib/open-gpib.lib
-
+CFLAGS+=-Wall -I. -I ../lib
+OG_LIB=../lib/libopen-gpib.a
+HAVE_LA2VCD=$(shell pkg-config --libs libla2vcd2)
+LDFLAGS+=-lm -L../lib -lopen-gpib
+ifneq ($(HAVE_LA2VCD),)
+	CFLAGS+=-DHAVE_LIBLA2VCD2
+	LDFLAGS+=$(HAVE_LA2VCD)
+endif
 MISC = COPYING README Makefile makepng runcal ChangeLog
 
 DISTFILES = $(MISC) $(HDRS) $(CSRCS)
 DISTNAME = $(PACKAGE)-$(VERSION)
-
-CFLAGS+=-Wall -DVERSION=$(VERSION) -I`pwd` -I`pwd`/../lib
-
-ifndef LA2VCD_LIB
-LA2VCD_LIB=
-else
-LA2VCD_H=$(dir $(LA2VCD_LIB))
-CFLAGS +=-I$(LA2VCD_H) -DLA2VCD_LIB=$(LA2VCD_LIB)
-endif
 
 all: help
 
@@ -72,15 +68,16 @@ build: $(OG_LIB) $(TARGETS)
 
 #hp16500.o hp16500ip.o hp1655x.o hp1653x.o: CFLAGS+=-std=c99 
 
-get_tek_waveform.o: CFLAGS+= -D_GLOBAL_TEK_2440_
+get_tek_waveform.o: CFLAGS+= -D_GLOBAL_TEK_2440_ 
+
 
 tek2gplot.o: get_tek_waveform.o tek2gplot.c $(OG_LIB)
 
 tek2gplot: tek2gplot.o $(OG_LIB)
-	gcc  -lm -o $@ $^
+	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 	
 calc_area_under_curve: calc_area_under_curve.o $(OG_LIB)
-	gcc -lm  -o $@ $^
+	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(OG_LIB):
 	$(MAKE) -C ../lib -f Makefile.orig
@@ -90,39 +87,36 @@ hp16500.o: hp16500.c  hp16500.h
 hp16500ip.o: hp16500ip.c  hp16500ip.h	
 
 hp16500.lib: hp16500.o 
-	gcc -Wall -nostdlib -o $@  $^  -Wl,-r;
+	ar -cr $@ $^
 
 get_tek_waveform:	get_tek_waveform.o $(OG_LIB)
-	gcc -lm -o $@ $^
+	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 	
 get_hp_1653xx_scope.o get_hp_16555_waveform.o parse_16500_config.o: hp16500.h
 
 
-get_hp_1653xx_scope: get_hp_1653xx_scope.o $(OG_LIB) hp16500.lib $(LA2VCD_LIB) hp1653x.o
-	gcc -lm -o $@ $^
+get_hp_1653xx_scope: get_hp_1653xx_scope.o $(OG_LIB) hp16500.lib hp1653x.o 
+	gcc $(CFLAGS) -lm -o $@ $^ $(LDFLAGS)
 	
-get_hp_16555_waveform: get_hp_16555_waveform.o $(OG_LIB)  hp16500.lib $(LA2VCD_LIB) hp1655x.o
-	gcc -lm -o $@ $^
+get_hp_16555_waveform: get_hp_16555_waveform.o $(OG_LIB) hp16500.lib hp1655x.o
+	gcc $(CFLAGS) -lm -o $@ $^ $(LDFLAGS)
 	
 hp16500.main.o: hp16500.c  hp16500.h
 	gcc $(CFLAGS) -DMAIN_QUERY  -c -o $@ hp16500.c
 
 hp16500: hp16500.main.o $(OG_LIB) hp1653x.o
-	gcc -lm -o $@ $^
+	gcc $(CFLAGS) -lm -o $@ $^
 	
 test: test.o $(OG_LIB)
-	gcc -lm -o $@ $^
+	gcc $(CFLAGS) -lm -o $@ $^
 
 %.o: Makefile
 
-#parse_16500_config.o: parse_16500_config.c 
-#	gcc -Wall -c  -o $@ $<
-
-parse_16500_config:parse_16500_config.o hp16500.lib $(OG_LIB) $(LA2VCD_LIB) hp1655x.o
-	gcc -lm -o $@ $^
+parse_16500_config:parse_16500_config.o hp16500.lib $(OG_LIB) hp1655x.o
+	gcc $(CFLAGS) -lm -o $@ $^ $(LDFLAGS)
 
 networkanalyzer: networkanalyzer.o $(OG_LIB)
-	gcc -lm -o $@ $^
+	gcc $(CFLAGS) -lm -o $@ $^
 
 .PHONY: clean
 clean:
