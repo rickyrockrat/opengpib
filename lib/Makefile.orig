@@ -3,6 +3,7 @@ L2SRCS = $(LSRCS) open-gpib.c
 LOBJS = $(patsubst %.c,%.o,$(L2SRCS))
 LHDRS = open-gpib.h prologixs.h open-gpib-ip.h serial.h fileio.h 
 LIB=libopen-gpib.a
+PACKAGE_VERSION?=$(shell ./get-version)
 
 CFLAGS+=-I .
 all: $(LIB)
@@ -15,7 +16,7 @@ interface.h:
 open-gpib.h: interface.h
 	./build-interfaces "header"
 
-open-gpib.o: CFLAGS+=-D_ALLOC_REGISTER_
+open-gpib.o: CFLAGS+=-D_ALLOC_REGISTER_ -DPACKAGE_VERSION='"$(PACKAGE_VERSION)"'
 
 %.o: %.c %.h
 	gcc -Wall $(CFLAGS) -c -o $@ $<
