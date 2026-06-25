@@ -157,4 +157,8 @@ useful for zooming in and out on the plot.
 
 Feel free to e mail me at g p i b a t rickyrockrat d o t  n e t.
 
+If you don't want to install after building:
 
+LD_LIBRARY_PATH=lib scripts/hp1653x_acquire -f xxxx -c 1 2 3 4 5 6 7 8 -t svg -s 3000,2000 -x 600:800
+  This will get 8 channels from with 4 dual channel cards installed. -s sets the size of the output, 
+  and -x sets the start/end of the xrange for the plot
