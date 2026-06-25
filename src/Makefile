@@ -7,6 +7,7 @@ CFLAGS=-Wall $(LA2VCDC) -DHAVE_CONFIG_H -I ../lib -I .
 LDFLAGS=-L ../lib
 LDLIBS=-lopen-gpib  $(LA2VCDL) -lm 
 HAVE_LIBLA2VCD2:=$(shell if [ -n "$(LA2VCDL)" ]; then echo '-DHAVE_LIBLA2VCD2'; fi)
+CFLAGS+=$(HAVE_LIBLA2VCD2)
 
 all: $(BINS)
 
