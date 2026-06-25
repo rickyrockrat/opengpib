@@ -3,7 +3,7 @@ prefix?=usr
 
 LA2VCDLD|=$(shell pkg-config --libs libla2vcd2)
 LA2VCDCF|=$(shell pkg-config --cflags libla2vcd2)
-
+PACKAGE_VERSION?=$(shell ./get-version)
 LIBS = libopen-gpib.a libopen-gpib.so
 all: $(LIBS)
 
@@ -23,7 +23,7 @@ CFLAGS=-Wall -I. -I .. -fPIC -DHAVE_CONFIG_H
 config.h:
 	./make-config
 
-open-gpib.o: CFLAGS+=-D_ALLOC_REGISTER_
+open-gpib.o: CFLAGS+=-D_ALLOC_REGISTER_ -DPACKAGE_VERSION='"$(PACKAGE_VERSION)"'
 
 open-gpib.c : open-gpib.h
 
