@@ -1,26 +1,61 @@
 #!/bin/bash
-if [ $# -lt 1 ]; then
-	echo "Use: fname <ch>"
-	echo " Where fname is the base name of the files created from a trace grab"
-	echo " From the HP scope. We assume channel 1 if more channels are specified,"
-	echo " Then more -c will be added to the scope data command"
+help () {
+	echo "Usage: hp1653x_acquire <options>"
+	echo "  -c 'chanlist', i.e. -c '1 2 3 4'"
+	echo "  -f filebase"
+	echo "  -h this screen"
+	echo "  -s size, in x,y format. (i.e. -s $size)"
+	echo "  -t png, svg, or x11 output"
+	echo "  -x xstart:xend set Xrange for plot"
+	echo "   filebase is the base name of the files created from a trace grab"
+	echo "   From the HP scope. We assume channel 1 if more channels are specified,"
+	echo "   Then more -c will be added to the scope data command"
 	exit 1
+}
+chan=()
+let channels=0
+add_channel () {
+	local c i
+	c=$1
+	let i=c-1
+	if [ $i -lt 0 ] || [ $i -gt 8 ]; then
+		echo "Invalid channel number $1, must be 1-8"
+		exit 1
+	fi
+	chan[$i]="$c"
+	let channels=channels+1
+}
+if [ $# -lt 1 ]; then
+	help
 fi
-fname="$1"
-chan=($2 $3 $4 $5 $6 $7 $8 $9)
-if [ -n "${chan[4]}" ]; then
+
+CH=''
+size="1920,1080"
+ttype="svg"
+xrange=''
+while  getopts c:f:hs:t:x: opt ; do
+	case $opt in
+		c) for x in $OPTARG; do add_channel $x; done;;
+		f) fname="$OPTARG";;
+		h) help;;
+		s) size="$OPTARG";;
+		t) ttype="$OPTARG";;
+		x) xrange="-x $OPTARG";;
+	esac
+done
+
+if [ $channels -gt 4 ]; then
 	type=13
 else
 	type=14
 fi
 let i=0
 let sub=0
-while [ $i -lt ${#chan[@]} ]; do
-	c=${chan[$i]}
+while [ $i -lt $channels ]; do
 	let fn=i+1
-	let c=c-sub
-	CH="$CH -c $c"
+	let c=fn-sub
 	INF="$INF $fname.$fn"
+	CH="$CH -c $c"
 	if [ $i -eq 3 ]; then
 		src/get_hp_1653xx_scope -t $type -a 192.168.0.200 -g -v $CH -o $fname
 		sub=4
@@ -45,4 +80,7 @@ if [ -n "${chan[4]}" ]; then
 	rm -r $t
 fi
 
-scripts/plot-file -f 2 -k png -p $fname.plot -o $fname.1.png $INF
+# -k takes png, x11, and svg
+cmd="scripts/plot-file $xrange -f 2 -g $size -k $ttype -p $fname.plot -o $fname.$ttype $INF"
+echo "Running $cmd"
+$cmd
