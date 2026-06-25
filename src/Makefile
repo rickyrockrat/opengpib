@@ -1,5 +1,5 @@
 SHELL|=/bin/bash
-BINS= parse_16500_config networkanalyzer calc_area_under_curve get_hp_16555_waveform get_hp_1653xx_scope get_tek_waveform tek2gplot  hp16500_test
+BINS= parse_16500_config networkanalyzer calc_area_under_curve get_hp_1653xx_scope get_tek_waveform tek2gplot hp16500_test # get_hp_16555_waveform 
 
 LA2VCDL:=$(shell pkg-config --libs libla2vcd2)
 LA2VCDC:=$(shell pkg-config --cflags libla2vcd2)
@@ -21,7 +21,7 @@ tek2gplot_SOURCES=tek2gplot.c tek2gplot.h
 
 get_hp_1653xx_scope:get_hp_1653xx_scope.o hp16500.o hp1653x.o
 
-get_hp_16555_waveform:get_hp_16555_waveform.o hp16500.o hp1655x.o
+#get_hp_16555_waveform:get_hp_16555_waveform.o hp16500.o hp1655x.o
 
 calc_area_under_curve:calc_area_under_curve.o 
 
