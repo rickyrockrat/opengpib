@@ -237,7 +237,8 @@ plot_file () {
 	  echo -e "$tmp" >>"$plotfile"
 	fi
 	let fileno=fileno+1
-	}
+}
+
 # type out
 plot_all () {
  if [ "$1" = "png" ] || [ "$1" = "svg" ]; then
@@ -323,8 +324,8 @@ usage() {
 	echo "  -g set grahpic size (640,480)"
 	echo "  -k kind set plot kind to x11, svg, or png (required)"
 	echo "  -p fname set plot file to fname (required)"
-	#echo "  -l type name set label to 'name', where type is:"
-  echo "      x or y and in format -l \"x this is my x label\""
+	echo "  -l Use generic lables CH1, CH2, etc for scope channels."
+	echo "      x or y and in format -l \"x this is my x label\""
 	echo "  -o outfile set png file to fname (requred if type is png)"
 	echo "  -s x Add smoothing style x to waveform:"
 	echo "     1=csplines 2=bezier 3=acsplines 4=unique 5=frequency 6=sbezier "
@@ -340,6 +341,7 @@ let fileno=1
 MODE="ready"
 XRANGE=""
 GSIZE="1920,1080"
+GENERIC_LABELS=''
 let args=0
 while  getopts f:g:k:hl:o:p:s:t:x: opt ; do
   let args=args+2
@@ -363,8 +365,7 @@ while  getopts f:g:k:hl:o:p:s:t:x: opt ; do
                  usage;;
        esac;;
     h) usage;; 
-   # l) for l in $OPTARG; do
-   #      if [ "$l" = "x" ]; then
+    l) GENERIC_LABELS="yes";;
     p) plotfile="$OPTARG";;
     o) outfile="$OPTARG";;
     s) case $OPTARG in 
@@ -412,24 +413,19 @@ done
 echo "Files=$FILES"
 if [ "ready" = "$MODE" ]; then
 
-#if [ $# -gt 1 ]; then
-#  let multi=
-  echo "Have $# args after getopt,args=$args"
-#fi
-do_header  "$multi"
-set_ylabel "Volts"
-for f in "$FILES"; do
-  plot_file "$f" "" "CH$fileno"
-done
-plot_all "$plottype" "$outfile"
-exit
+	#if [ $# -gt 1 ]; then
+	#  let multi=
+	echo "Have $# args after getopt,args=$args"
+	#fi
+	do_header  "$multi"
+	set_ylabel "Volts"
+	for f in "$FILES"; do
+		plot_file "$f" "" "CH$fileno"
+	done
+	plot_all "$plottype" "$outfile"
+	exit
 fi
-#echo "$#: $@"
-#shift $args
-#echo "$args: $@"
-#if [ $# -gt 1 ]; then
-#  let multi=$#
-#fi
+
 delay1=""
 maxx="-99999"
 maxy="-1000"
@@ -443,7 +439,7 @@ for f in $FILES; do
   while read a b c d l; do
     case $i in 
      0) 
-      if [ -n "$l" ]; then 
+      if [ -n "$l" ] && [ -z "$GENERIC_LABELS" ]; then 
 		xlegend="$l"
 	  else
 		xlegend="CH$fileno"
@@ -472,54 +468,47 @@ for f in $FILES; do
 $(head -n 4 "$f")
 EOF
  
-if [ "minmax" = "$MODE" ]; then
- if float_cond "$maxx < $MAXT"; then
-   maxx="$MAXT"
- fi
- if float_cond "$maxy < $MAXY"; then
-   maxy="$MAXY"
- fi 
- if float_cond "$miny > $MINY"; then
-   miny="$MINY"
- fi
- if [ -z "$delay1" ]; then
-   delay1="$DELAY"
- fi
-fi
-echo -n "$f: $MAXT ($maxx) $MINY $MAXY $XTITLE $YTITLE" 
-if [ $fileno -eq 1 ]; then
-   do_xlabel  "$XTITLE" "$plottitle"
-   if [ -n "$XRANGE" ]; then
-     do_xrange "$XRANGE"
-   elif [ "minmax" = "$MODE" ]; then
-     do_xrange  "$maxxorg:$gmaxx"
-   fi
-  #echo -e "set bmargin 5\n" >>"$plotfile"
-  do_header  "$multi"
-fi
-do_ylabel "$YTITLE"
-# add a little headroom for the Y-axis plot
-ADDER=$(float_eval "($MAXY - $MINY)*0.05")
-MINY=$(float_eval "$MINY - $ADDER")
-MAXY=$(float_eval "$MAXY + $ADDER")
-echo " ... $ADDER $MINY $MAXY"
-do_yrange "$MINY" "$MAXY"
-#calculate the x data offset - two sources of offset, differing delay values
-# and 32/34 scope buffer lenghts. delay is from trigger to center of screen
-if float_cond "$MAXT < $gmaxx"; then
-  #fixme. We assume if it's less, we are looking at the '32, which only
-  # has 8000 points as opposed to the 34 with 32768 points
-  #THISOFF=$(float_eval "((32768-8000)/2)*$xdelta") 
-  THISOFF=$(float_eval "(($gmaxx-$MAXT)/2)")
-  echo "g$gmaxx m$MAXT T$THISOFF"
-  USING="using (\$1+$THISOFF):2"
-  #USING="using 1:2"
-else
-  #save our x delta
-  xdelta=$(float_eval "$x2-$x1")
-  USING="using 1:2"
-fi
-plot_file "$f" "$USING $EVERY" "$xlegend" "$XTITLE" "0" "$maxx" "$plottitle"
+	if [ "minmax" = "$MODE" ]; then
+		if float_cond "$maxx < $MAXT"; then maxx="$MAXT"; fi
+		if float_cond "$maxy < $MAXY"; then maxy="$MAXY"; fi 
+		if float_cond "$miny > $MINY"; then miny="$MINY"; fi
+		if [ -z "$delay1" ]; then delay1="$DELAY"; fi
+	fi
+	echo -n "$f: $MAXT ($maxx) $MINY $MAXY $XTITLE $YTITLE" 	
+	if [ $fileno -eq 1 ]; then
+		do_xlabel  "$XTITLE" "$plottitle"
+		if [ -n "$XRANGE" ]; then
+			do_xrange "$XRANGE"
+		elif [ "minmax" = "$MODE" ]; then
+			do_xrange  "$maxxorg:$gmaxx"
+		fi
+		#echo -e "set bmargin 5\n" >>"$plotfile"
+		do_header  "$multi"
+	fi
+	do_ylabel "$YTITLE"
+	# add a little headroom for the Y-axis plot
+	ADDER=$(float_eval "($MAXY - $MINY)*0.05")
+	MINY=$(float_eval "$MINY - $ADDER")
+	MAXY=$(float_eval "$MAXY + $ADDER")
+	echo " ... $ADDER $MINY $MAXY"
+	do_yrange "$MINY" "$MAXY"
+	#calculate the x data offset - two sources of offset, differing delay values
+	# and 32/34 scope buffer lenghts. delay is from trigger to center of screen
+	if float_cond "$MAXT < $gmaxx"; then
+		#fixme. We assume if it's less, we are looking at the '32, which only
+		# has 8000 points as opposed to the 34 with 32768 points
+		#THISOFF=$(float_eval "((32768-8000)/2)*$xdelta") 
+		THISOFF=$(float_eval "(($gmaxx-$MAXT)/2)")
+		echo "g$gmaxx m$MAXT T$THISOFF"
+		USING="using (\$1+$THISOFF):2"
+		#USING="using 1:2"
+	else
+		#save our x delta
+		xdelta=$(float_eval "$x2-$x1")
+		USING="using 1:2"
+	fi
+	#This increments fileno, btw..
+	plot_file "$f" "$USING $EVERY" "$xlegend" "$XTITLE" "0" "$maxx" "$plottitle"
 done 
 #file loop
 
