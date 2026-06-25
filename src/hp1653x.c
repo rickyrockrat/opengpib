@@ -224,7 +224,7 @@ int oscope_get_preamble(struct open_gpib_dev *g,char *ch, struct hp_scope_preamb
 ****************************************************************************/
 int get_oscope_data(struct open_gpib_dev *g, char *ch, struct hp_scope_preamble *h)
 {
-	int i,x;
+	int i;
 	if(NULL == ch)
 		return -1;
 	if(0 == (i=check_oscope_channel(ch)))
@@ -233,8 +233,8 @@ int get_oscope_data(struct open_gpib_dev *g, char *ch, struct hp_scope_preamble 
 	sprintf(g->buf,":WAV:SOUR CHAN%d;DATA?",i);
 	i=write_get_data(g,g->buf);	
   h->point_len=strtol(&g->buf[2],NULL,10);
-  for (x=2;g->buf[x] && isdigit(g->buf[x]); ++x);
-  h->point_start=x; /**point to start of data  */
+	/** The buffer always has #8%08u bytes  */
+  h->point_start=10; /**point to start of data  */
 	return i;
 }
 
