@@ -47,8 +47,10 @@ struct hp_scope_preamble {
   int count;    /**number of aquisitions always 1 for type 1. */
   long point_len; /**number of bytes that follow on data stream  */
   int point_start; /**location in buffer where points start.  */
+	char label[10]; /**label on the channel  */
 };
 /**scope functions  */
+int get_channel_label(struct open_gpib_dev *g, int channel, char *rbuf);
 int get_trigger_source(struct open_gpib_dev *g);
 int oscope_parse_preamble(struct open_gpib_dev *g, struct hp_scope_preamble *h);
 int check_oscope_channel(char *ch);

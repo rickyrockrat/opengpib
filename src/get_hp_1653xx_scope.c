@@ -352,7 +352,7 @@ int main(int argc, char * argv[])
     if(xy){
 		/*save room for our min/max y*/
     if(HDR_FULL == hdr)
-	     fprintf(ofd,"                                                         ");
+	     fprintf(ofd,"                                                                ");
     if(HDR_FULL == hdr||HDR_TITLE == hdr)  
 	    fprintf(ofd,"%s Volts\n",h.xunits);
 	  miny=maxy=0;
@@ -423,7 +423,7 @@ int main(int argc, char * argv[])
 		if(NULL != ofname && NULL != ofd){
       if(HDR_FULL == hdr){
         fseek(ofd,0,SEEK_SET);
-  			fprintf(ofd,"%e %e %e %e\n",h.xorg,time,miny,maxy);  
+  			fprintf(ofd,"%e %e %e %e %s\n",h.xorg,time,miny,maxy,h.label);  
       }
 			
 			fclose(ofd);

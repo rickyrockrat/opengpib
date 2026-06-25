@@ -33,6 +33,35 @@
                      oscilliscope functionality
    #######################################################################*/
 
+
+/***************************************************************************/
+/** .
+\n\b Arguments:
+\n\b Returns:
+****************************************************************************/
+int get_channel_label(struct open_gpib_dev *g, int channel, char *rbuf)
+{
+	char buf[90];
+	int l=sprintf(buf,"CHANNEL%d",channel);
+	if(NULL == g) 
+  	return -1;
+	sprintf(g->buf,"DISP:LAB? %s", buf);
+  if(0 == write_get_data(g,g->buf))
+    return -1;
+  if(!strncmp(g->buf,buf,l) ) {
+		int x, sl=strlen(g->buf);
+		l+=2; /*'CHANNEL1,"12V  "' */
+		for (x=0; x<10 && l<sl; ++x) {
+			if( 0 == g->buf[l+x] || '"' == g->buf[l+x]) 
+				break;
+			rbuf[x]=g->buf[l+x];
+		}
+		rbuf[x]=0;
+	}else
+		rbuf[0]=0;
+	return 0;
+}
+
 /***************************************************************************/
 /** ":CHAN1:OFFS 0;:CHAN2:OFFS 0;:CHAN3:OFFS 0;:CHAN4:OFFS 0".
 \n\b Arguments:
@@ -127,8 +156,8 @@ int oscope_parse_preamble(struct open_gpib_dev *g, struct hp_scope_preamble *h)
     default: snprintf(h->xunits,3,"?S"); break;  
   }
   fprintf(stderr,"%s\n",g->buf);
-  fprintf(stderr,"fmt %d type %d points %d count %d xinc %e xorg %e xref %e yinc %e yorg %e yref %e xmult %e inc_thou %d '%s'\n",
-  h->fmt, h->type,h->points, h->count,h->xinc,h->xorg,h->xref,h->yinc,h->yorg,h->yref,h->xincmult,h->xinc_thou,h->xunits);
+  fprintf(stderr,"%s fmt %d type %d points %d count %d xinc %e xorg %e xref %e yinc %e yorg %e yref %e xmult %e inc_thou %d '%s'\n",
+	h->label, h->fmt, h->type,h->points, h->count,h->xinc,h->xorg,h->xref,h->yinc,h->yorg,h->yref,h->xincmult,h->xinc_thou,h->xunits);
 	return 0;
 }
 
@@ -177,13 +206,13 @@ int oscope_get_preamble(struct open_gpib_dev *g,char *ch, struct hp_scope_preamb
     fprintf(stderr,"There is no valid data. Have you triggered the scope?\n");
     return 0;
   }
+	get_channel_label(g, i, h->label);
 	/*fprintf(stderr,"GetPre %d\n",i);	  */
 	sprintf(g->buf,":WAV:SOUR CHAN%d;PRE?",i);
 	if( (i=write_get_data(g,g->buf)) <=0){
 		fprintf(stderr,"No data from preamble (%d)\n",i);
 		return 0; 
 	}
-		
 	oscope_parse_preamble(g,h);
 	return i;
 }
