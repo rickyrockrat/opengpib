@@ -81,6 +81,7 @@ get_rgb (){
 	 esac
 	 
 }
+# " Fix highlighting
 # dumps the colors above into the gnuplot file
 set_rgb_colors () {
 	let i=1
@@ -143,6 +144,7 @@ do_trigger () {
 #  term size window_title
 # types: x11 png
 do_term () {
+	local xtra
 if [ "$1" = "x11" ]; then
   if [ -n "$3" ]; then
     XTITLE="title \"$3\""
@@ -151,12 +153,16 @@ if [ "$1" = "x11" ]; then
   fi
   echo "set terminal x11 $XTITLE persist" >>"$plotfile"
 fi
-if [ "$1" = "png" ]; then
+if [ "$1" = "png" ] || [ "$1" = "svg" ]; then
 	ver=$(gnuplot --version|sed 's![^0-9]*\([0-9]*\.[0-9]*\).*!\1!'|tr -d '.')
 	let x=ver # make sure it's an integer
+	xtra=''
+	if [ "$1" = "png" ]; then
+		xtra="medium "
+	fi
 	if [ $x -ge 46 ]; then
-		echo "set terminal png medium size $2 " >>"$plotfile"
-		echo "set term png background \"#FFFFFF\"" >>"$plotfile"
+		echo "set terminal $1$xtra size $2 " >>"$plotfile"
+		echo "set term $1 background \"#FFFFFF\"" >>"$plotfile"
 		echo "set linetype 1 lc rgb \"#000000\"" >>"$plotfile"
 		echo "set linetype 2 lc rgb \"#404040\"" >>"$plotfile"
 		echo "set linetype 3 lc rgb \"#ff0000\"" >>"$plotfile"
@@ -168,7 +174,7 @@ if [ "$1" = "png" ]; then
 		echo "set linetype 9 lc rgb \"#dda0dd\"" >>"$plotfile"
 		echo "set linetype 10 lc rgb \"#9500d3\"" >>"$plotfile"
 	else
-		echo "set terminal png medium size $2 \\" >>"$plotfile"
+		echo "set terminal $1$xtra size $2 \\" >>"$plotfile"
 		echo "xffffff x000000 x404040 \\">>"$plotfile"
 		echo "xff0000 x00ff00 x66cdaa xcdb5cd \\">>"$plotfile"
 		echo "xadd8e6 x0000ff xdda0dd x9500d3 ">>"$plotfile"
@@ -234,7 +240,7 @@ plot_file () {
 	}
 # type out
 plot_all () {
- if [ "$1" = "png" ]; then
+ if [ "$1" = "png" ] || [ "$1" = "svg" ]; then
    gnuplot "$plotfile" > "$2"
  fi
  if [ "$1" = "x11" ]; then
@@ -281,7 +287,10 @@ do_header () {
 do_trailer () {
 	echo -e "unset multiplot\nset bmargin 20\n" >> "$plotfile"
 }
-find_gmaxx (){
+find_gmaxx () {
+	local xorg
+	gmaxx="-1"
+	maxxorg="-999"
 	if [ "minmax" != "$MODE" ]; then
 		return
 	fi
@@ -289,17 +298,20 @@ find_gmaxx (){
 	for f in $@; do
 		  #xorg lasttime miny maxy
 		  while read a b c d; do
-			if [ $i -eq 0 ]; then
-				MAXT="$b"
-			fi
-			let i=i+1
+			xorg="$a"
+			MAXT="$b"
 		  done << EOF
-$(head -n 2 "$f")
+$(head -n 1 "$f")
 EOF
+		echo -n "$(basename $f) $gmaxx < $MAXT->"
+		if float_cond "$maxxorg < $xorg"; then
+			maxxorg="$xorg"
+		fi
 		if float_cond "$gmaxx < $MAXT"; then
 			gmaxx="$MAXT"
 			#keep track of maxx of all files.
 		fi
+		echo "$gmaxx xorg=$maxxorg"
 	done
 }
 #smoothing types: bezier  csplines acsplines 
@@ -309,7 +321,7 @@ usage() {
 	echo " where options are:"
 	echo "  -f fmt - set format to 0, 1 , or 2 header lines. (0)"
 	echo "  -g set grahpic size (640,480)"
-	echo "  -k kind set plot kind to x11 or png (required)"
+	echo "  -k kind set plot kind to x11, svg, or png (required)"
 	echo "  -p fname set plot file to fname (required)"
 	#echo "  -l type name set label to 'name', where type is:"
   echo "      x or y and in format -l \"x this is my x label\""
@@ -327,7 +339,7 @@ fi
 let fileno=1
 MODE="ready"
 XRANGE=""
-GSIZE="640,480"
+GSIZE="1920,1080"
 let args=0
 while  getopts f:g:k:hl:o:p:s:t:x: opt ; do
   let args=args+2
@@ -346,7 +358,7 @@ while  getopts f:g:k:hl:o:p:s:t:x: opt ; do
     g) GSIZE="$OPTARG";;
     k) plottype="$OPTARG"
        case $plottype in
-         x11|png) ;;
+         x11|png|svg) ;;
          *) echo "Unknown type ($OPTARG) for -t"
                  usage;;
        esac;;
@@ -377,9 +389,11 @@ if [ -z "$plotfile" ] || [ -z "$plottype" ]; then
   echo "must specify plotfile and plot type"
   usage
 fi
-if [ "png" = "$plottype" ] && [ -z "$outfile" ]; then
-  echo "must specify out file witn plot type png"
-  usage
+if [ "png" = "$plottype" ] || [ "svg" = "$plottype" ]; then
+	if [ -z "$outfile" ]; then
+		echo "must specify out file witn plot type png"
+		usage
+	fi
 fi
 all_args=( $@ );
 echo "args=$args, in=$#"
@@ -420,16 +434,20 @@ delay1=""
 maxx="-99999"
 maxy="-1000"
 miny="1000"
-gmaxx="0"
 find_gmaxx $FILES
 echo "gmaxx=$gmaxx"
 # read min/max, title, and get first two X data points
 for f in $FILES; do
   let i=0
-  #xorg lasttime miny maxy
-  while read a b c d; do
+  #xorg lasttime miny maxy label
+  while read a b c d l; do
     case $i in 
      0) 
+      if [ -n "$l" ]; then 
+		xlegend="$l"
+	  else
+		xlegend="CH$fileno"
+	  fi
       if [ "minmax" = "$MODE" ]; then
         DELAY="$a"
         MAXT="$b"
@@ -474,7 +492,7 @@ if [ $fileno -eq 1 ]; then
    if [ -n "$XRANGE" ]; then
      do_xrange "$XRANGE"
    elif [ "minmax" = "$MODE" ]; then
-     do_xrange  "0:$maxx"
+     do_xrange  "$maxxorg:$gmaxx"
    fi
   #echo -e "set bmargin 5\n" >>"$plotfile"
   do_header  "$multi"
@@ -501,7 +519,7 @@ else
   xdelta=$(float_eval "$x2-$x1")
   USING="using 1:2"
 fi
-plot_file "$f" "$USING $EVERY" "CH$fileno" "$XTITLE" "0" "$maxx" "$plottitle"
+plot_file "$f" "$USING $EVERY" "$xlegend" "$XTITLE" "0" "$maxx" "$plottitle"
 done 
 #file loop
 
